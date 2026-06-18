@@ -3,14 +3,12 @@
   "name": "nexus01-framework",
   "builds": [
     {
-      "src": "index.html",
+      "src": "*.html",
       "use": "@vercel/static"
-    }
-  ],
-  "routes": [
+    },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "src": "css/**",
+      "use": "@vercel/static"
     }
   ],
   "outputDirectory": "."
