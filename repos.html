@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS-01 — Repositories</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .repo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+    .repo-card {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .repo-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .repo-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    .repo-card-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text1);
+      text-decoration: none;
+      word-break: break-word;
+    }
+    .repo-card-name:hover { color: var(--accent); }
+    .repo-card-desc {
+      font-size: 0.85rem;
+      color: var(--text3);
+      line-height: 1.5;
+      flex: 1;
+    }
+    .repo-card-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .lang-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .lang-python { background: #3572A5; }
+    .lang-typescript { background: #3178C6; }
+    .lang-solidity { background: #363636; border: 1px solid #666; }
+    .lang-html { background: #E34F26; }
+    .lang-rust { background: #DEA584; }
+    .lang-shell { background: #89E051; }
+    .lang-go { background: #00ADD8; }
+    .lang-markdown { background: #083FA1; }
+    .lang-cpp { background: #F34B7D; }
+    .lang-none { background: #555; }
+    .lang-label {
+      font-size: 0.75rem;
+      color: var(--text3);
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-critical { background: rgba(168,85,247,0.15); color: #a855f7; }
+    .badge-high { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    .badge-medium { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .badge-low { background: rgba(107,114,128,0.15); color: #6b7280; }
+    .filter-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .filter-tab {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      color: var(--text3);
+      padding: 0.4rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .filter-tab:hover, .filter-tab.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .stat-card-number {
+      font-size: 2rem;
+      font-weight: 800;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-card-label {
+      font-size: 0.8rem;
+      color: var(--text3);
+      margin-top: 0.25rem;
+    }
+    .component-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .component-table th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      background: var(--bg2);
+      color: var(--text2);
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+    .component-table td {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text3);
+    }
+    .component-table tr:hover td {
+      background: rgba(99,102,241,0.04);
+    }
+    .component-table .comp-name {
+      font-weight: 600;
+      color: var(--text1);
+    }
+    .reusability-bar {
+      display: inline-block;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--accent);
+      vertical-align: middle;
+      margin-right: 0.4rem;
+    }
+    @media (max-width: 768px) {
+      .repo-grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .component-table { font-size: 0.75rem; }
+      .component-table th, .component-table td { padding: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav" id="nav">
+    <div class="container">
+      <a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="architecture.html">Architecture</a></li>
+        <li><a href="frameworks.html">Frameworks</a></li>
+        <li><a href="agents.html">Agents</a></li>
+        <li><a href="build-plan.html">Build Plan</a></li>
+        <li><a href="repos.html" class="active">Repos</a></li>
+        <li><a href="research.html">Research</a></li>
+        <li><a href="skills.html">Skills</a></li>
+        <li><a href="use-cases.html">Use Cases</a></li>
+        <li><a href="costs.html">Costs</a></li>
+        <li><a href="https://github.com/xosbot/nexus01-framework" class="nav-cta" target="_blank">GitHub</a></li>
+      </ul>
+      <button class="nav-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</button>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="container">
+      <div class="breadcrumb"><a href="index.html">Home</a> / Repositories</div>
+      <h1>Our <span class="gradient-text">Codebase</span></h1>
+      <p class="hero-subtitle">50+ repositories across two accounts — the building blocks of NEXUS-01</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="stats-row" id="stats">
+        <div class="stat-card fade-in"><div class="stat-card-number">50+</div><div class="stat-card-label">Total Repos</div></div>
+        <div class="stat-card fade-in"><div class="stat-card-number">5</div><div class="stat-card-label">Core Framework</div></div>
+        <div class="stat-card fade-in"><div class="stat-card-number">8</div><div class="stat-card-label">AI Agents</div></div>
+        <div class="stat-card fade-in"><div class="stat-card-number">15+</div><div class="stat-card-label">Web Apps</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Repository Analysis</h2>
+      <p class="section-subtitle">Browse and filter all repositories by category</p>
+      <div class="filter-tabs" id="filterTabs">
+        <button class="filter-tab active" data-filter="all">All</button>
+        <button class="filter-tab" data-filter="core">Core Framework</button>
+        <button class="filter-tab" data-filter="agent">AI Agents</button>
+        <button class="filter-tab" data-filter="crypto">Crypto/Web3</button>
+        <button class="filter-tab" data-filter="webapp">Web Apps</button>
+        <button class="filter-tab" data-filter="research">Research</button>
+      </div>
+      <div class="repo-grid" id="repoGrid">
+
+        <a href="https://github.com/navigatorxm/NEXUS-01" target="_blank" class="repo-card fade-in" data-category="core">
+          <div class="repo-card-header">
+            <span class="repo-card-name">NEXUS-01</span>
+            <span class="badge badge-critical">CRITICAL</span>
+          </div>
+          <p class="repo-card-desc">Digital OS with Autonomous AI Agent</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/X-Claw" target="_blank" class="repo-card fade-in" data-category="core">
+          <div class="repo-card-header">
+            <span class="repo-card-name">X-Claw</span>
+            <span class="badge badge-critical">CRITICAL</span>
+          </div>
+          <p class="repo-card-desc">Autonomous AI Agent with Think-Plan-Act-Recheck, 14 Subagents</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/Xclaw-x-DClaw" target="_blank" class="repo-card fade-in" data-category="core">
+          <div class="repo-card-header">
+            <span class="repo-card-name">XClaw-x-DClaw</span>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Inter-Agent Communication System</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/IVAmini-V3" target="_blank" class="repo-card fade-in" data-category="core">
+          <div class="repo-card-header">
+            <span class="repo-card-name">IVAmini-V3</span>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Personal AI System — IVAmini</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/GodMode-Dcrypt-v3.0" target="_blank" class="repo-card fade-in" data-category="core">
+          <div class="repo-card-header">
+            <span class="repo-card-name">GodMode-Dcrypt-v3.0</span>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">GodMode DCrypt Framework</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/NEXUS-01" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <span class="repo-card-name">NEXUS-01</span>
+            <span class="badge badge-critical">CRITICAL</span>
+          </div>
+          <p class="repo-card-desc">Digital OS with Autonomous AI Agent</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/XClaw" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <span class="repo-card-name">XClaw</span>
+            <span class="badge badge-critical">CRITICAL</span>
+          </div>
+          <p class="repo-card-desc">Autonomous AI Agent with 14 Subagents</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/ivamini-v3" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <span class="repo-card-name">ivamini-v3</span>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">IVA Mini Version 3</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/infra" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <span class="repo-card-name">infra</span>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Infrastructure</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/templates" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <span class="repo-card-name">templates</span>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Templates</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/CryptoGod" target="_blank" class="repo-card fade-in" data-category="crypto">
+          <div class="repo-card-header">
+            <span class="repo-card-name">CryptoGod</span>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Crypto Intelligence Dashboard</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/wallet-connectr" target="_blank" class="repo-card fade-in" data-category="crypto">
+          <div class="repo-card-header">
+            <span class="repo-card-name">wallet-connectr</span>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Multi-chain Wallet Manager with Admin Dashboard</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/DCrypt" target="_blank" class="repo-card fade-in" data-category="crypto">
+          <div class="repo-card-header">
+            <span class="repo-card-name">DCrypt</span>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Decryption Framework</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/CrypDr" target="_blank" class="repo-card fade-in" data-category="crypto">
+          <div class="repo-card-header">
+            <span class="repo-card-name">CrypDr</span>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Crypto Research</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/defi-spark" target="_blank" class="repo-card fade-in" data-category="crypto">
+          <div class="repo-card-header">
+            <span class="repo-card-name">defi-spark</span>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">DeFi Spark</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/onchain-token" target="_blank" class="repo-card fade-in" data-category="crypto">
+          <div class="repo-card-header">
+            <span class="repo-card-name">onchain-token</span>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">On-chain Token Analytics</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-solidity"></span><span class="lang-label">Solidity</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/trust_usdt" target="_blank" class="repo-card fade-in" data-category="crypto">
+          <div class="repo-card-header">
+            <span class="repo-card-name">trust_usdt</span>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">USDT Trust</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-solidity"></span><span class="lang-label">Solidity</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/AetherDrop" target="_blank" class="repo-card fade-in" data-category="crypto">
+          <div class="repo-card-header">
+            <span class="repo-card-name">AetherDrop</span>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">AetherDrop</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/shaan.bio" target="_blank" class="repo-card fade-in" data-category="webapp">
+          <div class="repo-card-header">
+            <span class="repo-card-name">shaan.bio</span>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">Dr. Shaan Sherif Portfolio</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-html"></span><span class="lang-label">HTML</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/uig-llc" target="_blank" class="repo-card fade-in" data-category="webapp">
+          <div class="repo-card-header">
+            <span class="repo-card-name">uig-llc</span>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">United Investing Group</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/ubaka-school" target="_blank" class="repo-card fade-in" data-category="webapp">
+          <div class="repo-card-header">
+            <span class="repo-card-name">ubaka-school</span>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">School Management</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/xcrow-website" target="_blank" class="repo-card fade-in" data-category="webapp">
+          <div class="repo-card-header">
+            <span class="repo-card-name">xcrow-website</span>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Digital Escrow Platform</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/hire4sure" target="_blank" class="repo-card fade-in" data-category="webapp">
+          <div class="repo-card-header">
+            <span class="repo-card-name">hire4sure</span>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">Hiring Platform</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/santos.travel" target="_blank" class="repo-card fade-in" data-category="webapp">
+          <div class="repo-card-header">
+            <span class="repo-card-name">santos.travel</span>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">Travel Company</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/fx-teller" target="_blank" class="repo-card fade-in" data-category="webapp">
+          <div class="repo-card-header">
+            <span class="repo-card-name">fx-teller</span>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">FX Intelligence</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/paadi-marketing" target="_blank" class="repo-card fade-in" data-category="webapp">
+          <div class="repo-card-header">
+            <span class="repo-card-name">paadi-marketing</span>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">Marketing</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/pokkalivillage-report" target="_blank" class="repo-card fade-in" data-category="webapp">
+          <div class="repo-card-header">
+            <span class="repo-card-name">pokkalivillage-report</span>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">Village Report</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/Legal-AI" target="_blank" class="repo-card fade-in" data-category="research">
+          <div class="repo-card-header">
+            <span class="repo-card-name">Legal-AI</span>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Legal AI System</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/AIRS" target="_blank" class="repo-card fade-in" data-category="research">
+          <div class="repo-card-header">
+            <span class="repo-card-name">AIRS</span>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">AI System</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/navigatorxm/OneThing-1.O" target="_blank" class="repo-card fade-in" data-category="research">
+          <div class="repo-card-header">
+            <span class="repo-card-name">OneThing-1.O</span>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">One Thing</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/CryptoGod" target="_blank" class="repo-card fade-in" data-category="research">
+          <div class="repo-card-header">
+            <span class="repo-card-name">CryptoGod</span>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Crypto Intelligence</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/sterling-circle" target="_blank" class="repo-card fade-in" data-category="research">
+          <div class="repo-card-header">
+            <span class="repo-card-name">sterling-circle</span>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Knowledge Graph</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+        <a href="https://github.com/xosbot/project-proposal" target="_blank" class="repo-card fade-in" data-category="research">
+          <div class="repo-card-header">
+            <span class="repo-card-name">project-proposal</span>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">Project Proposal</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-none"></span><span class="lang-label">—</span></div>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background:var(--bg2);">
+    <div class="container">
+      <h2 class="section-title">Most Reusable Components</h2>
+      <p class="section-subtitle">Cross-validated components ready for integration into NEXUS-01</p>
+      <div style="overflow-x:auto;margin-top:1.5rem;">
+        <table class="component-table">
+          <thead>
+            <tr><th>Component</th><th>Source Repo</th><th>Lines</th><th>Reusability</th><th>Integration Effort</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="comp-name">LLM Router</td>
+              <td>XClaw/brain/llm_router.py</td>
+              <td>500</td>
+              <td><span class="reusability-bar" style="width:90px"></span> 9/10</td>
+              <td><span class="badge badge-low">Low</span></td>
+            </tr>
+            <tr>
+              <td class="comp-name">Agent Loop</td>
+              <td>XClaw/core/agent_loop.py</td>
+              <td>204</td>
+              <td><span class="reusability-bar" style="width:90px"></span> 9/10</td>
+              <td><span class="badge badge-low">Low</span></td>
+            </tr>
+            <tr>
+              <td class="comp-name">Tool Registry</td>
+              <td>XClaw/core/tool_registry.py</td>
+              <td>138</td>
+              <td><span class="reusability-bar" style="width:90px"></span> 9/10</td>
+              <td><span class="badge badge-critical">Very Low</span></td>
+            </tr>
+            <tr>
+              <td class="comp-name">Memory System</td>
+              <td>XClaw/core/memory.py</td>
+              <td>145</td>
+              <td><span class="reusability-bar" style="width:80px"></span> 8/10</td>
+              <td><span class="badge badge-low">Low</span></td>
+            </tr>
+            <tr>
+              <td class="comp-name">Gateway</td>
+              <td>XClaw/core/gateway.py</td>
+              <td>75</td>
+              <td><span class="reusability-bar" style="width:80px"></span> 8/10</td>
+              <td><span class="badge badge-critical">Very Low</span></td>
+            </tr>
+            <tr>
+              <td class="comp-name">Commander</td>
+              <td>XClaw/core/commander.py</td>
+              <td>79</td>
+              <td><span class="reusability-bar" style="width:80px"></span> 8/10</td>
+              <td><span class="badge badge-low">Low</span></td>
+            </tr>
+            <tr>
+              <td class="comp-name">IVA Prompts</td>
+              <td>IVA-CORTEX-v1/cortex/prompts.py</td>
+              <td>108</td>
+              <td><span class="reusability-bar" style="width:80px"></span> 8/10</td>
+              <td><span class="badge badge-critical">Very Low</span></td>
+            </tr>
+            <tr>
+              <td class="comp-name">Inter-Claw Comms</td>
+              <td>XClaw/shared/comms.py</td>
+              <td>40</td>
+              <td><span class="reusability-bar" style="width:70px"></span> 7/10</td>
+              <td><span class="badge badge-low">Low</span></td>
+            </tr>
+            <tr>
+              <td class="comp-name">Agent Army</td>
+              <td>NEXUS-01/agents/army.py</td>
+              <td>236</td>
+              <td><span class="reusability-bar" style="width:70px"></span> 7/10</td>
+              <td><span class="badge badge-medium">Medium</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand"><a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a><p>A minimal, modular agentic AI framework.</p></div>
+        <div class="footer-col"><h4>Pages</h4><a href="architecture.html">Architecture</a><a href="frameworks.html">Frameworks</a><a href="agents.html">Agents</a><a href="build-plan.html">Build Plan</a></div>
+        <div class="footer-col"><h4>Research</h4><a href="repos.html">Repositories</a><a href="research.html">Starred Repos</a><a href="skills.html">Skills System</a><a href="use-cases.html">Use Cases</a></div>
+        <div class="footer-col"><h4>Connect</h4><a href="https://github.com/xosbot/nexus01-framework" target="_blank">GitHub</a></div>
+      </div>
+      <div class="footer-bottom"><span>Built with precision. Powered by agents.</span><span>© 2026 NEXUS-01</span></div>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll('.filter-tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        var filter = tab.getAttribute('data-filter');
+        document.querySelectorAll('.repo-card').forEach(function(card) {
+          if (filter === 'all' || card.getAttribute('data-category') === filter) {
+            card.style.display = '';
+          } else {
+            card.style.display = 'none';
+          }
+        });
+      });
+    });
+
+    var fadeEls = document.querySelectorAll('.fade-in');
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+    fadeEls.forEach(function(el) { observer.observe(el); });
+
+    window.addEventListener('scroll', function() {
+      var nav = document.getElementById('nav');
+      if (window.scrollY > 50) {
+        nav.classList.add('nav-scrolled');
+      } else {
+        nav.classList.remove('nav-scrolled');
+      }
+    });
+  </script>
+</body>
+</html>

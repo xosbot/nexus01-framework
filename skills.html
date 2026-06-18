@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skills — NEXUS-01</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.skill-format-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:48px}
+.skill-format-card{padding:28px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass)}
+.skill-format-card h3{font-size:1.05rem;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.skill-format-card h3 .icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem}
+.skill-format-card:nth-child(1) h3 .icon{background:rgba(0,212,255,0.1);color:var(--blue)}
+.skill-format-card:nth-child(2) h3 .icon{background:rgba(139,92,246,0.1);color:var(--purple)}
+.skill-format-card:nth-child(3) h3 .icon{background:rgba(16,185,129,0.1);color:var(--green)}
+.progressive-levels{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.progressive-level{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--radius-xs);border:1px solid var(--glass-border);background:rgba(255,255,255,0.02);transition:all 0.3s}
+.progressive-level:hover{border-color:rgba(0,212,255,0.2);background:rgba(0,212,255,0.03)}
+.level-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;font-family:'JetBrains Mono',monospace;flex-shrink:0}
+.level-num.l1{background:rgba(0,212,255,0.15);color:var(--blue)}
+.level-num.l2{background:rgba(139,92,246,0.15);color:var(--purple)}
+.level-num.l3{background:rgba(16,185,129,0.15);color:var(--green)}
+.progressive-level .level-info h4{font-size:0.9rem;margin-bottom:2px}
+.progressive-level .level-info p{font-size:0.78rem;color:var(--text3)}
+.registry-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.registry-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--radius-xs);border:1px solid var(--glass-border);background:rgba(255,255,255,0.02);transition:all 0.3s}
+.registry-item:hover{border-color:rgba(0,212,255,0.2);transform:translateX(4px)}
+.registry-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.registry-item:nth-child(1) .registry-icon{background:rgba(245,158,11,0.1);color:var(--amber)}
+.registry-item:nth-child(2) .registry-icon{background:rgba(139,92,246,0.1);color:var(--purple)}
+.registry-item:nth-child(3) .registry-icon{background:rgba(0,212,255,0.1);color:var(--blue)}
+.registry-item h4{font-size:0.9rem;margin-bottom:2px}
+.registry-item p{font-size:0.78rem;color:var(--text3)}
+.nexus-skill-flow{margin-top:60px;padding:40px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass)}
+.nexus-skill-flow h3{font-size:1.2rem;margin-bottom:24px;text-align:center}
+.flow-steps{display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap;margin-bottom:32px}
+.flow-step{flex:1;min-width:140px;padding:16px;text-align:center;border:1px solid var(--glass-border);border-radius:var(--radius-sm);background:var(--bg3);transition:all 0.3s;position:relative}
+.flow-step:hover{border-color:rgba(0,212,255,0.3)}
+.flow-step .fs-num{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--text3);margin-bottom:6px}
+.flow-step .fs-title{font-size:0.85rem;font-weight:600;margin-bottom:4px}
+.flow-step .fs-desc{font-size:0.72rem;color:var(--text3)}
+.flow-step::after{content:'&#8594;';position:absolute;right:-12px;top:50%;transform:translateY(-50%);color:var(--text4);font-size:1rem;z-index:1}
+.flow-step:last-child::after{display:none}
+.flow-note{font-size:0.85rem;color:var(--text2);text-align:center;line-height:1.7}
+.flow-note strong{color:var(--blue)}
+.karpathy-hero{margin-top:60px;padding:48px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass);text-align:center;position:relative;overflow:hidden}
+.karpathy-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),var(--purple),var(--pink))}
+.karpathy-hero .source{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:999px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);font-size:0.8rem;color:var(--amber);margin-bottom:20px;font-family:'JetBrains Mono',monospace}
+.karpathy-hero h2{font-size:clamp(1.8rem,4vw,2.5rem);margin-bottom:12px}
+.karpathy-hero p{color:var(--text2);max-width:700px;margin:0 auto;font-size:1.05rem}
+.principles-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:28px;margin-top:48px}
+.principle-card{padding:32px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass);position:relative;overflow:hidden;transition:all 0.4s}
+.principle-card:hover{border-color:rgba(0,212,255,0.3);transform:translateY(-4px)}
+.principle-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.principle-card:nth-child(1)::before{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+.principle-card:nth-child(2)::before{background:linear-gradient(90deg,var(--purple),var(--pink))}
+.principle-card:nth-child(3)::before{background:linear-gradient(90deg,var(--green),var(--blue))}
+.principle-card:nth-child(4)::before{background:linear-gradient(90deg,var(--amber),var(--pink))}
+.principle-card h3{font-size:1.2rem;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.principle-card h3 .num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0}
+.principle-card:nth-child(1) h3 .num{background:rgba(0,212,255,0.15);color:var(--blue)}
+.principle-card:nth-child(2) h3 .num{background:rgba(139,92,246,0.15);color:var(--purple)}
+.principle-card:nth-child(3) h3 .num{background:rgba(16,185,129,0.15);color:var(--green)}
+.principle-card:nth-child(4) h3 .num{background:rgba(245,158,11,0.15);color:var(--amber)}
+.principle-card p{color:var(--text2);font-size:0.9rem;margin-bottom:18px}
+.before-after{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ba-box{padding:14px;border-radius:var(--radius-xs);font-size:0.8rem;line-height:1.6}
+.ba-before{background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);color:var(--text2)}
+.ba-after{background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.15);color:var(--text2)}
+.ba-label{font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:700}
+.ba-before .ba-label{color:var(--red)}
+.ba-after .ba-label{color:var(--green)}
+.error-chart{margin-top:48px;padding:40px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass);text-align:center}
+.error-chart h3{font-size:1.3rem;margin-bottom:8px}
+.error-chart>p{color:var(--text2);font-size:0.95rem;margin-bottom:32px}
+.error-bar-wrap{max-width:500px;margin:0 auto}
+.error-bar-row{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+.error-bar-label{width:120px;text-align:right;font-size:0.85rem;color:var(--text2);flex-shrink:0}
+.error-bar-track{flex:1;height:32px;background:rgba(255,255,255,0.03);border-radius:var(--radius-xs);overflow:hidden}
+.error-bar-fill{height:100%;border-radius:var(--radius-xs);display:flex;align-items:center;justify-content:flex-end;padding-right:12px;font-family:'JetBrains Mono',monospace;font-size:0.8rem;font-weight:700;color:#fff}
+.error-bar-fill.before{background:linear-gradient(90deg,var(--red),#f97316)}
+.error-bar-fill.after{background:linear-gradient(90deg,var(--green),var(--blue))}
+.build-skill-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:28px;margin-top:48px}
+.build-skill-card{padding:28px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass);transition:all 0.3s}
+.build-skill-card:hover{border-color:rgba(0,212,255,0.2);transform:translateY(-3px)}
+.build-skill-card h3{font-size:1rem;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.build-skill-card h3 .step-num{font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--blue);background:rgba(0,212,255,0.1);padding:3px 8px;border-radius:999px}
+.build-skill-card p{color:var(--text2);font-size:0.85rem;margin-bottom:12px}
+.build-skill-card .code-block{font-size:0.72rem}
+.browser-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:48px}
+.browser-card{padding:28px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass);text-align:center;transition:all 0.3s}
+.browser-card:hover{border-color:rgba(0,212,255,0.2);transform:translateY(-4px)}
+.browser-card .br-icon{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto 16px}
+.browser-card:nth-child(1) .br-icon{background:rgba(0,212,255,0.1);color:var(--blue)}
+.browser-card:nth-child(2) .br-icon{background:rgba(139,92,246,0.1);color:var(--purple)}
+.browser-card:nth-child(3) .br-icon{background:rgba(16,185,129,0.1);color:var(--green)}
+.browser-card h3{font-size:1.05rem;margin-bottom:8px}
+.browser-card p{color:var(--text2);font-size:0.85rem;margin-bottom:16px}
+.browser-features{display:flex;flex-direction:column;gap:8px;text-align:left}
+.browser-features li{font-size:0.8rem;color:var(--text2);display:flex;align-items:center;gap:8px;list-style:none}
+.browser-features li::before{content:'&#9656;';color:var(--blue);font-weight:700}
+.browser-compare{margin-top:40px;overflow-x:auto}
+.browser-compare .data-table{min-width:700px}
+.skill-examples{margin-top:48px}
+.skill-examples-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;margin-top:24px}
+.skill-example-card{padding:20px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);background:var(--glass);transition:all 0.3s}
+.skill-example-card:hover{border-color:rgba(0,212,255,0.2)}
+.skill-example-card .se-name{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:0.9rem;margin-bottom:6px;color:var(--blue)}
+.skill-example-card .se-desc{font-size:0.8rem;color:var(--text2);margin-bottom:10px}
+.skill-example-card .se-tags{display:flex;flex-wrap:wrap;gap:6px}
+.skill-example-card .se-tag{padding:2px 8px;border-radius:999px;font-size:0.65rem;font-family:'JetBrains Mono',monospace;background:rgba(139,92,246,0.08);color:var(--purple);border:1px solid rgba(139,92,246,0.15)}
+@media(max-width:1024px){.skill-format-grid,.principles-grid,.browser-grid,.build-skill-grid{grid-template-columns:1fr}.before-after{grid-template-columns:1fr}}
+@media(max-width:768px){.error-bar-row{flex-direction:column;align-items:stretch}.error-bar-label{text-align:left;width:auto}.flow-steps{flex-direction:column;gap:16px}.flow-step::after{content:'&#8595';right:auto;bottom:-20px;top:auto;transform:none}}
+</style>
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <div class="container">
+    <a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="frameworks.html">Frameworks</a></li>
+      <li><a href="agents.html">Agents</a></li>
+      <li><a href="build-plan.html">Build Plan</a></li>
+      <li><a href="repos.html">Repos</a></li>
+      <li><a href="research.html">Research</a></li>
+      <li><a href="skills.html" class="active">Skills</a></li>
+      <li><a href="use-cases.html">Use Cases</a></li>
+      <li><a href="costs.html">Costs</a></li>
+      <li><a href="https://github.com/xosbot/nexus01-framework" class="nav-cta" target="_blank">GitHub</a></li>
+    </ul>
+    <button class="nav-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">&#9776;</button>
+  </div>
+</nav>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="breadcrumb reveal"><a href="index.html">Home</a> / Skills</div>
+    <h1 class="reveal"><span class="gradient-text">Agentic Skills</span> &amp; Intelligence</h1>
+    <p class="subtitle reveal">How agents learn, specialize, and extend their capabilities</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>The <span class="gradient-text">SKILL.md</span> Format</h2>
+      <p>A standardized format for agent instruction files &mdash; progressive loading, portable across platforms.</p>
+    </div>
+    <div class="skill-format-grid">
+      <div class="skill-format-card glass reveal reveal-delay-1">
+        <h3><span class="icon">&#128196;</span> Format Structure</h3>
+        <div class="code-block">
+<span class="comment"># SKILL.md</span>
+<span class="keyword">---</span>
+<span class="function">name</span>: <span class="string">"web-scraping"</span>
+<span class="function">description</span>: <span class="string">"Extract data from URLs"</span>
+<span class="function">version</span>: <span class="string">"1.0.0"</span>
+<span class="function">tags</span>: [<span class="string">"osint"</span>, <span class="string">"web"</span>]
+
+<span class="keyword">## Instructions</span>
+<span class="comment">When to activate this skill...</span>
+1. Validate URL format
+2. Set timeout and headers
+3. Parse response with BS4
+4. Store in ChromaDB
+
+<span class="keyword">## Resources</span>
+- scripts/scraper.py
+- templates/report.md
+        </div>
+      </div>
+      <div class="skill-format-card glass reveal reveal-delay-2">
+        <h3><span class="icon">&#9889;</span> Progressive Loading</h3>
+        <div class="progressive-levels">
+          <div class="progressive-level">
+            <div class="level-num l1">1</div>
+            <div class="level-info">
+              <h4>Metadata</h4>
+              <p>Name, description, tags &mdash; loaded first for routing decisions</p>
+            </div>
+          </div>
+          <div class="progressive-level">
+            <div class="level-num l2">2</div>
+            <div class="level-info">
+              <h4>Instructions</h4>
+              <p>Core logic, decision trees, when-to-activate rules</p>
+            </div>
+          </div>
+          <div class="progressive-level">
+            <div class="level-num l3">3</div>
+            <div class="level-info">
+              <h4>Resources</h4>
+              <p>Scripts, templates, reference docs &mdash; loaded on execution</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="skill-format-card glass reveal reveal-delay-3">
+        <h3><span class="icon">&#128230;</span> Registries</h3>
+        <div class="registry-list">
+          <div class="registry-item">
+            <div class="registry-icon">&#127968;</div>
+            <div>
+              <h4>Claude Code Skills</h4>
+              <p>Official Anthropic skill marketplace for Claude agents</p>
+            </div>
+          </div>
+          <div class="registry-item">
+            <div class="registry-icon">&#129415;</div>
+            <div>
+              <h4>DeerFlow</h4>
+              <p>Open-source deep research agent with modular skill system</p>
+            </div>
+          </div>
+          <div class="registry-item">
+            <div class="registry-icon">&#128640;</div>
+            <div>
+              <h4>antigravity-awesome-skills</h4>
+              <p>Community-curated collection of 200+ agent skills</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="nexus-skill-flow glass reveal">
+      <h3>How Skills Work in <span class="gradient-text">NEXUS-01</span></h3>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="fs-num">01</div>
+          <div class="fs-title">User Request</div>
+          <div class="fs-desc">Telegram or CLI input</div>
+        </div>
+        <div class="flow-step">
+          <div class="fs-num">02</div>
+          <div class="fs-title">Router Agent</div>
+          <div class="fs-desc">Matches to SKILL.md</div>
+        </div>
+        <div class="flow-step">
+          <div class="fs-num">03</div>
+          <div class="fs-title">Load Metadata</div>
+          <div class="fs-desc">Name, tags, description</div>
+        </div>
+        <div class="flow-step">
+          <div class="fs-num">04</div>
+          <div class="fs-title">Load Instructions</div>
+          <div class="fs-desc">Decision tree loaded</div>
+        </div>
+        <div class="flow-step">
+          <div class="fs-num">05</div>
+          <div class="fs-title">Execute Skill</div>
+          <div class="fs-desc">Run scripts &amp; tools</div>
+        </div>
+        <div class="flow-step">
+          <div class="fs-num">06</div>
+          <div class="fs-title">Return Result</div>
+          <div class="fs-desc">Response to user</div>
+        </div>
+      </div>
+      <p class="flow-note">
+        The <strong>SKILL.md</strong> format enables progressive loading: metadata is read first to determine if a skill matches,
+        instructions are loaded only when the skill is activated, and resources are fetched on-demand during execution.
+        This keeps token usage minimal while maintaining full capability.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="karpathy">
+  <div class="container">
+    <div class="karpathy-hero reveal">
+      <div class="source">&#9733; multica-ai/andrej-karpathy-skills &middot; 177k&#11088;</div>
+      <h2>Karpathy's 4 Principles for <span class="gradient-text">AI Coding</span></h2>
+      <p>The rules that reduce agent errors from 41% to 11% &mdash; battle-tested guidelines from one of the most respected voices in AI.</p>
+    </div>
+
+    <div class="principles-grid">
+      <div class="principle-card glass reveal reveal-delay-1">
+        <h3><span class="num">1</span> THINK BEFORE CODING</h3>
+        <p>The most common failure mode is jumping to code before understanding the problem fully. Agents that pause to think produce dramatically fewer bugs.</p>
+        <div class="before-after">
+          <div class="ba-box ba-before"><div class="ba-label">Before (41% errors)</div>Immediately generates code from first token. No planning, no context gathering.</div>
+          <div class="ba-box ba-after"><div class="ba-label">After (11% errors)</div>Reads codebase, gathers context, plans approach, then writes focused implementation.</div>
+        </div>
+      </div>
+      <div class="principle-card glass reveal reveal-delay-2">
+        <h3><span class="num">2</span> SIMPLICITY FIRST</h3>
+        <p>Over-engineering is the silent killer of AI-generated code. The best agents choose the simplest solution that works, then iterate only when needed.</p>
+        <div class="before-after">
+          <div class="ba-box ba-before"><div class="ba-label">Before</div>Creates abstract factory patterns for a 20-line function. Adds 15 dependencies.</div>
+          <div class="ba-box ba-after"><div class="ba-label">After</div>Writes a single function. Adds complexity only when requirements demand it.</div>
+        </div>
+      </div>
+      <div class="principle-card glass reveal reveal-delay-3">
+        <h3><span class="num">3</span> SURGICAL CHANGES</h3>
+        <p>Rewriting entire files when a 3-line edit would suffice. Targeted changes reduce regression risk by an order of magnitude.</p>
+        <div class="before-after">
+          <div class="ba-box ba-before"><div class="ba-label">Before</div>Rewrites 500 lines to fix a single off-by-one error. Breaks unrelated features.</div>
+          <div class="ba-box ba-after"><div class="ba-label">After</div>Edits exactly 3 lines. Tests the specific behavior. Nothing else changes.</div>
+        </div>
+      </div>
+      <div class="principle-card glass reveal reveal-delay-4">
+        <h3><span class="num">4</span> GOAL-DRIVEN EXECUTION</h3>
+        <p>Lost agents produce code that technically works but misses the actual goal. Clear goal articulation prevents costly detours.</p>
+        <div class="before-after">
+          <div class="ba-box ba-before"><div class="ba-label">Before</div>Implements what was literally asked. Misses the business intent. Rework required.</div>
+          <div class="ba-box ba-after"><div class="ba-label">After</div>Asks clarifying questions. Validates understanding. Builds the right thing first.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="error-chart glass reveal">
+      <h3>Error Rate Reduction</h3>
+      <p>Applying Karpathy's principles cuts agent coding errors by 73%</p>
+      <div class="error-bar-wrap">
+        <div class="error-bar-row">
+          <div class="error-bar-label">Without Principles</div>
+          <div class="error-bar-track"><div class="error-bar-fill before" data-width="82%">41%</div></div>
+        </div>
+        <div class="error-bar-row">
+          <div class="error-bar-label">With Principles</div>
+          <div class="error-bar-track"><div class="error-bar-fill after" data-width="22%">11%</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Build Your Own <span class="gradient-text">Skills</span></h2>
+      <p>A step-by-step guide to creating custom SKILL.md files for your agents.</p>
+    </div>
+    <div class="build-skill-grid">
+      <div class="build-skill-card glass reveal reveal-delay-1">
+        <h3><span class="step-num">Step 1</span> Define the Skill</h3>
+        <p>Start with a clear problem statement. What does this skill do? When should it activate?</p>
+        <div class="code-block">
+<span class="comment"># Define your skill metadata</span>
+<span class="function">name</span>: <span class="string">"email-triage"</span>
+<span class="function">description</span>: <span class="string">"Sort and prioritize emails"</span>
+<span class="function">triggers</span>:
+  - <span class="string">"new email arrived"</span>
+  - <span class="string">"check inbox"</span>
+        </div>
+      </div>
+      <div class="build-skill-card glass reveal reveal-delay-2">
+        <h3><span class="step-num">Step 2</span> Write Instructions</h3>
+        <p>Define the decision tree. Be explicit about conditions, thresholds, and fallbacks.</p>
+        <div class="code-block">
+<span class="keyword">## Instructions</span>
+<span class="function">when</span> <span class="string">"email contains attachment"</span>:
+  1. Extract attachment metadata
+  2. Classify by file type
+  3. Store in appropriate folder
+  4. Notify user of receipt
+
+<span class="function">when</span> <span class="string">"email is newsletter"</span>:
+  1. Mark as read
+  2. Archive after 24h
+        </div>
+      </div>
+      <div class="build-skill-card glass reveal reveal-delay-3">
+        <h3><span class="step-num">Step 3</span> Add Resources</h3>
+        <p>Link scripts, templates, and reference files that the skill needs during execution.</p>
+        <div class="code-block">
+<span class="keyword">## Resources</span>
+<span class="function">scripts</span>:
+  - <span class="string">scripts/parse_email.py</span>
+  - <span class="string">scripts/classify.py</span>
+<span class="function">templates</span>:
+  - <span class="string">templates/digest.md</span>
+<span class="function">references</span>:
+  - <span class="string">docs/priority-rules.md</span>
+        </div>
+      </div>
+      <div class="build-skill-card glass reveal reveal-delay-4">
+        <h3><span class="step-num">Step 4</span> Test &amp; Iterate</h3>
+        <p>Activate the skill, observe agent behavior, refine instructions based on real outcomes.</p>
+        <div class="code-block">
+<span class="comment"># Test the skill via Telegram</span>
+/send <span class="string">"Process my inbox"</span>
+
+<span class="comment"># Agent will:</span>
+<span class="comment"># 1. Match email-triage skill</span>
+<span class="comment"># 2. Load instructions</span>
+<span class="comment"># 3. Execute scripts</span>
+<span class="comment"># 4. Return results</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Example <span class="gradient-text">Skills</span></h2>
+      <p>Pre-built skills included with NEXUS-01, ready to use or customize.</p>
+    </div>
+    <div class="skill-examples-grid">
+      <div class="skill-example-card glass reveal reveal-delay-1">
+        <div class="se-name">web-scraping</div>
+        <div class="se-desc">Extract structured data from any URL with anti-detection and retry logic.</div>
+        <div class="se-tags"><span class="se-tag">osint</span><span class="se-tag">web</span><span class="se-tag">data</span></div>
+      </div>
+      <div class="skill-example-card glass reveal reveal-delay-2">
+        <div class="se-name">email-triage</div>
+        <div class="se-desc">Sort incoming emails by priority, extract attachments, generate summaries.</div>
+        <div class="se-tags"><span class="se-tag">automation</span><span class="se-tag">email</span></div>
+      </div>
+      <div class="skill-example-card glass reveal reveal-delay-3">
+        <div class="se-name">code-review</div>
+        <div class="se-desc">Review PRs against Karpathy's principles. Flag complexity and suggest simplifications.</div>
+        <div class="se-tags"><span class="se-tag">dev</span><span class="se-tag">quality</span></div>
+      </div>
+      <div class="skill-example-card glass reveal reveal-delay-4">
+        <div class="se-name">news-digest</div>
+        <div class="se-desc">Aggregate news from configured RSS feeds. Summarize with LLM. Send daily digest.</div>
+        <div class="se-tags"><span class="se-tag">osint</span><span class="se-tag">news</span></div>
+      </div>
+      <div class="skill-example-card glass reveal reveal-delay-1">
+        <div class="se-name">crypto-alerts</div>
+        <div class="se-desc">Monitor crypto prices. Alert on threshold breaches. Track portfolio changes.</div>
+        <div class="se-tags"><span class="se-tag">finance</span><span class="se-tag">crypto</span></div>
+      </div>
+      <div class="skill-example-card glass reveal reveal-delay-2">
+        <div class="se-name">system-health</div>
+        <div class="se-desc">Monitor VPS health: CPU, memory, disk, Docker containers. Alert on anomalies.</div>
+        <div class="se-tags"><span class="se-tag">sysadmin</span><span class="se-tag">monitoring</span></div>
+      </div>
+      <div class="skill-example-card glass reveal reveal-delay-3">
+        <div class="se-name">report-gen</div>
+        <div class="se-desc">Generate formatted reports from data. Supports markdown, PDF, and HTML output.</div>
+        <div class="se-tags"><span class="se-tag">docs</span><span class="se-tag">output</span></div>
+      </div>
+      <div class="skill-example-card glass reveal reveal-delay-4">
+        <div class="se-name">threat-intel</div>
+        <div class="se-desc">Scan CVE feeds, security advisories. Match against your tech stack. Alert on risk.</div>
+        <div class="se-tags"><span class="se-tag">security</span><span class="se-tag">osint</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="browser">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Browser Harness &amp; <span class="gradient-text">Computer Use</span></h2>
+      <p>Three approaches to giving agents eyes and hands on the web.</p>
+    </div>
+    <div class="browser-grid">
+      <div class="browser-card glass reveal reveal-delay-1">
+        <div class="br-icon">&#127760;</div>
+        <h3>Playwright MCP</h3>
+        <p>Model Context Protocol server for browser automation. Structured, reliable, testable.</p>
+        <ul class="browser-features">
+          <li>Headless Chromium automation</li>
+          <li>Screenshot &amp; DOM extraction</li>
+          <li>Form filling &amp; navigation</li>
+          <li>Network interception</li>
+          <li>MCP-native tool interface</li>
+        </ul>
+      </div>
+      <div class="browser-card glass reveal reveal-delay-2">
+        <div class="br-icon">&#129302;</div>
+        <h3>Claude Computer Use</h3>
+        <p>Anthropic's vision-based approach. The model sees screenshots and moves the mouse.</p>
+        <ul class="browser-features">
+          <li>Screenshot-based reasoning</li>
+          <li>Pixel-level mouse control</li>
+          <li>Keyboard input simulation</li>
+          <li>Works with any application</li>
+          <li>No DOM access needed</li>
+        </ul>
+      </div>
+      <div class="browser-card glass reveal reveal-delay-3">
+        <div class="br-icon">&#128065;</div>
+        <h3>Browser Use Framework</h3>
+        <p>Open-source framework for building browser-using agents with custom workflows.</p>
+        <ul class="browser-features">
+          <li>Python SDK for browser control</li>
+          <li>Multi-tab management</li>
+          <li>Cookie &amp; session handling</li>
+          <li>Visual element grounding</li>
+          <li>Custom action pipelines</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="browser-compare glass reveal" style="padding:24px;border-radius:var(--radius);margin-top:40px;overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Playwright MCP</th>
+            <th>Claude Computer Use</th>
+            <th>Browser Use</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Architecture</td><td>MCP Server</td><td>Vision + Input</td><td>Python SDK</td></tr>
+          <tr><td>DOM Access</td><td class="highlight">Full</td><td>None</td><td>Full</td></tr>
+          <tr><td>Speed</td><td class="highlight">Fast</td><td>Slow</td><td>Medium</td></tr>
+          <tr><td>Reliability</td><td class="highlight">High</td><td>Medium</td><td>High</td></tr>
+          <tr><td>Works Without JS</td><td>No</td><td class="highlight">Yes</td><td>No</td></tr>
+          <tr><td>Setup Complexity</td><td>Low</td><td>Medium</td><td>Medium</td></tr>
+          <tr><td>Cost</td><td>Free</td><td>API-based</td><td>Free</td></tr>
+          <tr><td>Best For</td><td>Structured tasks</td><td>Any GUI</td><td>Complex workflows</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand"><a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a><p>A minimal, modular agentic AI framework.</p></div>
+      <div class="footer-col"><h4>Pages</h4><a href="architecture.html">Architecture</a><a href="frameworks.html">Frameworks</a><a href="agents.html">Agents</a><a href="build-plan.html">Build Plan</a></div>
+      <div class="footer-col"><h4>Research</h4><a href="repos.html">Repositories</a><a href="research.html">Starred Repos</a><a href="skills.html">Skills System</a><a href="use-cases.html">Use Cases</a></div>
+      <div class="footer-col"><h4>Connect</h4><a href="https://github.com/xosbot/nexus01-framework" target="_blank">GitHub</a></div>
+    </div>
+    <div class="footer-bottom"><span>Built with precision. Powered by agents.</span><span>&copy; 2026 NEXUS-01</span></div>
+  </div>
+</footer>
+
+<script>
+window.addEventListener('scroll',()=>{document.getElementById('nav').classList.toggle('scrolled',window.scrollY>50)});
+const reveals=document.querySelectorAll('.reveal');
+const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target)}});},{threshold:0.1,rootMargin:'0px 0px -50px 0px'});
+reveals.forEach(r=>observer.observe(r));
+const chartObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.querySelectorAll('.error-bar-fill').forEach(bar=>{bar.style.width=bar.dataset.width});chartObs.unobserve(e.target)}});},{threshold:0.5});
+document.querySelectorAll('.error-chart').forEach(c=>chartObs.observe(c));
+</script>
+</body>
+</html>

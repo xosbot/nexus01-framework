@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agentic Frameworks Landscape 2026 — NEXUS-01</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.frameworks-hero::after{background:linear-gradient(90deg,transparent,var(--green),transparent)}
+.frameworks-hero .gradient-text{background:linear-gradient(135deg,var(--green),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.framework-table-wrap{overflow-x:auto;margin-top:40px;border:1px solid var(--glass-border);border-radius:var(--radius);background:var(--glass)}
+.framework-table{width:100%;border-collapse:collapse;font-size:0.82rem;white-space:nowrap}
+.framework-table th{text-align:left;padding:14px 16px;border-bottom:2px solid var(--glass-border);color:var(--text3);font-weight:600;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;font-family:'JetBrains Mono',monospace;position:sticky;top:0;background:var(--bg2)}
+.framework-table td{padding:12px 16px;border-bottom:1px solid var(--glass-border);color:var(--text2)}
+.framework-table tr:hover td{background:var(--glass)}
+.framework-table td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
+.framework-table .highlight-row td{background:rgba(0,212,255,0.04);border-bottom-color:rgba(0,212,255,0.1)}
+.framework-table .highlight-row td:first-child{color:var(--blue)}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:600;font-family:'JetBrains Mono',monospace}
+.badge-high{background:rgba(16,185,129,0.12);color:var(--green)}
+.badge-medium{background:rgba(245,158,11,0.12);color:var(--amber)}
+.badge-low{background:rgba(239,68,68,0.12);color:var(--red)}
+.badge-yes{background:rgba(16,185,129,0.12);color:var(--green)}
+.badge-no{background:rgba(239,68,68,0.08);color:var(--red)}
+.badge-planned{background:rgba(139,92,246,0.12);color:var(--purple)}
+.badge-native{background:rgba(0,212,255,0.12);color:var(--blue)}
+.pattern-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;margin-top:40px}
+.pattern-card{padding:32px;border:1px solid var(--glass-border);border-radius:var(--radius);background:var(--glass);transition:all 0.3s;position:relative;overflow:hidden}
+.pattern-card:hover{border-color:rgba(255,255,255,0.1);transform:translateY(-2px)}
+.pattern-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.pattern-card:nth-child(1)::before{background:linear-gradient(90deg,var(--green),var(--blue))}
+.pattern-card:nth-child(2)::before{background:linear-gradient(90deg,var(--purple),var(--pink))}
+.pattern-card:nth-child(3)::before{background:linear-gradient(90deg,var(--amber),var(--pink))}
+.pattern-card:nth-child(4)::before{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+.pattern-card .pattern-tag{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--text3);margin-bottom:10px;display:block}
+.pattern-card h3{font-size:1.15rem;margin-bottom:10px}
+.pattern-card p{color:var(--text2);font-size:0.9rem;line-height:1.6}
+.pattern-card .pattern-example{margin-top:14px;padding:12px 16px;background:var(--bg3);border:1px solid var(--glass-border);border-radius:var(--radius-xs);font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);line-height:1.6}
+.bars-container{margin-top:40px;max-width:700px}
+.bar-item{margin-bottom:20px}
+.bar-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.bar-label span:first-child{font-size:0.9rem;font-weight:600}
+.bar-label span:last-child{font-family:'JetBrains Mono',monospace;font-size:0.85rem;color:var(--blue)}
+.bar-track{height:8px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden}
+.bar-fill{height:100%;border-radius:999px;transition:width 1.5s cubic-bezier(0.16,1,0.3,1);width:0}
+.bar-fill.animated{width:var(--w)}
+.bar-fill.green{background:linear-gradient(90deg,var(--green),var(--blue))}
+.bar-fill.blue{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+.bar-fill.purple{background:linear-gradient(90deg,var(--purple),var(--pink))}
+.bar-fill.amber{background:linear-gradient(90deg,var(--amber),var(--pink))}
+.learn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:40px}
+.learn-card{padding:24px;border:1px solid var(--glass-border);border-radius:var(--radius-sm);background:var(--glass);transition:all 0.3s}
+.learn-card:hover{border-color:rgba(255,255,255,0.1);transform:translateY(-2px)}
+.learn-card .from{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--text4);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
+.learn-card h4{font-size:1rem;margin-bottom:6px;color:var(--text)}
+.learn-card p{font-size:0.82rem;color:var(--text2);line-height:1.6}
+.proto-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:40px}
+.proto-card{padding:28px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass)}
+.proto-card h3{font-size:1.15rem;margin-bottom:6px}
+.proto-card .proto-subtitle{font-size:0.85rem;color:var(--text3);margin-bottom:16px;font-style:italic}
+.proto-card ul{list-style:none;display:flex;flex-direction:column;gap:8px;margin:16px 0}
+.proto-card li{font-size:0.85rem;color:var(--text2);display:flex;align-items:flex-start;gap:8px}
+.proto-card li::before{content:'▸';color:var(--green);font-weight:700;flex-shrink:0}
+.proto-card .proto-uses{margin-top:16px;padding-top:16px;border-top:1px solid var(--glass-border)}
+.proto-card .proto-uses h5{font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text4);margin-bottom:8px}
+.proto-card .proto-uses span{font-size:0.85rem;color:var(--text2)}
+@media(max-width:900px){.pattern-grid{grid-template-columns:1fr}.learn-grid{grid-template-columns:1fr}.proto-grid{grid-template-columns:1fr}.framework-table{font-size:0.75rem}}
+@media(max-width:768px){.framework-table th,.framework-table td{padding:8px 10px}}
+</style>
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <div class="container">
+    <a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="frameworks.html" class="active">Frameworks</a></li>
+      <li><a href="agents.html">Agents</a></li>
+      <li><a href="build-plan.html">Build Plan</a></li>
+      <li><a href="repos.html">Repos</a></li>
+      <li><a href="research.html">Research</a></li>
+      <li><a href="skills.html">Skills</a></li>
+      <li><a href="use-cases.html">Use Cases</a></li>
+      <li><a href="costs.html">Costs</a></li>
+      <li><a href="https://github.com/xosbot/nexus01-framework" class="nav-cta" target="_blank">GitHub</a></li>
+    </ul>
+    <button class="nav-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</button>
+  </div>
+</nav>
+
+<section class="page-hero frameworks-hero">
+  <div class="container">
+    <div class="breadcrumb"><a href="index.html">Home</a> / Frameworks</div>
+    <h1><span class="gradient-text">Agentic Frameworks Landscape 2026</span></h1>
+    <p class="subtitle">How the major frameworks compare — and what NEXUS-01 learns from each</p>
+  </div>
+</section>
+
+<section class="section-sm">
+  <div class="container">
+    <div class="grid-4 reveal" style="gap:20px">
+      <div class="glass" style="padding:24px;text-align:center">
+        <div class="stat-value" style="color:var(--green)">9+</div>
+        <div class="stat-label">Frameworks Compared</div>
+      </div>
+      <div class="glass" style="padding:24px;text-align:center">
+        <div class="stat-value" style="color:var(--blue)">4</div>
+        <div class="stat-label">Architecture Patterns</div>
+      </div>
+      <div class="glass" style="padding:24px;text-align:center">
+        <div class="stat-value" style="color:var(--purple)">6</div>
+        <div class="stat-label">Ideas Borrowed</div>
+      </div>
+      <div class="glass" style="padding:24px;text-align:center">
+        <div class="stat-value" style="color:var(--amber)">2</div>
+        <div class="stat-label">Protocols Covered</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Head-to-Head Comparison</h2>
+      <p>Every framework, every dimension — including NEXUS-01</p>
+    </div>
+
+    <div class="framework-table-wrap reveal">
+      <table class="framework-table">
+        <thead>
+          <tr>
+            <th>Framework</th>
+            <th>Stars</th>
+            <th>Architecture</th>
+            <th>Learning Curve</th>
+            <th>State Mgmt</th>
+            <th>Multi-Agent</th>
+            <th>MCP Support</th>
+            <th>Production Ready</th>
+            <th>Best For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CrewAI</td>
+            <td>41.8k</td>
+            <td>Role-based</td>
+            <td><span class="badge badge-low">Low</span></td>
+            <td>Basic</td>
+            <td><span class="badge badge-native">Native</span></td>
+            <td><span class="badge badge-medium">Via ext</span></td>
+            <td><span class="badge badge-medium">Medium</span></td>
+            <td>Business automation</td>
+          </tr>
+          <tr>
+            <td>LangGraph</td>
+            <td>31.2k</td>
+            <td>State machine</td>
+            <td><span class="badge badge-high">High</span></td>
+            <td>Excellent</td>
+            <td><span class="badge badge-medium">Via patterns</span></td>
+            <td><span class="badge badge-yes">Yes</span></td>
+            <td><span class="badge badge-high">High</span></td>
+            <td>Complex stateful workflows</td>
+          </tr>
+          <tr>
+            <td>AutoGen</td>
+            <td>52.9k</td>
+            <td>Conversation</td>
+            <td><span class="badge badge-high">High</span></td>
+            <td>Basic</td>
+            <td><span class="badge badge-native">Native</span></td>
+            <td><span class="badge badge-medium">Via ext</span></td>
+            <td><span class="badge badge-low">Low</span></td>
+            <td>Research, agent debate</td>
+          </tr>
+          <tr>
+            <td>OpenAI SDK</td>
+            <td>—</td>
+            <td>Handoffs</td>
+            <td><span class="badge badge-low">Low</span></td>
+            <td>Good</td>
+            <td><span class="badge badge-native">Handoffs</span></td>
+            <td><span class="badge badge-yes">Native</span></td>
+            <td><span class="badge badge-high">High</span></td>
+            <td>Rapid prototyping</td>
+          </tr>
+          <tr>
+            <td>Claude SDK</td>
+            <td>—</td>
+            <td>Tool loops</td>
+            <td><span class="badge badge-low">Low</span></td>
+            <td>Good</td>
+            <td><span class="badge badge-medium">Subagents</span></td>
+            <td><span class="badge badge-yes">Native</span></td>
+            <td><span class="badge badge-high">High</span></td>
+            <td>Code generation</td>
+          </tr>
+          <tr>
+            <td>SmolAgents</td>
+            <td>27.9k</td>
+            <td>Code-first</td>
+            <td><span class="badge badge-low">Low</span></td>
+            <td>Basic</td>
+            <td><span class="badge badge-medium">Hierarchical</span></td>
+            <td><span class="badge badge-planned">In progress</span></td>
+            <td><span class="badge badge-medium">Medium</span></td>
+            <td>Research, internal</td>
+          </tr>
+          <tr>
+            <td>DeerFlow</td>
+            <td>71.5k</td>
+            <td>Super agent</td>
+            <td><span class="badge badge-medium">Medium</span></td>
+            <td>Good</td>
+            <td><span class="badge badge-medium">Sub-agents</span></td>
+            <td><span class="badge badge-yes">Yes</span></td>
+            <td><span class="badge badge-medium">Medium</span></td>
+            <td>Deep research</td>
+          </tr>
+          <tr>
+            <td>AgentScope</td>
+            <td>27k</td>
+            <td>Permission-first</td>
+            <td><span class="badge badge-medium">Medium</span></td>
+            <td>Good</td>
+            <td><span class="badge badge-native">Native</span></td>
+            <td><span class="badge badge-native">Native+MCP</span></td>
+            <td><span class="badge badge-high">High</span></td>
+            <td>Enterprise</td>
+          </tr>
+          <tr class="highlight-row">
+            <td>NEXUS-01</td>
+            <td>—</td>
+            <td>Minimal</td>
+            <td><span class="badge badge-low">Low</span></td>
+            <td>SQLite</td>
+            <td><span class="badge badge-native">3 agents</span></td>
+            <td><span class="badge badge-planned">Planned</span></td>
+            <td><span class="badge badge-low">MVP</span></td>
+            <td>Learning, personal</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-blue mt-4 reveal">
+      <strong>Note</strong>
+      Stars are approximate as of June 2026. NEXUS-01 is intentionally minimalist — it trades production readiness for simplicity and learning value.
+    </div>
+  </div>
+</section>
+
+<section class="section" style="background:var(--bg2)">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Architecture Patterns Explained</h2>
+      <p>The four dominant approaches to building agentic systems</p>
+    </div>
+
+    <div class="pattern-grid">
+      <div class="pattern-card reveal reveal-delay-1">
+        <span class="pattern-tag">CrewAI · AutoGen</span>
+        <h3>Role-Based</h3>
+        <p>Agents have roles, goals, and backstories. A manager agent delegates tasks to worker agents based on their specialties. Simple to understand, natural to reason about, easy to extend with new roles.</p>
+        <div class="pattern-example">Crew(researcher, writer, reviewer)<br>→ manager.assign(task, agent)</div>
+      </div>
+      <div class="pattern-card reveal reveal-delay-2">
+        <span class="pattern-tag">LangGraph</span>
+        <h3>State Machine</h3>
+        <p>Nodes are computation steps. Edges define transitions based on conditions. Durable execution means state survives crashes. Best for complex, branching workflows that need persistence.</p>
+        <div class="pattern-example">graph.add_node("fetch", fetch_data)<br>graph.add_edge("fetch", "analyze")</div>
+      </div>
+      <div class="pattern-card reveal reveal-delay-3">
+        <span class="pattern-tag">AutoGen</span>
+        <h3>Conversation</h3>
+        <p>Everything is agent-to-agent dialogue. A GroupChatManager selects which speaker talks next. Agents debate, refine, and converge on answers through structured discussion.</p>
+        <div class="pattern-example">GroupChat(agents=[a1, a2, a3])<br>manager.select_next_speaker()</div>
+      </div>
+      <div class="pattern-card reveal reveal-delay-4">
+        <span class="pattern-tag">SmolAgents</span>
+        <h3>Code-First</h3>
+        <p>Agents write Python code, not JSON. The framework parses and executes agent-generated code directly. 30% fewer steps than tool-calling approaches for many tasks.</p>
+        <div class="pattern-example">@tool<br>def search(query):<br>    return web_search(query)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Performance on Complex Tasks</h2>
+      <p>Multi-step reasoning benchmarks — higher is better</p>
+    </div>
+
+    <div class="bars-container">
+      <div class="bar-item reveal">
+        <div class="bar-label"><span>LangGraph</span><span>62%</span></div>
+        <div class="bar-track"><div class="bar-fill green" style="--w:62%"></div></div>
+      </div>
+      <div class="bar-item reveal">
+        <div class="bar-label"><span>OpenAI SDK</span><span>58%</span></div>
+        <div class="bar-track"><div class="bar-fill blue" style="--w:58%"></div></div>
+      </div>
+      <div class="bar-item reveal">
+        <div class="bar-label"><span>NEXUS-01</span><span>58%</span></div>
+        <div class="bar-track"><div class="bar-fill purple" style="--w:58%"></div></div>
+      </div>
+      <div class="bar-item reveal">
+        <div class="bar-label"><span>CrewAI</span><span>54%</span></div>
+        <div class="bar-track"><div class="bar-fill amber" style="--w:54%"></div></div>
+      </div>
+      <div class="bar-item reveal">
+        <div class="bar-label"><span>AutoGen</span><span>48%</span></div>
+        <div class="bar-track"><div class="bar-fill purple" style="--w:48%"></div></div>
+      </div>
+    </div>
+
+    <p class="text-dim text-sm mt-3 reveal">Benchmarks from JetThoughts (2026) on multi-step reasoning tasks</p>
+
+    <div class="callout callout-green mt-4 reveal">
+      <strong>Takeaway</strong>
+      NEXUS-01 matches OpenAI SDK performance at zero cost — by combining local LLM inference with a minimal agent architecture that avoids framework overhead.
+    </div>
+  </div>
+</section>
+
+<section class="section" style="background:var(--bg2)">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>What NEXUS-01 Takes From Each</h2>
+      <p>Cherry-picking the best ideas from every framework</p>
+    </div>
+
+    <div class="learn-grid">
+      <div class="learn-card reveal reveal-delay-1">
+        <span class="from">From CrewAI</span>
+        <h4>Role-Based Agent Design</h4>
+        <p>OSINT / Executor / Analyst roles with clear responsibilities, goals, and handoff protocols between agents.</p>
+      </div>
+      <div class="learn-card reveal reveal-delay-2">
+        <span class="from">From LangGraph</span>
+        <h4>State Machine Orchestration</h4>
+        <p>Agent lifecycle management with explicit state transitions: idle → working → complete → error.</p>
+      </div>
+      <div class="learn-card reveal reveal-delay-3">
+        <span class="from">From SmolAgents</span>
+        <h4>Code-First Execution</h4>
+        <p>Agents write and execute Python directly for complex tasks, not just call pre-defined tool functions.</p>
+      </div>
+      <div class="learn-card reveal reveal-delay-1">
+        <span class="from">From AgentScope</span>
+        <h4>Permission System</h4>
+        <p>Cold Mode gates — no destructive action (file write, API call, shell command) without explicit user approval.</p>
+      </div>
+      <div class="learn-card reveal reveal-delay-2">
+        <span class="from">From DeerFlow</span>
+        <h4>Sub-Agent Spawning</h4>
+        <p>Parallel research via sub-agents for deep, multi-source intelligence gathering on complex topics.</p>
+      </div>
+      <div class="learn-card reveal reveal-delay-3">
+        <span class="from">From Claude SDK</span>
+        <h4>Extended Thinking</h4>
+        <p>Chain-of-thought reasoning for complex analysis tasks before taking any action in the world.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Communication Protocols: MCP vs A2A</h2>
+      <p>Two protocols, two directions — together they form the complete nervous system</p>
+    </div>
+
+    <div class="proto-grid">
+      <div class="proto-card reveal reveal-delay-1">
+        <h3 style="color:var(--blue)">MCP</h3>
+        <span class="proto-subtitle">Model Context Protocol</span>
+        <p style="font-size:0.9rem;color:var(--text);margin-bottom:12px;font-weight:600">Agent ↔ Tool communication</p>
+        <ul>
+          <li>97M+ downloads, Linux Foundation governance</li>
+          <li>Primitives: Tools, Resources, Prompts</li>
+          <li>JSON-RPC 2.0 over HTTP/StdIO</li>
+          <li>Standardized tool discovery and invocation</li>
+          <li>Secure, sandboxed execution environment</li>
+        </ul>
+        <div class="proto-uses">
+          <h5>Used By</h5>
+          <span>Claude Desktop, Cursor, ChatGPT, Windsurf, Zed, VS Code</span>
+        </div>
+      </div>
+
+      <div class="proto-card reveal reveal-delay-2">
+        <h3 style="color:var(--green)">A2A</h3>
+        <span class="proto-subtitle">Agent-to-Agent Protocol</span>
+        <p style="font-size:0.9rem;color:var(--text);margin-bottom:12px;font-weight:600">Agent ↔ Agent communication</p>
+        <ul>
+          <li>150+ organizations in production</li>
+          <li>Agent Cards for discovery and capability negotiation</li>
+          <li>HTTPS + SSE for streaming responses</li>
+          <li>Cross-platform agent interoperability</li>
+          <li>Task lifecycle management with status tracking</li>
+        </ul>
+        <div class="proto-uses">
+          <h5>Used By</h5>
+          <span>Salesforce, Accenture, MongoDB, SAP, Atlassian, Google</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout callout-purple mt-4 reveal" style="text-align:center">
+      <strong>The Big Picture</strong>
+      MCP is vertical (agent → tool). A2A is horizontal (agent → agent). Together they form the complete nervous system of an agentic architecture.
+    </div>
+
+    <div class="grid-3 mt-4 reveal" style="gap:16px">
+      <div class="glass" style="padding:24px;text-align:center">
+        <div style="font-size:2rem;margin-bottom:8px">↕</div>
+        <h4 style="font-size:0.95rem;margin-bottom:4px">MCP = Vertical</h4>
+        <p class="text-sm text-dim">Agent talks to its tools</p>
+      </div>
+      <div class="glass" style="padding:24px;text-align:center">
+        <div style="font-size:2rem;margin-bottom:8px">↔</div>
+        <h4 style="font-size:0.95rem;margin-bottom:4px">A2A = Horizontal</h4>
+        <p class="text-sm text-dim">Agent talks to other agents</p>
+      </div>
+      <div class="glass" style="padding:24px;text-align:center">
+        <div style="font-size:2rem;margin-bottom:8px">⊞</div>
+        <h4 style="font-size:0.95rem;margin-bottom:4px">NEXUS-01</h4>
+        <p class="text-sm text-dim">Uses asyncio.Queue + planned MCP/A2A</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="background:var(--bg2)">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Framework Maturity Matrix</h2>
+      <p>How mature is each framework across key dimensions</p>
+    </div>
+
+    <div style="overflow-x:auto" class="reveal">
+      <table class="framework-table">
+        <thead>
+          <tr>
+            <th>Framework</th>
+            <th>Docs Quality</th>
+            <th>Community</th>
+            <th>Ecosystem</th>
+            <th>Error Handling</th>
+            <th>Observability</th>
+            <th>Testing</th>
+            <th>Maintenance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CrewAI</td>
+            <td><span class="badge badge-high">Good</span></td>
+            <td><span class="badge badge-high">Active</span></td>
+            <td><span class="badge badge-medium">Growing</span></td>
+            <td><span class="badge badge-medium">Basic</span></td>
+            <td><span class="badge badge-low">Minimal</span></td>
+            <td><span class="badge badge-medium">Partial</span></td>
+            <td><span class="badge badge-high">Active</span></td>
+          </tr>
+          <tr>
+            <td>LangGraph</td>
+            <td><span class="badge badge-high">Excellent</span></td>
+            <td><span class="badge badge-high">Large</span></td>
+            <td><span class="badge badge-high">Rich</span></td>
+            <td><span class="badge badge-high">Strong</span></td>
+            <td><span class="badge badge-high">LangSmith</span></td>
+            <td><span class="badge badge-high">Built-in</span></td>
+            <td><span class="badge badge-high">Active</span></td>
+          </tr>
+          <tr>
+            <td>AutoGen</td>
+            <td><span class="badge badge-medium">Decent</span></td>
+            <td><span class="badge badge-high">Large</span></td>
+            <td><span class="badge badge-medium">Growing</span></td>
+            <td><span class="badge badge-medium">Basic</span></td>
+            <td><span class="badge badge-low">Minimal</span></td>
+            <td><span class="badge badge-low">Manual</span></td>
+            <td><span class="badge badge-high">Active</span></td>
+          </tr>
+          <tr>
+            <td>OpenAI SDK</td>
+            <td><span class="badge badge-high">Excellent</span></td>
+            <td><span class="badge badge-high">Official</span></td>
+            <td><span class="badge badge-high">Native</span></td>
+            <td><span class="badge badge-high">Strong</span></td>
+            <td><span class="badge badge-high">Dashboard</span></td>
+            <td><span class="badge badge-high">Built-in</span></td>
+            <td><span class="badge badge-high">Active</span></td>
+          </tr>
+          <tr>
+            <td>Claude SDK</td>
+            <td><span class="badge badge-high">Excellent</span></td>
+            <td><span class="badge badge-high">Official</span></td>
+            <td><span class="badge badge-high">Native</span></td>
+            <td><span class="badge badge-high">Strong</span></td>
+            <td><span class="badge badge-medium">Basic</span></td>
+            <td><span class="badge badge-high">Built-in</span></td>
+            <td><span class="badge badge-high">Active</span></td>
+          </tr>
+          <tr>
+            <td>SmolAgents</td>
+            <td><span class="badge badge-medium">Decent</span></td>
+            <td><span class="badge badge-medium">Growing</span></td>
+            <td><span class="badge badge-low">Early</span></td>
+            <td><span class="badge badge-medium">Basic</span></td>
+            <td><span class="badge badge-low">Minimal</span></td>
+            <td><span class="badge badge-medium">Partial</span></td>
+            <td><span class="badge badge-high">Active</span></td>
+          </tr>
+          <tr>
+            <td>DeerFlow</td>
+            <td><span class="badge badge-medium">Decent</span></td>
+            <td><span class="badge badge-high">Large</span></td>
+            <td><span class="badge badge-medium">Growing</span></td>
+            <td><span class="badge badge-medium">Basic</span></td>
+            <td><span class="badge badge-low">Minimal</span></td>
+            <td><span class="badge badge-low">Manual</span></td>
+            <td><span class="badge badge-high">Active</span></td>
+          </tr>
+          <tr>
+            <td>AgentScope</td>
+            <td><span class="badge badge-high">Good</span></td>
+            <td><span class="badge badge-medium">Growing</span></td>
+            <td><span class="badge badge-medium">Growing</span></td>
+            <td><span class="badge badge-high">Strong</span></td>
+            <td><span class="badge badge-medium">Basic</span></td>
+            <td><span class="badge badge-high">Built-in</span></td>
+            <td><span class="badge badge-high">Active</span></td>
+          </tr>
+          <tr class="highlight-row">
+            <td>NEXUS-01</td>
+            <td><span class="badge badge-low">Minimal</span></td>
+            <td><span class="badge badge-low">Solo</span></td>
+            <td><span class="badge badge-low">Self</span></td>
+            <td><span class="badge badge-medium">Basic</span></td>
+            <td><span class="badge badge-medium">structlog</span></td>
+            <td><span class="badge badge-low">Manual</span></td>
+            <td><span class="badge badge-low">Active</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-amber mt-4 reveal">
+      <strong>Reality Check</strong>
+      Maturity matters for production. NEXUS-01 trades maturity for transparency — you can see exactly how every component works, modify anything, and learn from the implementation.
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>When to Use What</h2>
+      <p>A decision guide for choosing the right framework for your project</p>
+    </div>
+
+    <div class="grid-3 reveal" style="gap:20px">
+      <div class="glass" style="padding:24px;border-left:3px solid var(--green)">
+        <h4 style="margin-bottom:10px;color:var(--green)">Choose CrewAI if...</h4>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:6px">
+          <li style="font-size:0.85rem;color:var(--text2)">→ You need business automation fast</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ Your team knows Python but not AI</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You want role-based agent design</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You need production-ready features</li>
+        </ul>
+      </div>
+      <div class="glass" style="padding:24px;border-left:3px solid var(--purple)">
+        <h4 style="margin-bottom:10px;color:var(--purple)">Choose LangGraph if...</h4>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:6px">
+          <li style="font-size:0.85rem;color:var(--text2)">→ You need complex state management</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ Your workflow has branching paths</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You need durable execution</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You want LangSmith observability</li>
+        </ul>
+      </div>
+      <div class="glass" style="padding:24px;border-left:3px solid var(--blue)">
+        <h4 style="margin-bottom:10px;color:var(--blue)">Choose NEXUS-01 if...</h4>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:6px">
+          <li style="font-size:0.85rem;color:var(--text2)">→ You want to learn how agents work</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You need zero-cost local development</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You want full control over every layer</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You're building personal tools</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="grid-3 mt-3 reveal" style="gap:20px">
+      <div class="glass" style="padding:24px;border-left:3px solid var(--amber)">
+        <h4 style="margin-bottom:10px;color:var(--amber)">Choose OpenAI SDK if...</h4>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:6px">
+          <li style="font-size:0.85rem;color:var(--text2)">→ You want the simplest possible API</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You're prototyping, not production</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You need agent handoffs</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You're already in the OpenAI ecosystem</li>
+        </ul>
+      </div>
+      <div class="glass" style="padding:24px;border-left:3px solid var(--pink)">
+        <h4 style="margin-bottom:10px;color:var(--pink)">Choose AutoGen if...</h4>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:6px">
+          <li style="font-size:0.85rem;color:var(--text2)">→ You want agent debate/consensus</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ Your task benefits from discussion</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You're doing research/experimentation</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You need multi-agent conversation</li>
+        </ul>
+      </div>
+      <div class="glass" style="padding:24px;border-left:3px solid var(--cyan)">
+        <h4 style="margin-bottom:10px;color:var(--cyan)">Choose Claude SDK if...</h4>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:6px">
+          <li style="font-size:0.85rem;color:var(--text2)">→ You need code generation</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You want tool-use loops</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You're building coding assistants</li>
+          <li style="font-size:0.85rem;color:var(--text2)">→ You need sub-agent spawning</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a>
+        <p>A minimal, modular agentic AI framework. Build autonomous agents that gather intelligence, analyze patterns, and execute tasks.</p>
+      </div>
+      <div class="footer-col"><h4>Pages</h4><a href="architecture.html">Architecture</a><a href="frameworks.html">Frameworks</a><a href="agents.html">Agents</a><a href="build-plan.html">Build Plan</a></div>
+      <div class="footer-col"><h4>Research</h4><a href="repos.html">Repositories</a><a href="research.html">Starred Repos</a><a href="skills.html">Skills System</a><a href="use-cases.html">Use Cases</a></div>
+      <div class="footer-col"><h4>Connect</h4><a href="https://github.com/xosbot/nexus01-framework" target="_blank">GitHub</a><a href="https://github.com/navigatorxm" target="_blank">NavigatorXM</a><a href="https://github.com/xosbot" target="_blank">XOSBot</a></div>
+    </div>
+    <div class="footer-bottom"><span>Built with precision. Powered by agents.</span><span>© 2026 NEXUS-01</span></div>
+  </div>
+</footer>
+
+<script>
+const reveals = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+reveals.forEach(r => observer.observe(r));
+
+window.addEventListener('scroll', () => {
+  document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 50);
+});
+
+const barObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('.bar-fill').forEach(bar => bar.classList.add('animated'));
+      barObserver.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.3 });
+const barsContainer = document.querySelector('.bars-container');
+if (barsContainer) barObserver.observe(barsContainer);
+</script>
+</body>
+</html>

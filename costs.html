@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tech Stack &amp; Costs — NEXUS-01</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.tech-choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;margin-top:48px}
+.tech-choice-card{padding:24px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);background:var(--glass);transition:all 0.3s}
+.tech-choice-card:hover{border-color:rgba(0,212,255,0.2);transform:translateY(-3px)}
+.tech-choice-card .tc-name{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:0.95rem;margin-bottom:4px}
+.tech-choice-card .tc-category{font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px}
+.tech-choice-card .tc-desc{font-size:0.8rem;color:var(--text2);line-height:1.6}
+.tech-choice-card .tc-reason{font-size:0.75rem;color:var(--green);margin-top:10px;padding-top:10px;border-top:1px solid var(--glass-border);font-style:italic}
+
+.cost-panels{display:grid;grid-template-columns:repeat(2,1fr);gap:32px;margin-top:48px;max-width:900px;margin-left:auto;margin-right:auto}
+.cost-panel{padding:36px;border-radius:var(--radius);text-align:center;border:1px solid var(--glass-border);background:var(--glass);transition:all 0.4s}
+.cost-panel:hover{transform:translateY(-4px)}
+.cost-panel.featured{border-color:rgba(0,212,255,0.3);background:rgba(0,212,255,0.02)}
+.cost-panel .cp-label{font-size:0.8rem;text-transform:uppercase;letter-spacing:2px;color:var(--text3);margin-bottom:8px}
+.cost-panel .cp-amount{font-size:3rem;font-weight:800;margin-bottom:4px}
+.cost-panel.featured .cp-amount{color:var(--blue)}
+.cost-panel .cp-period{font-size:0.85rem;color:var(--text3);margin-bottom:20px}
+.cost-breakdown{text-align:left;display:flex;flex-direction:column;gap:6px}
+.cost-item{display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2);padding:8px 0;border-bottom:1px solid var(--glass-border)}
+.cost-item:last-child{border-bottom:none}
+.cost-item span:last-child{font-family:'JetBrains Mono',monospace;color:var(--text)}
+
+.scaling-path{margin-top:48px;padding:40px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass)}
+.scaling-path h3{font-size:1.2rem;margin-bottom:24px;text-align:center}
+.scaling-steps{display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap}
+.scaling-step{flex:1;min-width:160px;padding:20px;text-align:center;border:1px solid var(--glass-border);border-radius:var(--radius-sm);position:relative;background:var(--bg3);transition:all 0.3s}
+.scaling-step:hover{border-color:rgba(0,212,255,0.3)}
+.scaling-step .ss-cost{font-family:'JetBrains Mono',monospace;font-size:1.3rem;font-weight:800;margin-bottom:6px}
+.scaling-step .ss-label{font-size:0.8rem;color:var(--text2);margin-bottom:4px}
+.scaling-step .ss-detail{font-size:0.7rem;color:var(--text3)}
+.scaling-step::after{content:'&#8594;';position:absolute;right:-14px;top:50%;transform:translateY(-50%);color:var(--text4);font-size:1.2rem;z-index:1}
+.scaling-step:last-child::after{display:none}
+
+.compare-section{margin-top:60px}
+.compare-section h3{font-size:1.3rem;margin-bottom:24px}
+.compare-wrap{overflow-x:auto}
+.compare-wrap .data-table{min-width:700px}
+.score-high{color:var(--green);font-weight:700}
+.score-mid{color:var(--amber);font-weight:700}
+.score-low{color:var(--red);font-weight:700}
+
+.vector-compare{margin-top:48px}
+.vector-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:24px}
+.vector-card{padding:24px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);background:var(--glass);text-align:center;transition:all 0.3s}
+.vector-card:hover{border-color:rgba(0,212,255,0.2);transform:translateY(-3px)}
+.vector-card.recommended{border-color:rgba(0,212,255,0.3);background:rgba(0,212,255,0.02)}
+.vector-card .vc-name{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:1rem;margin-bottom:8px}
+.vector-card .vc-price{font-size:1.5rem;font-weight:800;margin-bottom:4px}
+.vector-card.recommended .vc-price{color:var(--blue)}
+.vector-card .vc-period{font-size:0.75rem;color:var(--text3);margin-bottom:16px}
+.vector-card .vc-features{text-align:left;display:flex;flex-direction:column;gap:6px}
+.vector-card .vc-features li{font-size:0.8rem;color:var(--text2);display:flex;align-items:center;gap:6px;list-style:none}
+.vector-card .vc-features li::before{content:'&#10003;';color:var(--green);font-weight:700;font-size:0.7rem}
+.vector-card .vc-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.vector-card.recommended .vc-badge{background:rgba(0,212,255,0.1);color:var(--blue);border:1px solid rgba(0,212,255,0.2)}
+
+.llm-compare{margin-top:48px}
+.llm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:24px}
+.llm-card{padding:24px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);background:var(--glass);transition:all 0.3s}
+.llm-card:hover{border-color:rgba(0,212,255,0.2);transform:translateY(-3px)}
+.llm-card.recommended{border-color:rgba(16,185,129,0.3);background:rgba(16,185,129,0.02)}
+.llm-card .lc-name{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:0.95rem;margin-bottom:6px}
+.llm-card .lc-price{font-size:0.8rem;color:var(--text3);margin-bottom:12px}
+.llm-card .lc-price strong{color:var(--text);font-size:0.9rem}
+.llm-card .lc-features{text-align:left;display:flex;flex-direction:column;gap:6px}
+.llm-card .lc-features li{font-size:0.78rem;color:var(--text2);display:flex;align-items:center;gap:6px;list-style:none}
+.llm-card .lc-features li::before{content:'&#10003;';color:var(--green);font-weight:700;font-size:0.7rem}
+.llm-card .lc-features li.no::before{content:'&#10007;';color:var(--red)}
+.llm-card.recommended .lc-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)}
+@media(max-width:1024px){.cost-panels{grid-template-columns:1fr}.vector-grid,.llm-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.vector-grid,.llm-grid{grid-template-columns:1fr}.scaling-steps{flex-direction:column;gap:16px}.scaling-step::after{content:'&#8595';right:auto;bottom:-20px;top:auto;transform:none}}
+</style>
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <div class="container">
+    <a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="frameworks.html">Frameworks</a></li>
+      <li><a href="agents.html">Agents</a></li>
+      <li><a href="build-plan.html">Build Plan</a></li>
+      <li><a href="repos.html">Repos</a></li>
+      <li><a href="research.html">Research</a></li>
+      <li><a href="skills.html">Skills</a></li>
+      <li><a href="use-cases.html">Use Cases</a></li>
+      <li><a href="costs.html" class="active">Costs</a></li>
+      <li><a href="https://github.com/xosbot/nexus01-framework" class="nav-cta" target="_blank">GitHub</a></li>
+    </ul>
+    <button class="nav-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">&#9776;</button>
+  </div>
+</nav>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="breadcrumb reveal"><a href="index.html">Home</a> / Tech Stack &amp; Costs</div>
+    <h1 class="reveal">Tech Stack &amp; <span class="gradient-text">Cost Analysis</span></h1>
+    <p class="subtitle reveal">Every choice justified. Every dollar accounted for.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Technology <span class="gradient-text">Choices</span></h2>
+      <p>Every tool in the stack was chosen for a specific reason. No bloat, no hype.</p>
+    </div>
+    <div class="tech-choice-grid">
+      <div class="tech-choice-card glass reveal reveal-delay-1">
+        <div class="tc-category">Language</div>
+        <div class="tc-name">Python 3.11+</div>
+        <div class="tc-desc">Async-first, type-hinted, massive ecosystem. The lingua franca of AI.</div>
+        <div class="tc-reason">Why: Ollama SDK, ChromaDB, and all ML tools are Python-native.</div>
+      </div>
+      <div class="tech-choice-card glass reveal reveal-delay-2">
+        <div class="tc-category">LLM Runtime</div>
+        <div class="tc-name">Ollama</div>
+        <div class="tc-desc">Local LLM inference. Zero API costs. Full model control. One command setup.</div>
+        <div class="tc-reason">Why: Eliminates API dependency. Your data never leaves your machine.</div>
+      </div>
+      <div class="tech-choice-card glass reveal reveal-delay-3">
+        <div class="tc-category">Database</div>
+        <div class="tc-name">SQLite</div>
+        <div class="tc-desc">Embedded, zero-config, ACID-compliant. The most deployed database in the world.</div>
+        <div class="tc-reason">Why: Single file, no server process, handles 99% of use cases.</div>
+      </div>
+      <div class="tech-choice-card glass reveal reveal-delay-4">
+        <div class="tc-category">Vector Store</div>
+        <div class="tc-name">ChromaDB</div>
+        <div class="tc-desc">Python-native vector database. Embedded mode for local, client-server for scaling.</div>
+        <div class="tc-reason">Why: Simplest API. No separate server. Perfect for local-first.</div>
+      </div>
+      <div class="tech-choice-card glass reveal reveal-delay-1">
+        <div class="tc-category">HTTP Client</div>
+        <div class="tc-name">httpx</div>
+        <div class="tc-desc">Async HTTP client with connection pooling. Drop-in replacement for requests.</div>
+        <div class="tc-reason">Why: Native async support for concurrent web scraping.</div>
+      </div>
+      <div class="tech-choice-card glass reveal reveal-delay-2">
+        <div class="tc-category">Scraping</div>
+        <div class="tc-name">BeautifulSoup4</div>
+        <div class="tc-desc">Battle-tested HTML parser. Forgiving, fast, and handles messy real-world HTML.</div>
+        <div class="tc-reason">Why: Pairs with httpx for lightweight scraping without browser overhead.</div>
+      </div>
+      <div class="tech-choice-card glass reveal reveal-delay-3">
+        <div class="tc-category">Embeddings</div>
+        <div class="tc-name">sentence-transformers</div>
+        <div class="tc-desc">Local embedding generation. all-MiniLM-L6-v2 for speed, bge for quality.</div>
+        <div class="tc-reason">Why: Zero API cost embeddings. 384-768 dimensions. Runs on CPU.</div>
+      </div>
+      <div class="tech-choice-card glass reveal reveal-delay-4">
+        <div class="tc-category">Interface</div>
+        <div class="tc-name">Telegram Bot</div>
+        <div class="tc-desc">Conversational interface. Rich messages, inline keyboards, file sharing.</div>
+        <div class="tc-reason">Why: Free, reliable, works on every device. Best bot platform.</div>
+      </div>
+      <div class="tech-choice-card glass reveal reveal-delay-1">
+        <div class="tc-category">Containerization</div>
+        <div class="tc-name">Docker</div>
+        <div class="tc-desc">Isolated environments. Reproducible builds. Easy deployment.</div>
+        <div class="tc-reason">Why: One-command deployment. Consistent across dev and prod.</div>
+      </div>
+      <div class="tech-choice-card glass reveal reveal-delay-2">
+        <div class="tc-category">Browser Automation</div>
+        <div class="tc-name">Playwright</div>
+        <div class="tc-desc">Cross-browser automation. Headless Chrome, Firefox, WebKit.</div>
+        <div class="tc-reason">Why: Modern, fast, MCP-compatible. Better than Selenium.</div>
+      </div>
+      <div class="tech-choice-card glass reveal reveal-delay-3">
+        <div class="tc-category">CLI Framework</div>
+        <div class="tc-name">Rich</div>
+        <div class="tc-desc">Beautiful terminal output. Tables, progress bars, syntax highlighting.</div>
+        <div class="tc-reason">Why: Makes CLI output professional without extra effort.</div>
+      </div>
+      <div class="tech-choice-card glass reveal reveal-delay-4">
+        <div class="tc-category">Task Scheduling</div>
+        <div class="tc-name">APScheduler</div>
+        <div class="tc-desc">Cron-like scheduling in Python. Interval, cron, and date triggers.</div>
+        <div class="tc-reason">Why: Built-in persistence. Survives restarts. No external daemon.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Cost <span class="gradient-text">Comparison</span></h2>
+      <p>Start free. Scale only when you need to.</p>
+    </div>
+    <div class="cost-panels">
+      <div class="cost-panel glass reveal reveal-delay-1">
+        <div class="cp-label">MVP Phase</div>
+        <div class="cp-amount">$0</div>
+        <div class="cp-period">/month</div>
+        <div class="cost-breakdown">
+          <div class="cost-item"><span>LLMs (Ollama)</span><span>$0</span></div>
+          <div class="cost-item"><span>Database (SQLite)</span><span>$0</span></div>
+          <div class="cost-item"><span>Vectors (ChromaDB)</span><span>$0</span></div>
+          <div class="cost-item"><span>Interface (Telegram)</span><span>$0</span></div>
+          <div class="cost-item"><span>Scraping (httpx + BS4)</span><span>$0</span></div>
+          <div class="cost-item"><span>Embeddings (local)</span><span>$0</span></div>
+        </div>
+      </div>
+      <div class="cost-panel glass featured reveal reveal-delay-2">
+        <div class="cp-label">Production</div>
+        <div class="cp-amount">~$42</div>
+        <div class="cp-period">/month</div>
+        <div class="cost-breakdown">
+          <div class="cost-item"><span>VPS (Hetzner CX22)</span><span>$5</span></div>
+          <div class="cost-item"><span>Cloud APIs (selective)</span><span>$37</span></div>
+          <div class="cost-item"><span>LLMs (still Ollama)</span><span>$0</span></div>
+          <div class="cost-item"><span>Database (SQLite)</span><span>$0</span></div>
+          <div class="cost-item"><span>Vectors (ChromaDB)</span><span>$0</span></div>
+          <div class="cost-item"><span>Interface (Telegram)</span><span>$0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scaling-path glass reveal">
+      <h3>Scaling Path</h3>
+      <div class="scaling-steps">
+        <div class="scaling-step">
+          <div class="ss-cost" style="color:var(--green)">$0</div>
+          <div class="ss-label">Local Dev</div>
+          <div class="ss-detail">Ollama + SQLite + ChromaDB</div>
+        </div>
+        <div class="scaling-step">
+          <div class="ss-cost" style="color:var(--blue)">$5</div>
+          <div class="ss-label">VPS Deploy</div>
+          <div class="ss-detail">Hetzner CX22 + Docker</div>
+        </div>
+        <div class="scaling-step">
+          <div class="ss-cost" style="color:var(--amber)">$42</div>
+          <div class="ss-label">Production</div>
+          <div class="ss-detail">VPS + Cloud APIs</div>
+        </div>
+        <div class="scaling-step">
+          <div class="ss-cost" style="color:var(--purple)">$100+</div>
+          <div class="ss-label">Enterprise</div>
+          <div class="ss-detail">GPU instance + Multi-agent</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Framework <span class="gradient-text">Comparison</span></h2>
+      <p>How NEXUS-01 stacks up against the competition.</p>
+    </div>
+    <div class="compare-wrap glass reveal" style="padding:24px;border-radius:var(--radius)">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>NEXUS-01</th>
+            <th>AutoGPT</th>
+            <th>AgentGPT</th>
+            <th>LangChain</th>
+            <th>CrewAI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Local-First</td><td class="score-high">&#10003; Full</td><td>&#10007; No</td><td>&#10007; No</td><td>&#10007; No</td><td>&#10007; No</td></tr>
+          <tr><td>Monthly Cost</td><td class="score-high">$0&ndash;$42</td><td class="score-low">$50&ndash;$200</td><td class="score-mid">$20&ndash;$100</td><td class="score-low">$50&ndash;$300</td><td class="score-mid">$30&ndash;$150</td></tr>
+          <tr><td>Multi-Agent</td><td class="score-high">&#10003; Native</td><td>&#10007; Single</td><td>&#10007; Single</td><td class="score-mid">&#9733; Via chains</td><td class="score-high">&#10003; Native</td></tr>
+          <tr><td>Privacy</td><td class="score-high">&#10003; 100%</td><td class="score-low">Cloud</td><td class="score-low">Cloud</td><td class="score-low">Cloud</td><td class="score-mid">Hybrid</td></tr>
+          <tr><td>Skill System</td><td class="score-high">&#10003; SKILL.md</td><td>&#10007; None</td><td>&#10007; None</td><td class="score-mid">&#9733; Tools</td><td class="score-mid">&#9733; Tools</td></tr>
+          <tr><td>Browser Control</td><td class="score-high">&#10003; Playwright</td><td>&#10007; Limited</td><td>&#10007; Limited</td><td class="score-mid">&#9733; Via tools</td><td>&#10007; No</td></tr>
+          <tr><td>Cold Mode</td><td class="score-high">&#10003; 5-step</td><td>&#10007; No</td><td>&#10007; No</td><td>&#10007; No</td><td>&#10007; No</td></tr>
+          <tr><td>Telegram Bot</td><td class="score-high">&#10003; Native</td><td>&#10007; No</td><td>&#10007; No</td><td>&#10007; No</td><td>&#10007; No</td></tr>
+          <tr><td>Setup Time</td><td class="score-high">5 min</td><td class="score-mid">30 min</td><td class="score-high">10 min</td><td class="score-mid">20 min</td><td class="score-mid">15 min</td></tr>
+          <tr><td>Open Source</td><td class="score-high">&#10003; MIT</td><td class="score-high">&#10003; MIT</td><td class="score-high">&#10003; MIT</td><td class="score-high">&#10003; MIT</td><td class="score-high">&#10003; MIT</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Vector DB <span class="gradient-text">Comparison</span></h2>
+      <p>Why ChromaDB wins for local-first. Full comparison of alternatives.</p>
+    </div>
+    <div class="vector-grid">
+      <div class="vector-card recommended glass reveal reveal-delay-1">
+        <div class="vc-badge">Recommended</div>
+        <div class="vc-name">ChromaDB</div>
+        <div class="vc-price">$0</div>
+        <div class="vc-period">Embedded mode</div>
+        <ul class="vc-features">
+          <li>Zero-config setup</li>
+          <li>Python-native API</li>
+          <li>Embedded or client-server</li>
+          <li>Metadata filtering</li>
+          <li>Perfect for local-first</li>
+        </ul>
+      </div>
+      <div class="vector-card glass reveal reveal-delay-2">
+        <div class="vc-name">Qdrant</div>
+        <div class="vc-price">$0</div>
+        <div class="vc-period">Self-hosted</div>
+        <ul class="vc-features">
+          <li>Rust-powered speed</li>
+          <li>Advanced filtering</li>
+          <li>gRPC interface</li>
+          <li>Requires Docker server</li>
+          <li>Better at scale</li>
+        </ul>
+      </div>
+      <div class="vector-card glass reveal reveal-delay-3">
+        <div class="vc-name">Pinecone</div>
+        <div class="vc-price">$70+</div>
+        <div class="vc-period">/month</div>
+        <ul class="vc-features">
+          <li>Managed service</li>
+          <li>No infra to manage</li>
+          <li>High availability</li>
+          <li>Vendor lock-in</li>
+          <li>Data leaves your machine</li>
+        </ul>
+      </div>
+      <div class="vector-card glass reveal reveal-delay-4">
+        <div class="vc-name">pgvector</div>
+        <div class="vc-price">$0</div>
+        <div class="vc-period">PostgreSQL ext</div>
+        <ul class="vc-features">
+          <li>SQL-native vectors</li>
+          <li>ACID transactions</li>
+          <li>Mature ecosystem</li>
+          <li>Requires PostgreSQL</li>
+          <li>Heavier than needed</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>LLM <span class="gradient-text">Comparison</span></h2>
+      <p>Ollama + local models vs cloud APIs. Quality, cost, and privacy trade-offs.</p>
+    </div>
+    <div class="llm-grid">
+      <div class="llm-card glass reveal reveal-delay-1">
+        <div class="lc-name">GPT-4o</div>
+        <div class="lc-price"><strong>$2.50</strong> / 1M input tokens</div>
+        <ul class="lc-features">
+          <li>Best reasoning quality</li>
+          <li>128K context window</li>
+          <li>Tool use support</li>
+          <li class="no">Data sent to OpenAI</li>
+          <li class="no">Monthly cost scales</li>
+        </ul>
+      </div>
+      <div class="llm-card glass reveal reveal-delay-2">
+        <div class="lc-name">Claude 3.5 Sonnet</div>
+        <div class="lc-price"><strong>$3</strong> / 1M input tokens</div>
+        <ul class="lc-features">
+          <li>Excellent code generation</li>
+          <li>200K context window</li>
+          <li>Safety-focused</li>
+          <li class="no">Data sent to Anthropic</li>
+          <li class="no">Higher per-token cost</li>
+        </ul>
+      </div>
+      <div class="llm-card glass reveal reveal-delay-3">
+        <div class="lc-name">Gemini 1.5 Pro</div>
+        <div class="lc-price"><strong>$1.25</strong> / 1M input tokens</div>
+        <ul class="lc-features">
+          <li>1M context window</li>
+          <li>Multimodal native</li>
+          <li>Fast inference</li>
+          <li class="no">Data sent to Google</li>
+          <li class="no">Less coding capability</li>
+        </ul>
+      </div>
+      <div class="llm-card glass recommended reveal reveal-delay-4">
+        <div class="lc-badge">Recommended</div>
+        <div class="lc-name">Llama 3 (Ollama)</div>
+        <div class="lc-price"><strong>$0</strong> / forever</div>
+        <ul class="lc-features">
+          <li>100% local &amp; private</li>
+          <li>Zero API costs</li>
+          <li>8B&ndash;70B params</li>
+          <li>No internet required</li>
+          <li>Full control over model</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand"><a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a><p>A minimal, modular agentic AI framework.</p></div>
+      <div class="footer-col"><h4>Pages</h4><a href="architecture.html">Architecture</a><a href="frameworks.html">Frameworks</a><a href="agents.html">Agents</a><a href="build-plan.html">Build Plan</a></div>
+      <div class="footer-col"><h4>Research</h4><a href="repos.html">Repositories</a><a href="research.html">Starred Repos</a><a href="skills.html">Skills System</a><a href="use-cases.html">Use Cases</a></div>
+      <div class="footer-col"><h4>Connect</h4><a href="https://github.com/xosbot/nexus01-framework" target="_blank">GitHub</a></div>
+    </div>
+    <div class="footer-bottom"><span>Built with precision. Powered by agents.</span><span>&copy; 2026 NEXUS-01</span></div>
+  </div>
+</footer>
+
+<script>
+window.addEventListener('scroll',()=>{document.getElementById('nav').classList.toggle('scrolled',window.scrollY>50)});
+const reveals=document.querySelectorAll('.reveal');
+const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target)}});},{threshold:0.1,rootMargin:'0px 0px -50px 0px'});
+reveals.forEach(r=>observer.observe(r));
+</script>
+</body>
+</html>
+
+<style>
+.roi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:48px}
+.roi-card{padding:28px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass);text-align:center;transition:all 0.3s}
+.roi-card:hover{border-color:rgba(0,212,255,0.2);transform:translateY(-3px)}
+.roi-card .roi-icon{font-size:2rem;margin-bottom:12px}
+.roi-card h3{font-size:1rem;margin-bottom:8px}
+.roi-card p{font-size:0.85rem;color:var(--text2);line-height:1.6;margin-bottom:16px}
+.roi-card .roi-value{font-family:'JetBrains Mono',monospace;font-size:1.8rem;font-weight:800}
+.roi-card:nth-child(1) .roi-value{color:var(--blue)}
+.roi-card:nth-child(2) .roi-value{color:var(--green)}
+.roi-card:nth-child(3) .roi-value{color:var(--purple)}
+.hidden-costs{margin-top:48px;padding:36px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass)}
+.hidden-costs h3{font-size:1.2rem;margin-bottom:20px}
+.hidden-costs-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.hidden-cost-item{display:flex;align-items:start;gap:12px;padding:16px;border-radius:var(--radius-xs);border:1px solid var(--glass-border);background:rgba(255,255,255,0.02)}
+.hidden-cost-item .hci-icon{font-size:1.2rem;flex-shrink:0;margin-top:2px}
+.hidden-cost-item h4{font-size:0.9rem;margin-bottom:4px}
+.hidden-cost-item p{font-size:0.8rem;color:var(--text2);line-height:1.5}
+.decision-tree{margin-top:48px;padding:36px;border-radius:var(--radius);border:1px solid var(--glass-border);background:var(--glass)}
+.decision-tree h3{font-size:1.2rem;margin-bottom:24px;text-align:center}
+.dt-flow{display:flex;flex-direction:column;align-items:center;gap:0}
+.dt-question{padding:16px 24px;border-radius:var(--radius-sm);border:2px solid var(--blue);background:rgba(0,212,255,0.05);text-align:center;font-weight:600;max-width:400px;width:100%}
+.dt-branches{display:flex;gap:40px;margin-top:0}
+.dt-branch{display:flex;flex-direction:column;align-items:center;gap:0;flex:1}
+.dt-branch-label{font-size:0.8rem;color:var(--text3);padding:8px 0;font-weight:600}
+.dt-answer{padding:14px 20px;border-radius:var(--radius-xs);border:1px solid var(--glass-border);background:var(--bg3);text-align:center;font-size:0.85rem;width:100%}
+.dt-answer.recommended{border-color:rgba(16,185,129,0.3);background:rgba(16,185,129,0.05);color:var(--green);font-weight:600}
+.dt-connector{width:2px;height:24px;background:var(--glass-border)}
+.cost-faq{margin-top:48px}
+.cost-faq-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-top:24px}
+.cost-faq-item{padding:20px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);background:var(--glass)}
+.cost-faq-item h4{font-size:0.9rem;margin-bottom:6px;color:var(--text)}
+.cost-faq-item p{font-size:0.8rem;color:var(--text2);line-height:1.6}
+@media(max-width:1024px){.roi-grid,.hidden-costs-grid,.cost-faq-grid{grid-template-columns:1fr}.dt-branches{flex-direction:column;gap:16px}.dt-connector{display:none}}
+</style>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Return on <span class="gradient-text">Investment</span></h2>
+      <p>The real value of going local-first.</p>
+    </div>
+    <div class="roi-grid">
+      <div class="roi-card glass reveal reveal-delay-1">
+        <div class="roi-icon">&#128176;</div>
+        <h3>Annual Savings</h3>
+        <p>vs. cloud-only AI solutions with API costs, subscriptions, and data fees.</p>
+        <div class="roi-value">$1,200+</div>
+      </div>
+      <div class="roi-card glass reveal reveal-delay-2">
+        <div class="roi-icon">&#9202;</div>
+        <h3>Time Saved</h3>
+        <p>Automated daily tasks that previously required manual attention.</p>
+        <div class="roi-value">500+ hrs/yr</div>
+      </div>
+      <div class="roi-card glass reveal reveal-delay-3">
+        <div class="roi-icon">&#128274;</div>
+        <h3>Privacy Value</h3>
+        <p>Data that never leaves your machine. No vendor lock-in. No leaks.</p>
+        <div class="roi-value">Priceless</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Hidden Costs <span class="gradient-text">Exposed</span></h2>
+      <p>What other frameworks don't tell you.</p>
+    </div>
+    <div class="hidden-costs glass reveal">
+      <h3>The Real Cost of Cloud AI</h3>
+      <div class="hidden-costs-grid">
+        <div class="hidden-cost-item">
+          <div class="hci-icon">&#128176;</div>
+          <div>
+            <h4>API Token Costs</h4>
+            <p>GPT-4o: $2.50/1M input tokens. A busy agent can burn $50-100/month in API calls alone.</p>
+          </div>
+        </div>
+        <div class="hidden-cost-item">
+          <div class="hci-icon">&#128274;</div>
+          <div>
+            <h4>Data Privacy Risk</h4>
+            <p>Every prompt, every document, every code snippet sent to third-party servers. Compliance nightmare.</p>
+          </div>
+        </div>
+        <div class="hidden-cost-item">
+          <div class="hci-icon">&#128680;</div>
+          <div>
+            <h4>Vendor Lock-in</h4>
+            <p>API changes, price hikes, service deprecation. Your entire workflow depends on someone else's uptime.</p>
+          </div>
+        </div>
+        <div class="hidden-cost-item">
+          <div class="hci-icon">&#9200;</div>
+          <div>
+            <h4>Latency &amp; Rate Limits</h4>
+            <p>Network round-trips add 200-500ms per call. Rate limits kill batch processing workflows.</p>
+          </div>
+        </div>
+        <div class="hidden-cost-item">
+          <div class="hci-icon">&#128196;</div>
+          <div>
+            <h4>Compliance Costs</h4>
+            <p>SOC2, GDPR, HIPAA audits when data flows through external APIs. Thousands in legal fees.</p>
+          </div>
+        </div>
+        <div class="hidden-cost-item">
+          <div class="hci-icon">&#128200;</div>
+          <div>
+            <h4>Scaling Surprises</h4>
+            <p>What starts at $20/month becomes $200/month as usage grows. No cost predictability.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="decision-tree glass reveal">
+      <h3>Which Cost Tier is <span class="gradient-text">Right for You</span>?</h3>
+      <div class="dt-flow">
+        <div class="dt-question">Do you need cloud APIs (GPT-4o, Claude)?</div>
+        <div class="dt-connector"></div>
+        <div class="dt-branches">
+          <div class="dt-branch">
+            <div class="dt-branch-label">No &mdash; Local only</div>
+            <div class="dt-connector"></div>
+            <div class="dt-answer recommended">$0/month<br><small>Ollama + SQLite + ChromaDB</small></div>
+          </div>
+          <div class="dt-branch">
+            <div class="dt-branch-label">Yes &mdash; Selective API use</div>
+            <div class="dt-connector"></div>
+            <div class="dt-answer">$5&ndash;$42/month<br><small>VPS + selective cloud APIs</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Cost <span class="gradient-text">FAQ</span></h2>
+    </div>
+    <div class="cost-faq-grid">
+      <div class="cost-faq-item glass reveal reveal-delay-1">
+        <h4>Can I really start for $0?</h4>
+        <p>Yes. Ollama runs local LLMs, SQLite stores data, ChromaDB handles vectors, Telegram is free. All on your existing machine. No credit card needed.</p>
+      </div>
+      <div class="cost-faq-item glass reveal reveal-delay-2">
+        <h4>When should I upgrade to production?</h4>
+        <p>When you need 24/7 uptime, remote access, or higher throughput. A $5/month VPS handles most production workloads with room to grow.</p>
+      </div>
+      <div class="cost-faq-item glass reveal reveal-delay-3">
+        <h4>What about GPU costs?</h4>
+        <p>Not required. Ollama runs on CPU with 8B parameter models. GPU only needed for 70B+ models or high-throughput scenarios.</p>
+      </div>
+      <div class="cost-faq-item glass reveal reveal-delay-4">
+        <h4>How does this compare to SaaS alternatives?</h4>
+        <p>AutoGPT Pro: $40/mo. ChatGPT Team: $25/user/mo. Enterprise AI platforms: $500+/mo. NEXUS-01: $0&ndash;$42/mo with full data control.</p>
+      </div>
+    </div>
+  </div>
+</section>

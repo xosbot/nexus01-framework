@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS-01 — Research</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .stat-card-number {
+      font-size: 2rem;
+      font-weight: 800;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-card-label {
+      font-size: 0.8rem;
+      color: var(--text3);
+      margin-top: 0.25rem;
+    }
+    .filter-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .filter-tab {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      color: var(--text3);
+      padding: 0.4rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .filter-tab:hover, .filter-tab.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .repo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1.25rem;
+    }
+    .repo-card {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      text-decoration: none;
+    }
+    .repo-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .repo-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    .repo-card-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text1);
+      text-decoration: none;
+    }
+    .repo-card-name:hover { color: var(--accent); }
+    .repo-card-stars {
+      font-size: 0.8rem;
+      color: #f59e0b;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .repo-card-desc {
+      font-size: 0.85rem;
+      color: var(--text3);
+      line-height: 1.5;
+      flex: 1;
+    }
+    .repo-card-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .lang-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .lang-python { background: #3572A5; }
+    .lang-typescript { background: #3178C6; }
+    .lang-rust { background: #DEA584; }
+    .lang-shell { background: #89E051; }
+    .lang-go { background: #00ADD8; }
+    .lang-markdown { background: #083FA1; }
+    .lang-html { background: #E34F26; }
+    .lang-cpp { background: #F34B7D; }
+    .lang-label {
+      font-size: 0.75rem;
+      color: var(--text3);
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-critical { background: rgba(168,85,247,0.15); color: #a855f7; }
+    .badge-high { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    .badge-medium { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .badge-low { background: rgba(107,114,128,0.15); color: #6b7280; }
+    .integration-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      counter-reset: integration;
+    }
+    .integration-item {
+      counter-increment: integration;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 0.75rem;
+      transition: border-color 0.2s;
+    }
+    .integration-item:hover {
+      border-color: var(--accent);
+    }
+    .integration-rank {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--gradient);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .integration-rank::before {
+      content: counter(integration);
+    }
+    .integration-info { flex: 1; }
+    .integration-name {
+      font-weight: 700;
+      color: var(--text1);
+      font-size: 0.95rem;
+    }
+    .integration-stars {
+      color: #f59e0b;
+      font-size: 0.8rem;
+      margin-left: 0.4rem;
+    }
+    .integration-desc {
+      font-size: 0.8rem;
+      color: var(--text3);
+      margin-top: 0.2rem;
+    }
+    @media (max-width: 768px) {
+      .repo-grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .integration-item { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav" id="nav">
+    <div class="container">
+      <a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="architecture.html">Architecture</a></li>
+        <li><a href="frameworks.html">Frameworks</a></li>
+        <li><a href="agents.html">Agents</a></li>
+        <li><a href="build-plan.html">Build Plan</a></li>
+        <li><a href="repos.html">Repos</a></li>
+        <li><a href="research.html" class="active">Research</a></li>
+        <li><a href="skills.html">Skills</a></li>
+        <li><a href="use-cases.html">Use Cases</a></li>
+        <li><a href="costs.html">Costs</a></li>
+        <li><a href="https://github.com/xosbot/nexus01-framework" class="nav-cta" target="_blank">GitHub</a></li>
+      </ul>
+      <button class="nav-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</button>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="container">
+      <div class="breadcrumb"><a href="index.html">Home</a> / Research</div>
+      <h1>Open Source <span class="gradient-text">Intelligence</span></h1>
+      <p class="hero-subtitle">33 starred repositories — the best tools we've identified across the AI ecosystem</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="stats-row" id="stats">
+        <div class="stat-card fade-in"><div class="stat-card-number">33</div><div class="stat-card-label">Repos Analyzed</div></div>
+        <div class="stat-card fade-in"><div class="stat-card-number">10</div><div class="stat-card-label">Critical</div></div>
+        <div class="stat-card fade-in"><div class="stat-card-number">8</div><div class="stat-card-label">High Priority</div></div>
+        <div class="stat-card fade-in"><div class="stat-card-number">6</div><div class="stat-card-label">Medium</div></div>
+        <div class="stat-card fade-in"><div class="stat-card-number">4</div><div class="stat-card-label">Low</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Starred Repos by Category</h2>
+      <p class="section-subtitle">Curated open-source tools across the AI ecosystem</p>
+      <div class="filter-tabs" id="filterTabs">
+        <button class="filter-tab active" data-filter="all">All</button>
+        <button class="filter-tab" data-filter="agent">Agent Frameworks</button>
+        <button class="filter-tab" data-filter="osint">OSINT/Security</button>
+        <button class="filter-tab" data-filter="crypto">Crypto/Trading</button>
+        <button class="filter-tab" data-filter="tools">Tools</button>
+        <button class="filter-tab" data-filter="learning">Learning</button>
+      </div>
+      <div class="repo-grid" id="repoGrid">
+
+        <a href="https://github.com/bytedance/deer-flow" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">bytedance/deer-flow</span>
+              <span class="repo-card-stars">⭐ 71.5k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Super agent harness with sub-agents, memory, skills, sandbox execution for long-horizon tasks</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/huggingface/smolagents" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">huggingface/smolagents</span>
+              <span class="repo-card-stars">⭐ 27.9k</span>
+            </div>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Code-first agents — write Python actions, not JSON tool calls. 30% fewer steps.</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/agentscope-ai/agentscope" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">agentscope-ai/agentscope</span>
+              <span class="repo-card-stars">⭐ 27k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Permission-first with middleware pipeline, both MCP and A2A support</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/Fosowl/agenticSeek" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">Fosowl/agenticSeek</span>
+              <span class="repo-card-stars">⭐ 26.5k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">100% local Manus AI alternative with autonomous web browsing</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/different-ai/openwork" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">different-ai/openwork</span>
+              <span class="repo-card-stars">⭐ 16.2k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Desktop agent app with OpenCode backend, Tauri shell</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/kevinrgu/autoagent" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">kevinrgu/autoagent</span>
+              <span class="repo-card-stars">⭐ 4.5k</span>
+            </div>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Meta-agent builds iterates on agent harnesses</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/Nano-Collective/nanocoder" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">Nano-Collective/nanocoder</span>
+              <span class="repo-card-stars">⭐ 2k</span>
+            </div>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Local-first coding agent supporting Ollama</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/openagen/zeroclaw" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">openagen/zeroclaw</span>
+              <span class="repo-card-stars">⭐ 2k</span>
+            </div>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Ultra-lightweight Rust agent runtime, &lt;5MB RAM</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-rust"></span><span class="lang-label">Rust</span></div>
+        </a>
+
+        <a href="https://github.com/cosmicstack-labs/mercury-agent" target="_blank" class="repo-card fade-in" data-category="agent">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">cosmicstack-labs/mercury-agent</span>
+              <span class="repo-card-stars">⭐ 2.6k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Soul-driven agent with permissions, token budgets, SQLite memory</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/0xSteph/pentest-ai-agents" target="_blank" class="repo-card fade-in" data-category="osint">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">0xSteph/pentest-ai-agents</span>
+              <span class="repo-card-stars">⭐ 2k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">28 Claude subagents for penetration testing</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-shell"></span><span class="lang-label">Shell</span></div>
+        </a>
+
+        <a href="https://github.com/Z4nzu/hackingtool" target="_blank" class="repo-card fade-in" data-category="osint">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">Z4nzu/hackingtool</span>
+              <span class="repo-card-stars">⭐ 58k</span>
+            </div>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">185+ security tools across 20 categories</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/DedSecInside/TorBot" target="_blank" class="repo-card fade-in" data-category="osint">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">DedSecInside/TorBot</span>
+              <span class="repo-card-stars">⭐ 4k</span>
+            </div>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Dark web OSINT crawler for .onion sites</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/trufflesecurity/trufflehog" target="_blank" class="repo-card fade-in" data-category="osint">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">trufflesecurity/trufflehog</span>
+              <span class="repo-card-stars">⭐ 27k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Secrets discovery with 700+ credential detectors</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-go"></span><span class="lang-label">Go</span></div>
+        </a>
+
+        <a href="https://github.com/Fincept-Corporation/FinceptTerminal" target="_blank" class="repo-card fade-in" data-category="crypto">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">Fincept-Corporation/FinceptTerminal</span>
+              <span class="repo-card-stars">⭐ 25k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Bloomberg terminal alternative with 423K+ instruments</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-cpp"></span><span class="lang-label">C++</span></div>
+        </a>
+
+        <a href="https://github.com/nautechsystems/nautilus_trader" target="_blank" class="repo-card fade-in" data-category="crypto">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">nautechsystems/nautilus_trader</span>
+              <span class="repo-card-stars">⭐ 24k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Production-grade Rust-native trading engine</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-rust"></span><span class="lang-label">Rust</span></div>
+        </a>
+
+        <a href="https://github.com/fled-dev/CryptoDrain" target="_blank" class="repo-card fade-in" data-category="crypto">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">fled-dev/CryptoDrain</span>
+              <span class="repo-card-stars">⭐ 26</span>
+            </div>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">Bitcoin wallet sweeping</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/firecrawl/firecrawl" target="_blank" class="repo-card fade-in" data-category="tools">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">firecrawl/firecrawl</span>
+              <span class="repo-card-stars">⭐ 133k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Web scraping → LLM-ready markdown/structured data</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/Hmbown/CodeWhale" target="_blank" class="repo-card fade-in" data-category="tools">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">Hmbown/CodeWhale</span>
+              <span class="repo-card-stars">⭐ 38k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">DeepSeek-first coding agent with 25+ providers</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-rust"></span><span class="lang-label">Rust</span></div>
+        </a>
+
+        <a href="https://github.com/sickn33/antigravity-awesome-skills" target="_blank" class="repo-card fade-in" data-category="tools">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">sickn33/antigravity-awesome-skills</span>
+              <span class="repo-card-stars">⭐ 40k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">1,500+ agentic skills for Claude Code, Cursor, Codex</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/tirth8205/code-review-graph" target="_blank" class="repo-card fade-in" data-category="tools">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">tirth8205/code-review-graph</span>
+              <span class="repo-card-stars">⭐ 18k</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Code intelligence graph for MCP, 38-528x token reduction</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/giancarloerra/SocratiCode" target="_blank" class="repo-card fade-in" data-category="tools">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">giancarloerra/SocratiCode</span>
+              <span class="repo-card-stars">⭐ 700</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">Enterprise codebase intelligence with hybrid search</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/midudev/autoskills" target="_blank" class="repo-card fade-in" data-category="tools">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">midudev/autoskills</span>
+              <span class="repo-card-stars">⭐ 6k</span>
+            </div>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Auto-detect tech stack, install curated AI skills</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/CodebuffAI/codebuff" target="_blank" class="repo-card fade-in" data-category="tools">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">CodebuffAI/codebuff</span>
+              <span class="repo-card-stars">⭐ 5k</span>
+            </div>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">AI coding assistant with custom workflows</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/chenglou/pretext" target="_blank" class="repo-card fade-in" data-category="tools">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">chenglou/pretext</span>
+              <span class="repo-card-stars">⭐ 48k</span>
+            </div>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">Fast text measurement library</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/multica-ai/andrej-karpathy-skills" target="_blank" class="repo-card fade-in" data-category="learning">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">multica-ai/andrej-karpathy-skills</span>
+              <span class="repo-card-stars">⭐ 177k</span>
+            </div>
+            <span class="badge badge-critical">CRITICAL</span>
+          </div>
+          <p class="repo-card-desc">Karpathy's AI coding guidelines — 41% → 11% error reduction</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-markdown"></span><span class="lang-label">Markdown</span></div>
+        </a>
+
+        <a href="https://github.com/elder-plinius/CL4R1T4S" target="_blank" class="repo-card fade-in" data-category="learning">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">elder-plinius/CL4R1T4S</span>
+              <span class="repo-card-stars">⭐ 5k</span>
+            </div>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">AI model behavior analysis and optimization</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-typescript"></span><span class="lang-label">TypeScript</span></div>
+        </a>
+
+        <a href="https://github.com/elder-plinius/G0DM0D3" target="_blank" class="repo-card fade-in" data-category="learning">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">elder-plinius/G0DM0D3</span>
+              <span class="repo-card-stars">⭐ 5k</span>
+            </div>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+          <p class="repo-card-desc">Multi-model chat with GODMODE racing</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-html"></span><span class="lang-label">HTML</span></div>
+        </a>
+
+        <a href="https://github.com/elder-plinius/OBLITERATUS" target="_blank" class="repo-card fade-in" data-category="learning">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">elder-plinius/OBLITERATUS</span>
+              <span class="repo-card-stars">⭐ 5k</span>
+            </div>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">Remove refusal behaviors from LLMs</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/GAIR-NLP/ASI-Evolve" target="_blank" class="repo-card fade-in" data-category="learning">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">GAIR-NLP/ASI-Evolve</span>
+              <span class="repo-card-stars">⭐ 731</span>
+            </div>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <p class="repo-card-desc">AI-for-AI research framework</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+        <a href="https://github.com/kyegomez/OpenMythos" target="_blank" class="repo-card fade-in" data-category="learning">
+          <div class="repo-card-header">
+            <div>
+              <span class="repo-card-name">kyegomez/OpenMythos</span>
+              <span class="repo-card-stars">⭐ 14k</span>
+            </div>
+            <span class="badge badge-low">LOW</span>
+          </div>
+          <p class="repo-card-desc">Claude Mythos architecture reconstruction</p>
+          <div class="repo-card-meta"><span class="lang-dot lang-python"></span><span class="lang-label">Python</span></div>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background:var(--bg2);">
+    <div class="container">
+      <h2 class="section-title">Top 10 Must-Have Integrations</h2>
+      <p class="section-subtitle">Priority-ordered integrations for the NEXUS-01 framework</p>
+      <ul class="integration-list">
+        <li class="integration-item fade-in">
+          <div class="integration-rank"></div>
+          <div class="integration-info">
+            <div><span class="integration-name">Karpathy Guidelines</span><span class="integration-stars"> 177k⭐</span></div>
+            <div class="integration-desc">Adopt for all agents</div>
+          </div>
+          <span class="badge badge-critical">CRITICAL</span>
+        </li>
+        <li class="integration-item fade-in">
+          <div class="integration-rank"></div>
+          <div class="integration-info">
+            <div><span class="integration-name">Firecrawl</span><span class="integration-stars"> 133k⭐</span></div>
+            <div class="integration-desc">Primary web data extraction</div>
+          </div>
+          <span class="badge badge-high">HIGH</span>
+        </li>
+        <li class="integration-item fade-in">
+          <div class="integration-rank"></div>
+          <div class="integration-info">
+            <div><span class="integration-name">DeerFlow</span><span class="integration-stars"> 71.5k⭐</span></div>
+            <div class="integration-desc">Sub-agent spawning pattern</div>
+          </div>
+          <span class="badge badge-high">HIGH</span>
+        </li>
+        <li class="integration-item fade-in">
+          <div class="integration-rank"></div>
+          <div class="integration-info">
+            <div><span class="integration-name">antigravity-awesome-skills</span><span class="integration-stars"> 40k⭐</span></div>
+            <div class="integration-desc">1,500+ skills library</div>
+          </div>
+          <span class="badge badge-high">HIGH</span>
+        </li>
+        <li class="integration-item fade-in">
+          <div class="integration-rank"></div>
+          <div class="integration-info">
+            <div><span class="integration-name">AgentScope</span><span class="integration-stars"> 27k⭐</span></div>
+            <div class="integration-desc">Permission and middleware system</div>
+          </div>
+          <span class="badge badge-high">HIGH</span>
+        </li>
+        <li class="integration-item fade-in">
+          <div class="integration-rank"></div>
+          <div class="integration-info">
+            <div><span class="integration-name">trufflehog</span><span class="integration-stars"> 27k⭐</span></div>
+            <div class="integration-desc">Security scanning</div>
+          </div>
+          <span class="badge badge-high">HIGH</span>
+        </li>
+        <li class="integration-item fade-in">
+          <div class="integration-rank"></div>
+          <div class="integration-info">
+            <div><span class="integration-name">NautilusTrader</span><span class="integration-stars"> 24k⭐</span></div>
+            <div class="integration-desc">Trading execution backend</div>
+          </div>
+          <span class="badge badge-high">HIGH</span>
+        </li>
+        <li class="integration-item fade-in">
+          <div class="integration-rank"></div>
+          <div class="integration-info">
+            <div><span class="integration-name">code-review-graph</span><span class="integration-stars"> 18k⭐</span></div>
+            <div class="integration-desc">Code intelligence for reviews</div>
+          </div>
+          <span class="badge badge-high">HIGH</span>
+        </li>
+        <li class="integration-item fade-in">
+          <div class="integration-rank"></div>
+          <div class="integration-info">
+            <div><span class="integration-name">agenticSeek</span><span class="integration-stars"> 26.5k⭐</span></div>
+            <div class="integration-desc">Local-first architecture</div>
+          </div>
+          <span class="badge badge-high">HIGH</span>
+        </li>
+        <li class="integration-item fade-in">
+          <div class="integration-rank"></div>
+          <div class="integration-info">
+            <div><span class="integration-name">Mercury Agent</span><span class="integration-stars"> 2.6k⭐</span></div>
+            <div class="integration-desc">Governance layer</div>
+          </div>
+          <span class="badge badge-high">HIGH</span>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand"><a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a><p>A minimal, modular agentic AI framework.</p></div>
+        <div class="footer-col"><h4>Pages</h4><a href="architecture.html">Architecture</a><a href="frameworks.html">Frameworks</a><a href="agents.html">Agents</a><a href="build-plan.html">Build Plan</a></div>
+        <div class="footer-col"><h4>Research</h4><a href="repos.html">Repositories</a><a href="research.html">Starred Repos</a><a href="skills.html">Skills System</a><a href="use-cases.html">Use Cases</a></div>
+        <div class="footer-col"><h4>Connect</h4><a href="https://github.com/xosbot/nexus01-framework" target="_blank">GitHub</a></div>
+      </div>
+      <div class="footer-bottom"><span>Built with precision. Powered by agents.</span><span>© 2026 NEXUS-01</span></div>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll('.filter-tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        var filter = tab.getAttribute('data-filter');
+        document.querySelectorAll('.repo-card').forEach(function(card) {
+          if (filter === 'all' || card.getAttribute('data-category') === filter) {
+            card.style.display = '';
+          } else {
+            card.style.display = 'none';
+          }
+        });
+      });
+    });
+
+    var fadeEls = document.querySelectorAll('.fade-in');
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+    fadeEls.forEach(function(el) { observer.observe(el); });
+
+    window.addEventListener('scroll', function() {
+      var nav = document.getElementById('nav');
+      if (window.scrollY > 50) {
+        nav.classList.add('nav-scrolled');
+      } else {
+        nav.classList.remove('nav-scrolled');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS-01 — Agents</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+/* AGENTS PAGE — PAGE-SPECIFIC STYLES */
+
+.agent-detail-card {
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+}
+.agent-detail-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+.agent-detail-card.border-blue::before { background: linear-gradient(90deg, var(--blue), var(--cyan)); }
+.agent-detail-card.border-purple::before { background: linear-gradient(90deg, var(--purple), var(--pink)); }
+.agent-detail-card.border-pink::before { background: linear-gradient(90deg, var(--pink), var(--amber)); }
+.agent-detail-card.border-blue { border-left: 3px solid var(--blue); }
+.agent-detail-card.border-purple { border-left: 3px solid var(--purple); }
+.agent-detail-card.border-pink { border-left: 3px solid var(--pink); }
+
+.agent-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.agent-detail-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.agent-detail-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+.agent-detail-card.border-blue .agent-detail-icon { background: rgba(0,212,255,0.1); color: var(--blue); }
+.agent-detail-card.border-purple .agent-detail-icon { background: rgba(139,92,246,0.1); color: var(--purple); }
+.agent-detail-card.border-pink .agent-detail-icon { background: rgba(236,72,153,0.1); color: var(--pink); }
+
+.agent-detail-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+.agent-detail-codename {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.agent-detail-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--green);
+  font-weight: 600;
+}
+.agent-detail-status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: statusPulse 2s infinite;
+}
+.agent-directive {
+  font-style: italic;
+  color: var(--text2);
+  margin-bottom: 16px;
+  font-size: 0.95rem;
+  padding-left: 12px;
+  border-left: 2px solid var(--glass-border);
+}
+.agent-detail-desc {
+  color: var(--text2);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  margin-bottom: 24px;
+}
+.agent-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.agent-meta-item {
+  padding: 16px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+}
+.agent-meta-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.agent-meta-value {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.capabilities-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.capabilities-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--text2);
+}
+.capabilities-list .check {
+  color: var(--green);
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.tools-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.tool-tag {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text2);
+}
+
+/* COMMUNICATION FLOW */
+.comm-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 40px 0;
+}
+.comm-node {
+  padding: 14px 20px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  min-width: 100px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.comm-node:hover {
+  border-color: var(--blue);
+  transform: translateY(-2px);
+}
+.comm-node.user { border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.05); }
+.comm-node.osint { border-color: rgba(0,212,255,0.3); background: rgba(0,212,255,0.05); }
+.comm-node.analytics { border-color: rgba(139,92,246,0.3); background: rgba(139,92,246,0.05); }
+.comm-node.executor { border-color: rgba(236,72,153,0.3); background: rgba(236,72,153,0.05); }
+.comm-node .sub {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text3);
+  margin-top: 4px;
+}
+.comm-arrow {
+  color: var(--text3);
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+/* COLD MODE DEEP DIVE */
+.cold-steps-vertical {
+  max-width: 700px;
+  margin: 40px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+.cold-steps-vertical::before {
+  content: '';
+  position: absolute;
+  left: 24px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--blue), var(--purple), var(--pink));
+}
+.cold-step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 20px 0;
+  position: relative;
+}
+.cold-step-num {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  z-index: 1;
+}
+.cold-step-row:nth-child(1) .cold-step-num { background: rgba(0,212,255,0.15); color: var(--blue); border: 2px solid rgba(0,212,255,0.3); }
+.cold-step-row:nth-child(2) .cold-step-num { background: rgba(139,92,246,0.15); color: var(--purple); border: 2px solid rgba(139,92,246,0.3); }
+.cold-step-row:nth-child(3) .cold-step-num { background: rgba(16,185,129,0.15); color: var(--green); border: 2px solid rgba(16,185,129,0.3); }
+.cold-step-row:nth-child(4) .cold-step-num { background: rgba(245,158,11,0.15); color: var(--amber); border: 2px solid rgba(245,158,11,0.3); }
+.cold-step-row:nth-child(5) .cold-step-num { background: rgba(236,72,153,0.15); color: var(--pink); border: 2px solid rgba(236,72,153,0.3); }
+
+.cold-step-content {
+  flex: 1;
+  padding-top: 8px;
+}
+.cold-step-title {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+.cold-step-desc {
+  color: var(--text2);
+  font-size: 0.85rem;
+}
+
+.cold-outcomes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 700px;
+  margin: 40px auto 0;
+}
+.cold-outcome {
+  padding: 24px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  border: 2px solid;
+}
+.cold-outcome.pass {
+  border-color: rgba(16,185,129,0.3);
+  background: rgba(16,185,129,0.03);
+}
+.cold-outcome.fail {
+  border-color: rgba(239,68,68,0.3);
+  background: rgba(239,68,68,0.03);
+}
+.cold-outcome h4 {
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+.cold-outcome.pass h4 { color: var(--green); }
+.cold-outcome.fail h4 { color: var(--red); }
+.cold-outcome p {
+  font-size: 0.85rem;
+  color: var(--text2);
+}
+
+.activation-triggers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  max-width: 700px;
+  margin: 32px auto 0;
+}
+.trigger-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  font-size: 0.85rem;
+  color: var(--text2);
+}
+.trigger-item .icon {
+  font-size: 1rem;
+}
+
+@media(max-width:768px) {
+  .agent-meta-grid { grid-template-columns: 1fr; }
+  .comm-flow { flex-direction: column; }
+  .comm-arrow { transform: rotate(90deg); }
+  .cold-outcomes { grid-template-columns: 1fr; }
+  .cold-steps-vertical::before { left: 20px; }
+  .cold-step-num { width: 40px; height: 40px; font-size: 0.75rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+  <div class="container">
+    <a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="frameworks.html">Frameworks</a></li>
+      <li><a href="agents.html" class="active">Agents</a></li>
+      <li><a href="build-plan.html">Build Plan</a></li>
+      <li><a href="repos.html">Repos</a></li>
+      <li><a href="research.html">Research</a></li>
+      <li><a href="skills.html">Skills</a></li>
+      <li><a href="use-cases.html">Use Cases</a></li>
+      <li><a href="costs.html">Costs</a></li>
+      <li><a href="https://github.com/xosbot/nexus01-framework" class="nav-cta" target="_blank">GitHub</a></li>
+    </ul>
+    <button class="nav-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</button>
+  </div>
+</nav>
+
+<!-- PAGE HERO -->
+<section class="page-hero">
+  <div class="container">
+    <div class="breadcrumb reveal"><a href="index.html">Home</a> / Agents</div>
+    <h1 class="reveal">The <span class="gradient-text">Agent Team</span></h1>
+    <p class="subtitle reveal">Three specialized operators, each with distinct tradecraft</p>
+  </div>
+</section>
+
+<!-- AGENT CARDS -->
+<section class="section">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Meet the <span class="gradient-text">Agents</span></h2>
+      <p>Each agent operates autonomously within a permission-gated architecture. Collectively, they form an intelligence apparatus that learns, decides, and acts.</p>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:32px">
+
+      <!-- OSINT AGENT -->
+      <div class="agent-detail-card border-blue glass reveal">
+        <div class="agent-detail-header">
+          <div class="agent-detail-left">
+            <div class="agent-detail-icon">👁️</div>
+            <div>
+              <div class="agent-detail-name">OSINT Agent</div>
+              <div class="agent-detail-codename">Codename: RECON</div>
+            </div>
+          </div>
+          <div class="agent-detail-status"><div class="dot"></div> ACTIVE</div>
+        </div>
+        <div class="agent-directive">"Learn Daily. Stay Sharp."</div>
+        <p class="agent-detail-desc">The eyes and ears of the system. Continuously harvests data from multiple intelligence domains, normalizes it, scores reliability, and feeds structured intelligence to the Analytics agent.</p>
+
+        <div class="agent-meta-grid">
+          <div class="agent-meta-item">
+            <div class="agent-meta-label">Input</div>
+            <div class="agent-meta-value">Raw queries, targets, intelligence requests</div>
+          </div>
+          <div class="agent-meta-item">
+            <div class="agent-meta-label">Output</div>
+            <div class="agent-meta-value">Structured intelligence reports with confidence scores</div>
+          </div>
+          <div class="agent-meta-item">
+            <div class="agent-meta-label">Tools</div>
+            <div class="agent-meta-value">
+              <div class="tools-list">
+                <span class="tool-tag">web_search</span>
+                <span class="tool-tag">scrape_url</span>
+                <span class="tool-tag">check_breach</span>
+                <span class="tool-tag">rss_feed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <ul class="capabilities-list">
+          <li><span class="check">✓</span> Web scraping (httpx + BeautifulSoup4)</li>
+          <li><span class="check">✓</span> Social media monitoring (Twitter, Reddit, GitHub)</li>
+          <li><span class="check">✓</span> Financial intelligence (Etherscan, Dune, Arkham)</li>
+          <li><span class="check">✓</span> News/RSS aggregation</li>
+          <li><span class="check">✓</span> Dark web monitoring (Ahmia API)</li>
+          <li><span class="check">✓</span> Confidence scoring on all intelligence</li>
+        </ul>
+
+        <div class="code-block">
+<span class="comment"># OSINT Agent usage</span>
+<span class="keyword">agent</span> = <span class="function">OSINTAgent</span>(llm=<span class="function">OllamaClient</span>(), memory=<span class="function">Memory</span>())
+<span class="keyword">report</span> = <span class="keyword">await</span> agent.<span class="function">on_message</span>(<span class="function">Message</span>(
+    type=<span class="string">"task"</span>,
+    payload={<span class="string">"query"</span>: <span class="string">"monitor ETH whale movements"</span>}
+))
+<span class="comment"># Returns: IntelReport(summary, confidence, sources, indicators)</span>
+        </div>
+      </div>
+
+      <!-- EXECUTION AGENT -->
+      <div class="agent-detail-card border-purple glass reveal">
+        <div class="agent-detail-header">
+          <div class="agent-detail-left">
+            <div class="agent-detail-icon">⚙️</div>
+            <div>
+              <div class="agent-detail-name">Execution Agent</div>
+              <div class="agent-detail-codename">Codename: HANDS</div>
+            </div>
+          </div>
+          <div class="agent-detail-status"><div class="dot"></div> ACTIVE</div>
+        </div>
+        <div class="agent-directive">"Move with Precision."</div>
+        <p class="agent-detail-desc">The hands of the system. Takes synthesized intelligence and executes predefined payloads with permission-gated precision and rollback safety.</p>
+
+        <div class="agent-meta-grid">
+          <div class="agent-meta-item">
+            <div class="agent-meta-label">Input</div>
+            <div class="agent-meta-value">Intelligence packets, task assignments</div>
+          </div>
+          <div class="agent-meta-item">
+            <div class="agent-meta-label">Output</div>
+            <div class="agent-meta-value">Execution results, deployment confirmations</div>
+          </div>
+          <div class="agent-meta-item">
+            <div class="agent-meta-label">Permission Levels</div>
+            <div class="agent-meta-value" style="font-family:'JetBrains Mono',monospace;font-size:0.8rem">
+              <span style="color:var(--green)">READ(0)</span> → <span style="color:var(--blue)">WRITE(1)</span> → <span style="color:var(--amber)">EXECUTE(2)</span> → <span style="color:var(--red)">ADMIN(3)</span>
+            </div>
+          </div>
+        </div>
+
+        <ul class="capabilities-list">
+          <li><span class="check">✓</span> Shell command execution (permission levels 0-3)</li>
+          <li><span class="check">✓</span> Code generation and deployment</li>
+          <li><span class="check">✓</span> File system operations (atomic writes)</li>
+          <li><span class="check">✓</span> Browser automation (Playwright)</li>
+          <li><span class="check">✓</span> Smart contract deployment</li>
+          <li><span class="check">✓</span> Rollback capabilities (auto on failure)</li>
+        </ul>
+
+        <div class="code-block">
+<span class="comment"># Execution Agent usage</span>
+<span class="keyword">result</span> = <span class="keyword">await</span> executor.<span class="function">on_message</span>(<span class="function">Message</span>(
+    type=<span class="string">"task"</span>,
+    payload={<span class="string">"action"</span>: <span class="string">"run_command"</span>,
+             <span class="string">"params"</span>: {<span class="string">"cmd"</span>: <span class="string">"docker compose up -d"</span>}}
+))
+<span class="comment"># Cold Mode checks: data verified? params in range? risk acceptable?</span>
+        </div>
+      </div>
+
+      <!-- ANALYTICS AGENT -->
+      <div class="agent-detail-card border-pink glass reveal">
+        <div class="agent-detail-header">
+          <div class="agent-detail-left">
+            <div class="agent-detail-icon">📊</div>
+            <div>
+              <div class="agent-detail-name">Analytics Agent</div>
+              <div class="agent-detail-codename">Codename: EYES</div>
+            </div>
+          </div>
+          <div class="agent-detail-status"><div class="dot"></div> ACTIVE</div>
+        </div>
+        <div class="agent-directive">"Turn Noise into Signal."</div>
+        <p class="agent-detail-desc">The brain of the system. Monitors data streams, establishes baselines, detects anomalies, and produces actionable intelligence briefs.</p>
+
+        <div class="agent-meta-grid">
+          <div class="agent-meta-item">
+            <div class="agent-meta-label">Input</div>
+            <div class="agent-meta-value">Raw data streams, intelligence reports</div>
+          </div>
+          <div class="agent-meta-item">
+            <div class="agent-meta-label">Output</div>
+            <div class="agent-meta-value">Pattern analysis, anomaly alerts, actionable intelligence</div>
+          </div>
+        </div>
+
+        <ul class="capabilities-list">
+          <li><span class="check">✓</span> Pattern recognition (6-step cycle)</li>
+          <li><span class="check">✓</span> Anomaly detection (Z-score, ±2σ threshold)</li>
+          <li><span class="check">✓</span> Baseline establishment (rolling windows)</li>
+          <li><span class="check">✓</span> Cross-source correlation</li>
+          <li><span class="check">✓</span> Daily intelligence briefs</li>
+          <li><span class="check">✓</span> Trend detection and momentum analysis</li>
+        </ul>
+
+        <div style="margin-top:24px">
+          <div class="agent-meta-label" style="margin-bottom:16px">The 6-Step Analysis Cycle</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
+            <div style="padding:10px 16px;border-radius:var(--radius-xs);font-size:0.8rem;font-weight:600;border:1px solid rgba(0,212,255,0.2);background:rgba(0,212,255,0.05);color:var(--blue)">Observe</div>
+            <span class="comm-arrow">→</span>
+            <div style="padding:10px 16px;border-radius:var(--radius-xs);font-size:0.8rem;font-weight:600;border:1px solid rgba(139,92,246,0.2);background:rgba(139,92,246,0.05);color:var(--purple)">Organize</div>
+            <span class="comm-arrow">→</span>
+            <div style="padding:10px 16px;border-radius:var(--radius-xs);font-size:0.8rem;font-weight:600;border:1px solid rgba(16,185,129,0.2);background:rgba(16,185,129,0.05);color:var(--green)">Identify Patterns</div>
+            <span class="comm-arrow">→</span>
+            <div style="padding:10px 16px;border-radius:var(--radius-xs);font-size:0.8rem;font-weight:600;border:1px solid rgba(245,158,11,0.2);background:rgba(245,158,11,0.05);color:var(--amber)">Establish Baseline</div>
+            <span class="comm-arrow">→</span>
+            <div style="padding:10px 16px;border-radius:var(--radius-xs);font-size:0.8rem;font-weight:600;border:1px solid rgba(236,72,153,0.2);background:rgba(236,72,153,0.05);color:var(--pink)">Detect Anomalies</div>
+            <span class="comm-arrow">→</span>
+            <div style="padding:10px 16px;border-radius:var(--radius-xs);font-size:0.8rem;font-weight:600;border:1px solid rgba(6,182,212,0.2);background:rgba(6,182,212,0.05);color:var(--cyan)">Anticipate & Act</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- COMMUNICATION FLOW -->
+<section class="section" style="border-top:1px solid var(--glass-border)">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>How Agents <span class="gradient-text">Communicate</span></h2>
+      <p>Every interaction flows through a structured message bus. No direct agent-to-agent calls. Full audit trail.</p>
+    </div>
+
+    <div class="comm-flow reveal">
+      <div class="comm-node user">You<div class="sub">Telegram / CLI</div></div>
+      <div class="comm-arrow">→</div>
+      <div class="comm-node" style="border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.05)">Orchestrator<div class="sub">Routes tasks</div></div>
+      <div class="comm-arrow">→</div>
+      <div class="comm-node osint">OSINT Agent<div class="sub">Gathers intel</div></div>
+      <div class="comm-arrow">→</div>
+      <div class="comm-node analytics">Analytics Agent<div class="sub">Synthesizes</div></div>
+      <div class="comm-arrow">→</div>
+      <div class="comm-node executor">Executor Agent<div class="sub">Takes action</div></div>
+      <div class="comm-arrow">→</div>
+      <div class="comm-node user">You<div class="sub">Results</div></div>
+    </div>
+
+    <div class="callout callout-blue reveal" style="max-width:700px;margin:32px auto 0">
+      <strong>Message Format</strong>
+      All inter-agent communication uses a typed <code style="color:var(--blue)">Message</code> object with <code style="color:var(--blue)">type</code> (task, intel, alert, heartbeat) and <code style="color:var(--blue)">payload</code> (structured data). Every message is logged, timestamped, and traceable. The orchestrator routes based on message type and agent availability.
+    </div>
+  </div>
+</section>
+
+<!-- COLD MODE DEEP DIVE -->
+<section class="section" style="border-top:1px solid var(--glass-border)">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Cold Mode <span class="gradient-text">Protocol</span></h2>
+      <p>The system's immune system against hallucinations. Every decision verified. Every action deliberate.</p>
+    </div>
+
+    <div class="cold-steps-vertical reveal">
+      <div class="cold-step-row">
+        <div class="cold-step-num">01</div>
+        <div class="cold-step-content">
+          <div class="cold-step-title">DATA VERIFICATION</div>
+          <div class="cold-step-desc">Is the source reliable? Cross-validated? The agent checks data provenance, cross-references with known trusted sources, and validates freshness before proceeding.</div>
+        </div>
+      </div>
+      <div class="cold-step-row">
+        <div class="cold-step-num">02</div>
+        <div class="cold-step-content">
+          <div class="cold-step-title">PARAMETER VALIDATION</div>
+          <div class="cold-step-desc">Within standard deviation ranges? Input parameters are checked against historical baselines. Out-of-range values trigger alerts and require manual override.</div>
+        </div>
+      </div>
+      <div class="cold-step-row">
+        <div class="cold-step-num">03</div>
+        <div class="cold-step-content">
+          <div class="cold-step-title">CONFIDENCE ASSESSMENT</div>
+          <div class="cold-step-desc">Model confidence ≥ 0.8? The LLM's own confidence score is evaluated. Below threshold? The system defers to deterministic scripts or requests human input.</div>
+        </div>
+      </div>
+      <div class="cold-step-row">
+        <div class="cold-step-num">04</div>
+        <div class="cold-step-content">
+          <div class="cold-step-title">RISK EVALUATION</div>
+          <div class="cold-step-desc">What are the consequences of wrong action? Risk is scored on a 0-1 scale. High-risk actions require explicit approval and trigger enhanced monitoring.</div>
+        </div>
+      </div>
+      <div class="cold-step-row">
+        <div class="cold-step-num">05</div>
+        <div class="cold-step-content">
+          <div class="cold-step-title">FALLBACK DETERMINATION</div>
+          <div class="cold-step-desc">Is a deterministic script ready? If Cold Mode fails, the system checks for pre-built fallback scripts that can achieve the same goal without LLM reasoning.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cold-outcomes reveal">
+      <div class="cold-outcome pass glass">
+        <h4>✓ PASS</h4>
+        <p>All five gates cleared. Execute the action. Log the decision trail. Continue monitoring.</p>
+      </div>
+      <div class="cold-outcome fail glass">
+        <h4>✗ FAIL</h4>
+        <p>Block the action. Alert the operator. Attempt fallback. Log the failure reason.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:48px">
+      <div class="section-header center reveal">
+        <h3 style="font-size:1.1rem">Activation Triggers</h3>
+      </div>
+      <div class="activation-triggers reveal">
+        <div class="trigger-item"><span class="icon">🔒</span> Any action with write/execute permissions</div>
+        <div class="trigger-item"><span class="icon">💰</span> Financial transactions or contract calls</div>
+        <div class="trigger-item"><span class="icon">📡</span> Cross-agent intelligence relay</div>
+        <div class="trigger-item"><span class="icon">⚡</span> High-frequency or batch operations</div>
+        <div class="trigger-item"><span class="icon">🌐</span> External API calls with side effects</div>
+        <div class="trigger-item"><span class="icon">🗑️</span> Any destructive or irreversible action</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand"><a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a><p>A minimal, modular agentic AI framework.</p></div>
+      <div class="footer-col"><h4>Pages</h4><a href="architecture.html">Architecture</a><a href="frameworks.html">Frameworks</a><a href="agents.html">Agents</a><a href="build-plan.html">Build Plan</a></div>
+      <div class="footer-col"><h4>Research</h4><a href="repos.html">Repositories</a><a href="research.html">Starred Repos</a><a href="skills.html">Skills System</a><a href="use-cases.html">Use Cases</a></div>
+      <div class="footer-col"><h4>Connect</h4><a href="https://github.com/xosbot/nexus01-framework" target="_blank">GitHub</a></div>
+    </div>
+    <div class="footer-bottom"><span>Built with precision. Powered by agents.</span><span>© 2026 NEXUS-01</span></div>
+  </div>
+</footer>
+
+<script>
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Nav scroll
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 40);
+});
+</script>
+</body>
+</html>

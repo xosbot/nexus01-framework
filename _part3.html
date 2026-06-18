@@ -1,0 +1,946 @@
+<!-- SECTION 11: Agentic Skills System -->
+<section id="skills" class="section">
+  <div class="container">
+    <h2 class="section-title reveal">Agentic <span class="gradient-text">Skills System</span></h2>
+    <p class="section-subtitle reveal">How agents learn, specialize, and extend their capabilities</p>
+
+    <div class="grid-3 reveal" style="margin-top:4rem">
+      <!-- Column 1: SKILL.md Format -->
+      <div class="glass-card" style="padding:2rem">
+        <h3 style="font-size:1.3rem;margin-bottom:1rem;color:var(--blue)">The Universal Skill Definition</h3>
+        <p style="color:var(--text2);margin-bottom:1.5rem;font-size:0.9rem">SKILL.md is the universal format for defining agent capabilities — portable, human-readable, and LLM-native.</p>
+        <div style="background:rgba(0,0,0,0.4);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:1rem;font-family:'Fira Code',monospace;font-size:0.75rem;overflow-x:auto">
+          <pre style="margin:0;color:var(--text2)"><span style="color:var(--text3)">---</span>
+<span style="color:var(--blue)">name</span>: data-analysis
+<span style="color:var(--blue)">description</span>: Analyze datasets with pandas
+<span style="color:var(--blue)">license</span>: MIT
+<span style="color:var(--blue)">allowed-tools</span>: [bash, read_file, write_file]
+<span style="color:var(--text3)">---</span>
+<span style="color:var(--purple)"># Data Analysis Skill</span>
+
+<span style="color:var(--green)">## Steps</span>
+<span style="color:var(--amber)">1.</span> Load data from file
+<span style="color:var(--amber)">2.</span> Perform analysis
+<span style="color:var(--amber)">3.</span> Generate visualizations</pre>
+        </div>
+        <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:0.5rem">
+          <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:var(--text2)">
+            <span style="color:var(--blue);font-size:0.7rem">&#9632;</span> name — Unique skill identifier
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:var(--text2)">
+            <span style="color:var(--green);font-size:0.7rem">&#9632;</span> description — What this skill does
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:var(--text2)">
+            <span style="color:var(--purple);font-size:0.7rem">&#9632;</span> license — Usage rights
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:var(--text2)">
+            <span style="color:var(--pink);font-size:0.7rem">&#9632;</span> allowed-tools — Permission scope
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: Progressive Loading -->
+      <div class="glass-card" style="padding:2rem">
+        <h3 style="font-size:1.3rem;margin-bottom:1rem;color:var(--green)">Load What You Need, When You Need It</h3>
+        <p style="color:var(--text2);margin-bottom:1.5rem;font-size:0.9rem">Progressive loading minimizes context window waste — only load skill depth when the agent actually needs it.</p>
+        <div style="display:flex;flex-direction:column;gap:1rem">
+          <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:var(--radius-sm);padding:1.2rem;opacity:1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+              <span style="font-weight:600;color:var(--green);font-size:0.9rem">Level 1: Metadata</span>
+              <span style="font-size:0.75rem;color:var(--text3)">Always loaded</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="color:var(--text2);font-size:0.85rem">name + description</span>
+              <span style="font-size:0.75rem;color:var(--green);background:rgba(16,185,129,0.1);padding:2px 8px;border-radius:4px">~100 tokens</span>
+            </div>
+          </div>
+          <div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:var(--radius-sm);padding:1.2rem;opacity:0.85">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+              <span style="font-weight:600;color:var(--purple);font-size:0.9rem">Level 2: Instructions</span>
+              <span style="font-size:0.75rem;color:var(--text3)">On trigger</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="color:var(--text2);font-size:0.85rem">Full SKILL.md body</span>
+              <span style="font-size:0.75rem;color:var(--purple);background:rgba(139,92,246,0.1);padding:2px 8px;border-radius:4px">&lt;5K tokens</span>
+            </div>
+          </div>
+          <div style="background:rgba(236,72,153,0.08);border:1px solid rgba(236,72,153,0.2);border-radius:var(--radius-sm);padding:1.2rem;opacity:0.7">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+              <span style="font-weight:600;color:var(--pink);font-size:0.9rem">Level 3: Resources</span>
+              <span style="font-size:0.75rem;color:var(--text3)">On reference</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="color:var(--text2);font-size:0.85rem">Scripts, references, templates</span>
+              <span style="font-size:0.75rem;color:var(--pink);background:rgba(236,72,153,0.1);padding:2px 8px;border-radius:4px">variable</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: Skill Registries -->
+      <div class="glass-card" style="padding:2rem">
+        <h3 style="font-size:1.3rem;margin-bottom:1rem;color:var(--pink)">Where Skills Live</h3>
+        <p style="color:var(--text2);margin-bottom:1.5rem;font-size:0.9rem">The emerging ecosystem of skill registries — community-curated, auto-discoverable, and portable.</p>
+        <div style="display:flex;flex-direction:column;gap:1rem">
+          <div style="background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:1rem">
+            <div style="font-weight:600;color:var(--text);font-size:0.9rem;margin-bottom:0.3rem">DeerFlow Community Registry</div>
+            <div style="color:var(--text2);font-size:0.8rem;margin-bottom:0.5rem">Open-source skill marketplace with peer review</div>
+            <div style="font-size:0.75rem;color:var(--blue);background:rgba(0,212,255,0.1);padding:2px 8px;border-radius:4px;display:inline-block">PR #1824</div>
+          </div>
+          <div style="background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:1rem">
+            <div style="font-weight:600;color:var(--text);font-size:0.9rem;margin-bottom:0.3rem">Claude Code Local Skills</div>
+            <div style="color:var(--text2);font-size:0.8rem">~/.claude/skills/ — user-defined, local-first</div>
+          </div>
+          <div style="background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:1rem">
+            <div style="font-weight:600;color:var(--text);font-size:0.9rem;margin-bottom:0.3rem">antigravity-awesome-skills</div>
+            <div style="color:var(--text2);font-size:0.8rem;margin-bottom:0.5rem">Curated collection of production-ready skills</div>
+            <div style="font-size:0.75rem;color:var(--green);background:rgba(16,185,129,0.1);padding:2px 8px;border-radius:4px;display:inline-block">1,500+ skills</div>
+          </div>
+          <div style="background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:1rem">
+            <div style="font-weight:600;color:var(--text);font-size:0.9rem;margin-bottom:0.3rem">midudev/autoskills</div>
+            <div style="color:var(--text2);font-size:0.8rem">Auto-detect project type and install relevant skills</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Karpathy's 4 Principles -->
+    <div class="reveal" style="margin-top:5rem">
+      <div style="text-align:center;margin-bottom:3rem">
+        <h3 style="font-size:1.8rem;font-weight:700;margin-bottom:0.5rem">
+          Karpathy's <span class="gradient-text">Guidelines</span> — 41% → 11% Error Reduction
+        </h3>
+        <p style="color:var(--text2);font-size:1.05rem">The rules that make agents 4x less likely to make mistakes</p>
+      </div>
+
+      <div class="grid-4" style="gap:1.5rem">
+        <!-- Principle 1 -->
+        <div class="glass-card" style="padding:1.8rem;border-top:2px solid var(--blue)">
+          <div style="width:48px;height:48px;background:rgba(0,212,255,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:1rem">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 2.5-1.5 4.5-3 6l-1 1v2h-6v-2l-1-1c-1.5-1.5-3-3.5-3-6a7 7 0 0 1 7-7z"/><path d="M10 21h4"/></svg>
+          </div>
+          <h4 style="font-size:1.1rem;font-weight:700;color:var(--blue);margin-bottom:0.8rem">THINK BEFORE CODING</h4>
+          <p style="color:var(--text2);font-size:0.85rem;line-height:1.6;margin-bottom:1.2rem">State assumptions explicitly. Present alternatives. Push back when simpler approach exists.</p>
+          <div style="font-size:0.8rem;color:var(--text3);margin-bottom:0.4rem;text-decoration:line-through">Before: Claude picks interpretation silently</div>
+          <div style="font-size:0.8rem;color:var(--green)">After: Claude states assumptions, asks when unclear</div>
+        </div>
+
+        <!-- Principle 2 -->
+        <div class="glass-card" style="padding:1.8rem;border-top:2px solid var(--green)">
+          <div style="width:48px;height:48px;background:rgba(16,185,129,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:1rem">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><path d="M16 8L2 22"/><path d="M17.5 15H9"/></svg>
+          </div>
+          <h4 style="font-size:1.1rem;font-weight:700;color:var(--green);margin-bottom:0.8rem">SIMPLICITY FIRST</h4>
+          <p style="color:var(--text2);font-size:0.85rem;line-height:1.6;margin-bottom:1.2rem">No features beyond what was asked. No abstractions for single-use code. No speculative flexibility.</p>
+          <div style="font-size:0.8rem;color:var(--text3);margin-bottom:0.4rem;text-decoration:line-through">Before: 200 lines with error handling for impossible scenarios</div>
+          <div style="font-size:0.8rem;color:var(--green)">After: 50 lines that solve the actual problem</div>
+        </div>
+
+        <!-- Principle 3 -->
+        <div class="glass-card" style="padding:1.8rem;border-top:2px solid var(--purple)">
+          <div style="width:48px;height:48px;background:rgba(139,92,246,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:1rem">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5"/></svg>
+          </div>
+          <h4 style="font-size:1.1rem;font-weight:700;color:var(--purple);margin-bottom:0.8rem">SURGICAL CHANGES</h4>
+          <p style="color:var(--text2);font-size:0.85rem;line-height:1.6;margin-bottom:1.2rem">Touch only what the request requires. Match existing style. Every changed line traces to the request.</p>
+          <div style="font-size:0.8rem;color:var(--text3);margin-bottom:0.4rem;text-decoration:line-through">Before: Fix validation bug → reformat module, rename variables</div>
+          <div style="font-size:0.8rem;color:var(--green)">After: Fix validation bug → one line changed, bug fixed</div>
+        </div>
+
+        <!-- Principle 4 -->
+        <div class="glass-card" style="padding:1.8rem;border-top:2px solid var(--pink)">
+          <div style="width:48px;height:48px;background:rgba(236,72,153,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:1rem">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--pink)" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          </div>
+          <h4 style="font-size:1.1rem;font-weight:700;color:var(--pink);margin-bottom:0.8rem">GOAL-DRIVEN EXECUTION</h4>
+          <p style="color:var(--text2);font-size:0.85rem;line-height:1.6;margin-bottom:1.2rem">Define verifiable success criteria. Let the model loop until criteria are met.</p>
+          <div style="font-size:0.8rem;color:var(--text3);margin-bottom:0.4rem;text-decoration:line-through">Before: Step 1: create file. Step 2: add function.</div>
+          <div style="font-size:0.8rem;color:var(--green)">After: Goal: Write a test that reproduces the issue, then make it pass.</div>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-top:2rem;padding:1rem;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm)">
+        <span style="color:var(--green);font-weight:600;font-size:1.1rem">Error Rate: 41% → 11%</span>
+        <span style="color:var(--text3);margin:0 0.5rem">—</span>
+        <span style="color:var(--text2);font-size:0.9rem">Verified across 40 OpenClaw PRs</span>
+      </div>
+
+      <p style="text-align:center;color:var(--text3);margin-top:1.5rem;font-size:0.9rem;font-style:italic">NEXUS-01 implements these principles in every agent's system prompt</p>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 12: Browser Harness & Computer Use -->
+<section id="browser" class="section">
+  <div class="container">
+    <h2 class="section-title reveal">Browser Harness & <span class="gradient-text">Computer Use</span></h2>
+    <p class="section-subtitle reveal">How agents interact with the web — from DOM manipulation to visual understanding</p>
+
+    <div class="grid-3 reveal" style="margin-top:4rem">
+      <!-- Column 1: Playwright MCP -->
+      <div class="glass-card" style="padding:2rem;border-top:2px solid var(--blue)">
+        <h3 style="font-size:1.3rem;margin-bottom:1rem;color:var(--blue)">Structured DOM Control</h3>
+        <p style="color:var(--text2);margin-bottom:1.5rem;font-size:0.9rem">Playwright MCP gives agents precise, deterministic control over web pages through the Chrome DevTools Protocol.</p>
+        <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.5rem">
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">browser_navigate</span>
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">browser_click</span>
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">browser_fill</span>
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">browser_take_screenshot</span>
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">browser_snapshot</span>
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">browser_evaluate</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text3);margin-bottom:0.5rem">Architecture</div>
+        <div style="font-size:0.85rem;color:var(--text2);margin-bottom:1rem;font-family:'Fira Code',monospace">Agent → Playwright MCP Server → Browser (CDP) → Website</div>
+        <div style="background:rgba(0,0,0,0.4);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:0.8rem;font-family:'Fira Code',monospace;font-size:0.7rem;color:var(--text2);margin-bottom:1rem">
+          {"tool": "browser_navigate", "url": "https://example.com"}<br>{"tool": "browser_click", "selector": "#submit-btn"}
+        </div>
+        <div style="font-size:0.8rem;color:var(--blue);padding:6px 12px;background:rgba(0,212,255,0.08);border-radius:6px;text-align:center">Best for: Web scraping, form filling, precise interaction</div>
+      </div>
+
+      <!-- Column 2: Claude Computer Use -->
+      <div class="glass-card" style="padding:2rem;border-top:2px solid var(--purple)">
+        <h3 style="font-size:1.3rem;margin-bottom:1rem;color:var(--purple)">Visual Desktop Control</h3>
+        <p style="color:var(--text2);margin-bottom:1.5rem;font-size:0.9rem">Claude sees your screen and clicks like a human — no DOM, no API, just pixels and mouse coordinates.</p>
+        <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.5rem">
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">screenshot</span>
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">left_click / right_click</span>
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">type / key</span>
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">mouse_move / scroll</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text3);margin-bottom:0.5rem">Architecture</div>
+        <div style="font-size:0.85rem;color:var(--text2);margin-bottom:1rem;font-family:'Fira Code',monospace">Agent → Screenshot → Analyze → Action → Execute → Repeat</div>
+        <div style="background:rgba(0,0,0,0.4);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:0.8rem;font-family:'Fira Code',monospace;font-size:0.7rem;color:var(--text2);margin-bottom:1rem">
+          {"action": "screenshot"}<br>{"action": "left_click", "coordinate": [500, 300]}
+        </div>
+        <div style="font-size:0.8rem;color:var(--purple);padding:6px 12px;background:rgba(139,92,246,0.08);border-radius:6px;text-align:center">Best for: Desktop apps, any GUI, cross-platform</div>
+      </div>
+
+      <!-- Column 3: Browser Use Framework -->
+      <div class="glass-card" style="padding:2rem;border-top:2px solid var(--green)">
+        <h3 style="font-size:1.3rem;margin-bottom:1rem;color:var(--green)">Hybrid Vision + DOM</h3>
+        <p style="color:var(--text2);margin-bottom:1rem;font-size:0.9rem">The best of both worlds — visual understanding combined with DOM precision for complex web workflows.</p>
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:1.5rem">
+          <span style="font-size:2rem;font-weight:800;color:var(--green)">98K+</span>
+          <span style="font-size:0.85rem;color:var(--text2)">GitHub Stars</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.5rem">
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">Vision understanding</span>
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">DOM analysis</span>
+          <span style="color:var(--text2);font-size:0.8rem;background:var(--glass);padding:4px 10px;border-radius:6px;display:inline-block">Action execution</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text3);margin-bottom:0.5rem">Architecture</div>
+        <div style="font-size:0.85rem;color:var(--text2);margin-bottom:1rem;font-family:'Fira Code',monospace">LLM ↔ Playwright ↔ CDP ↔ Website</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem">
+          <span style="font-size:0.75rem;color:var(--green);background:rgba(16,185,129,0.1);padding:3px 8px;border-radius:4px">Self-healing</span>
+          <span style="font-size:0.75rem;color:var(--green);background:rgba(16,185,129,0.1);padding:3px 8px;border-radius:4px">Persistent sessions</span>
+          <span style="font-size:0.75rem;color:var(--green);background:rgba(16,185,129,0.1);padding:3px 8px;border-radius:4px">Stealth mode</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--green);padding:6px 12px;background:rgba(16,185,129,0.08);border-radius:6px;text-align:center">Best for: Complex web workflows, multi-step navigation</div>
+      </div>
+    </div>
+
+    <!-- NEXUS-01 Integration -->
+    <div class="glass-card reveal" style="margin-top:3rem;padding:2rem;border-left:3px solid var(--blue)">
+      <h4 style="font-size:1.1rem;font-weight:700;color:var(--blue);margin-bottom:1rem">NEXUS-01 Integration</h4>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem">
+        <div>
+          <div style="font-size:0.75rem;color:var(--blue);margin-bottom:0.3rem;font-weight:600">PHASE 1</div>
+          <div style="font-size:0.9rem;color:var(--text)">CLI-based command execution</div>
+          <div style="font-size:0.8rem;color:var(--text2);margin-top:0.3rem">Current — agents run shell commands, parse output</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--purple);margin-bottom:0.3rem;font-weight:600">PHASE 2</div>
+          <div style="font-size:0.9rem;color:var(--text)">Playwright for web automation</div>
+          <div style="font-size:0.8rem;color:var(--text2);margin-top:0.3rem">Planned — structured DOM interaction via MCP</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--green);margin-bottom:0.3rem;font-weight:600">PHASE 3</div>
+          <div style="font-size:0.9rem;color:var(--text)">Full browser harness</div>
+          <div style="font-size:0.8rem;color:var(--text2);margin-top:0.3rem">Vision — autonomous research with visual understanding</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 13: Use Cases -->
+<section id="usecases" class="section">
+  <div class="container">
+    <h2 class="section-title reveal">Use <span class="gradient-text">Cases</span></h2>
+    <p class="section-subtitle reveal">What NEXUS-01 can do — from personal automation to enterprise intelligence</p>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1.5rem;margin-top:4rem" class="reveal">
+      <!-- 1. Personal Automation -->
+      <div class="glass-card" style="padding:1.8rem">
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">
+          <span style="font-size:1.5rem">🤖</span>
+          <h4 style="font-size:1.05rem;font-weight:700;color:var(--text)">Personal Automation</h4>
+        </div>
+        <p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem;line-height:1.5">Email triage, scheduling, research synthesis, daily briefings</p>
+        <div style="font-size:0.8rem;color:var(--text3);background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);border:1px solid var(--glass-border)">
+          <span style="color:var(--blue);font-weight:600">OSINT agent</span> monitors inbox → <span style="color:var(--purple);font-weight:600">Analytics agent</span> prioritizes → <span style="color:var(--green);font-weight:600">Executor agent</span> drafts responses
+        </div>
+      </div>
+
+      <!-- 2. OSINT & Intelligence -->
+      <div class="glass-card" style="padding:1.8rem">
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">
+          <span style="font-size:1.5rem">🕵️</span>
+          <h4 style="font-size:1.05rem;font-weight:700;color:var(--text)">OSINT & Intelligence</h4>
+        </div>
+        <p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem;line-height:1.5">Web scraping, social media monitoring, dark web research</p>
+        <div style="font-size:0.8rem;color:var(--text3);background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);border:1px solid var(--glass-border)">
+          <span style="color:var(--blue);font-weight:600">OSINT agent</span> collects from 30+ sources → <span style="color:var(--purple);font-weight:600">Analytics agent</span> scores confidence → Reports via <span style="color:var(--pink);font-weight:600">Telegram</span>
+        </div>
+      </div>
+
+      <!-- 3. Crypto/DeFi -->
+      <div class="glass-card" style="padding:1.8rem">
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">
+          <span style="font-size:1.5rem">⛓️</span>
+          <h4 style="font-size:1.05rem;font-weight:700;color:var(--text)">Crypto/DeFi</h4>
+        </div>
+        <p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem;line-height:1.5">Wallet monitoring, trade signals, on-chain analytics</p>
+        <div style="font-size:0.8rem;color:var(--text3);background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);border:1px solid var(--glass-border)">
+          <span style="color:var(--blue);font-weight:600">OSINT agent</span> watches chains → <span style="color:var(--purple);font-weight:600">Analytics agent</span> detects patterns → <span style="color:var(--green);font-weight:600">Executor agent</span> executes trades
+        </div>
+      </div>
+
+      <!-- 4. Code Generation -->
+      <div class="glass-card" style="padding:1.8rem">
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">
+          <span style="font-size:1.5rem">💻</span>
+          <h4 style="font-size:1.05rem;font-weight:700;color:var(--text)">Code Generation</h4>
+        </div>
+        <p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem;line-height:1.5">Write, review, test, and deploy code</p>
+        <div style="font-size:0.8rem;color:var(--text3);background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);border:1px solid var(--glass-border)">
+          <span style="color:var(--green);font-weight:600">Executor agent</span> generates code → <span style="color:var(--purple);font-weight:600">Analyst agent</span> reviews → <span style="color:var(--red);font-weight:600">Cold Mode</span> validates → Deploy
+        </div>
+      </div>
+
+      <!-- 5. Content Creation -->
+      <div class="glass-card" style="padding:1.8rem">
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">
+          <span style="font-size:1.5rem">✍️</span>
+          <h4 style="font-size:1.05rem;font-weight:700;color:var(--text)">Content Creation</h4>
+        </div>
+        <p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem;line-height:1.5">Research, write, edit, publish across platforms</p>
+        <div style="font-size:0.8rem;color:var(--text3);background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);border:1px solid var(--glass-border)">
+          <span style="color:var(--blue);font-weight:600">OSINT agent</span> gathers research → <span style="color:var(--green);font-weight:600">Executor agent</span> writes → <span style="color:var(--purple);font-weight:600">Analytics agent</span> optimizes
+        </div>
+      </div>
+
+      <!-- 6. Security Monitoring -->
+      <div class="glass-card" style="padding:1.8rem">
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">
+          <span style="font-size:1.5rem">🛡️</span>
+          <h4 style="font-size:1.05rem;font-weight:700;color:var(--text)">Security Monitoring</h4>
+        </div>
+        <p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem;line-height:1.5">Threat detection, vulnerability scanning, incident response</p>
+        <div style="font-size:0.8rem;color:var(--text3);background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);border:1px solid var(--glass-border)">
+          <span style="color:var(--blue);font-weight:600">OSINT agent</span> scans → <span style="color:var(--purple);font-weight:600">Analytics agent</span> correlates → <span style="color:var(--green);font-weight:600">Executor agent</span> responds
+        </div>
+      </div>
+
+      <!-- 7. Financial Analysis -->
+      <div class="glass-card" style="padding:1.8rem">
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">
+          <span style="font-size:1.5rem">📊</span>
+          <h4 style="font-size:1.05rem;font-weight:700;color:var(--text)">Financial Analysis</h4>
+        </div>
+        <p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem;line-height:1.5">Market data, portfolio tracking, risk assessment</p>
+        <div style="font-size:0.8rem;color:var(--text3);background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);border:1px solid var(--glass-border)">
+          <span style="color:var(--blue);font-weight:600">OSINT agent</span> feeds data → <span style="color:var(--purple);font-weight:600">Analytics agent</span> models risk → Reports via <span style="color:var(--pink);font-weight:600">Telegram</span>
+        </div>
+      </div>
+
+      <!-- 8. Web Scraping -->
+      <div class="glass-card" style="padding:1.8rem">
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">
+          <span style="font-size:1.5rem">🌐</span>
+          <h4 style="font-size:1.05rem;font-weight:700;color:var(--text)">Web Scraping</h4>
+        </div>
+        <p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem;line-height:1.5">Structured data extraction at scale</p>
+        <div style="font-size:0.8rem;color:var(--text3);background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);border:1px solid var(--glass-border)">
+          <span style="color:var(--blue);font-weight:600">OSINT agent</span> targets URLs → <span style="color:var(--green);font-weight:600">Executor agent</span> scrapes → <span style="color:var(--purple);font-weight:600">Analytics agent</span> normalizes
+        </div>
+      </div>
+
+      <!-- 9. System Administration -->
+      <div class="glass-card" style="padding:1.8rem">
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">
+          <span style="font-size:1.5rem">⚙️</span>
+          <h4 style="font-size:1.05rem;font-weight:700;color:var(--text)">System Administration</h4>
+        </div>
+        <p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem;line-height:1.5">Server monitoring, log analysis, automated fixes</p>
+        <div style="font-size:0.8rem;color:var(--text3);background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);border:1px solid var(--glass-border)">
+          <span style="color:var(--purple);font-weight:600">Analytics agent</span> monitors → Detects anomaly → <span style="color:var(--green);font-weight:600">Executor agent</span> remediates
+        </div>
+      </div>
+
+      <!-- 10. Customer Support -->
+      <div class="glass-card" style="padding:1.8rem">
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">
+          <span style="font-size:1.5rem">💬</span>
+          <h4 style="font-size:1.05rem;font-weight:700;color:var(--text)">Customer Support</h4>
+        </div>
+        <p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem;line-height:1.5">Query routing, response drafting, knowledge base</p>
+        <div style="font-size:0.8rem;color:var(--text3);background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);border:1px solid var(--glass-border)">
+          <span style="color:var(--blue);font-weight:600">OSINT agent</span> classifies → <span style="color:var(--green);font-weight:600">Executor agent</span> drafts → Human approves via <span style="color:var(--pink);font-weight:600">Telegram</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 14: Tech Stack & Cost Analysis -->
+<section id="techstack" class="section">
+  <div class="container">
+    <h2 class="section-title reveal">Tech Stack & <span class="gradient-text">Cost Analysis</span></h2>
+    <p class="section-subtitle reveal">Every choice justified. Every dollar accounted for.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:4rem" class="reveal">
+      <!-- Left: Technology Choices -->
+      <div>
+        <h3 style="font-size:1.3rem;font-weight:700;margin-bottom:1.5rem;color:var(--text)">Technology Choices</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div class="glass-card" style="padding:1.2rem">
+            <div style="font-size:0.75rem;color:var(--blue);font-weight:600;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em">Core</div>
+            <div style="font-size:0.85rem;color:var(--text);margin-bottom:0.2rem">Python 3.12</div>
+            <div style="font-size:0.85rem;color:var(--text);margin-bottom:0.2rem">Ollama</div>
+            <div style="font-size:0.85rem;color:var(--text);margin-bottom:0.2rem">SQLite</div>
+            <div style="font-size:0.85rem;color:var(--text)">ChromaDB</div>
+          </div>
+          <div class="glass-card" style="padding:1.2rem">
+            <div style="font-size:0.75rem;color:var(--green);font-weight:600;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em">Agents</div>
+            <div style="font-size:0.85rem;color:var(--text);margin-bottom:0.2rem">httpx</div>
+            <div style="font-size:0.85rem;color:var(--text);margin-bottom:0.2rem">BeautifulSoup4</div>
+            <div style="font-size:0.85rem;color:var(--text)">sentence-transformers</div>
+          </div>
+          <div class="glass-card" style="padding:1.2rem">
+            <div style="font-size:0.75rem;color:var(--purple);font-weight:600;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em">Interface</div>
+            <div style="font-size:0.85rem;color:var(--text);margin-bottom:0.2rem">Telegram Bot</div>
+            <div style="font-size:0.85rem;color:var(--text)">Rich CLI</div>
+          </div>
+          <div class="glass-card" style="padding:1.2rem">
+            <div style="font-size:0.75rem;color:var(--pink);font-weight:600;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em">Protocols</div>
+            <div style="font-size:0.85rem;color:var(--text);margin-bottom:0.2rem">MCP</div>
+            <div style="font-size:0.85rem;color:var(--text);margin-bottom:0.2rem">A2A</div>
+            <div style="font-size:0.85rem;color:var(--text)">Redis Streams</div>
+          </div>
+          <div class="glass-card" style="padding:1.2rem">
+            <div style="font-size:0.75rem;color:var(--amber);font-weight:600;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em">Frameworks</div>
+            <div style="font-size:0.85rem;color:var(--text);margin-bottom:0.2rem">LangGraph</div>
+            <div style="font-size:0.85rem;color:var(--text);margin-bottom:0.2rem">CrewAI</div>
+            <div style="font-size:0.85rem;color:var(--text)">SmolAgents</div>
+          </div>
+          <div class="glass-card" style="padding:1.2rem">
+            <div style="font-size:0.75rem;color:var(--red);font-weight:600;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em">Browser</div>
+            <div style="font-size:0.85rem;color:var(--text);margin-bottom:0.2rem">Playwright</div>
+            <div style="font-size:0.85rem;color:var(--text)">Puppeteer</div>
+          </div>
+          <div class="glass-card" style="padding:1.2rem;grid-column:span 2">
+            <div style="font-size:0.75rem;color:var(--red);font-weight:600;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em">Security</div>
+            <div style="font-size:0.85rem;color:var(--text)">Cold Mode &nbsp;•&nbsp; RBAC &nbsp;•&nbsp; Audit Logging &nbsp;•&nbsp; Tool Sandboxing</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Cost Breakdown -->
+      <div>
+        <h3 style="font-size:1.3rem;font-weight:700;margin-bottom:1.5rem;color:var(--text)">Cost Breakdown</h3>
+        <div style="display:flex;flex-direction:column;gap:1.5rem">
+          <!-- MVP -->
+          <div class="glass-card" style="padding:1.5rem;border-left:3px solid var(--green)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+              <h4 style="font-size:1rem;color:var(--green)">MVP (Local Development)</h4>
+              <span style="font-size:1.3rem;font-weight:800;color:var(--green)">$0/mo</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.6rem">
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2)">
+                <span>Ollama (local LLM)</span><span style="color:var(--green)">$0</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2)">
+                <span>SQLite (database)</span><span style="color:var(--green)">$0</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2)">
+                <span>ChromaDB (vector search)</span><span style="color:var(--green)">$0</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2)">
+                <span>Telegram Bot</span><span style="color:var(--green)">$0</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2)">
+                <span>Your laptop</span><span style="color:var(--green)">$0</span>
+              </div>
+              <div style="border-top:1px solid var(--glass-border);padding-top:0.6rem;margin-top:0.3rem;display:flex;justify-content:space-between;font-weight:700;color:var(--green)">
+                <span>Total</span><span>Free forever</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Production -->
+          <div class="glass-card" style="padding:1.5rem;border-left:3px solid var(--blue)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+              <h4 style="font-size:1rem;color:var(--blue)">Production Deployment</h4>
+              <span style="font-size:1.3rem;font-weight:800;color:var(--blue)">~$41/mo</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.6rem">
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2)">
+                <span>Hetzner CX22 VPS</span><span style="color:var(--text)">$5</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2)">
+                <span>Claude API (moderate)</span><span style="color:var(--text)">$15</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2)">
+                <span>Perplexity API</span><span style="color:var(--text)">$20</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2)">
+                <span>OpenAI Embeddings</span><span style="color:var(--text)">$1</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2)">
+                <span>Supabase (free tier)</span><span style="color:var(--green)">$0</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2)">
+                <span>Telegram Bot</span><span style="color:var(--green)">$0</span>
+              </div>
+              <div style="border-top:1px solid var(--glass-border);padding-top:0.6rem;margin-top:0.3rem;display:flex;justify-content:space-between;font-weight:700;color:var(--blue)">
+                <span>Total</span><span>$41/month</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scaling Path -->
+        <div class="glass-card" style="padding:1.2rem;margin-top:1.5rem">
+          <div style="font-size:0.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.8rem;font-weight:600">Scaling Path</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.85rem">
+            <div style="text-align:center">
+              <div style="color:var(--green);font-weight:700">MVP</div>
+              <div style="color:var(--text3)">$0/mo</div>
+            </div>
+            <span style="color:var(--text3)">→</span>
+            <div style="text-align:center">
+              <div style="color:var(--blue);font-weight:700">10x agents</div>
+              <div style="color:var(--text3)">$117/mo</div>
+            </div>
+            <span style="color:var(--text3)">→</span>
+            <div style="text-align:center">
+              <div style="color:var(--purple);font-weight:700">100x agents</div>
+              <div style="color:var(--text3)">$350/mo</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Framework Comparison Table -->
+    <div class="reveal" style="margin-top:3rem">
+      <h3 style="font-size:1.3rem;font-weight:700;margin-bottom:1.5rem;color:var(--text)">Framework Comparison</h3>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+          <thead>
+            <tr style="border-bottom:1px solid var(--glass-border)">
+              <th style="text-align:left;padding:0.8rem;color:var(--text3);font-weight:600">Framework</th>
+              <th style="text-align:left;padding:0.8rem;color:var(--text3);font-weight:600">Learning Curve</th>
+              <th style="text-align:left;padding:0.8rem;color:var(--text3);font-weight:600">State Mgmt</th>
+              <th style="text-align:left;padding:0.8rem;color:var(--text3);font-weight:600">Multi-Agent</th>
+              <th style="text-align:left;padding:0.8rem;color:var(--text3);font-weight:600">MCP</th>
+              <th style="text-align:left;padding:0.8rem;color:var(--text3);font-weight:600">Production Ready</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--glass-border)">
+              <td style="padding:0.8rem;color:var(--text)">CrewAI</td>
+              <td style="padding:0.8rem;color:var(--green)">Low</td>
+              <td style="padding:0.8rem;color:var(--text2)">Basic</td>
+              <td style="padding:0.8rem;color:var(--green)">Native</td>
+              <td style="padding:0.8rem;color:var(--amber)">Via ext</td>
+              <td style="padding:0.8rem;color:var(--amber)">Medium</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--glass-border)">
+              <td style="padding:0.8rem;color:var(--text)">LangGraph</td>
+              <td style="padding:0.8rem;color:var(--red)">High</td>
+              <td style="padding:0.8rem;color:var(--green)">Excellent</td>
+              <td style="padding:0.8rem;color:var(--amber)">Via patterns</td>
+              <td style="padding:0.8rem;color:var(--green)">Yes</td>
+              <td style="padding:0.8rem;color:var(--green)">High</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--glass-border)">
+              <td style="padding:0.8rem;color:var(--text)">AutoGen</td>
+              <td style="padding:0.8rem;color:var(--red)">High</td>
+              <td style="padding:0.8rem;color:var(--text2)">Basic</td>
+              <td style="padding:0.8rem;color:var(--green)">Native</td>
+              <td style="padding:0.8rem;color:var(--amber)">Via ext</td>
+              <td style="padding:0.8rem;color:var(--red)">Low (maintenance)</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--glass-border)">
+              <td style="padding:0.8rem;color:var(--text)">OpenAI SDK</td>
+              <td style="padding:0.8rem;color:var(--green)">Low</td>
+              <td style="padding:0.8rem;color:var(--green)">Good</td>
+              <td style="padding:0.8rem;color:var(--text2)">Handoffs</td>
+              <td style="padding:0.8rem;color:var(--green)">Native</td>
+              <td style="padding:0.8rem;color:var(--green)">High</td>
+            </tr>
+            <tr>
+              <td style="padding:0.8rem;color:var(--blue);font-weight:600">NEXUS-01</td>
+              <td style="padding:0.8rem;color:var(--green)">Low</td>
+              <td style="padding:0.8rem;color:var(--green)">SQLite</td>
+              <td style="padding:0.8rem;color:var(--green)">3 agents</td>
+              <td style="padding:0.8rem;color:var(--amber)">Planned</td>
+              <td style="padding:0.8rem;color:var(--amber)">MVP</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 15: Footer -->
+<footer class="section" style="padding:4rem 0 2rem;border-top:1px solid var(--glass-border)">
+  <div class="container">
+    <div style="text-align:center">
+      <p style="font-size:1.1rem;color:var(--text2);margin-bottom:0.8rem;font-style:italic">Built with precision. Powered by agents.</p>
+      <p style="font-size:1.5rem;font-weight:700;margin-bottom:1.5rem">
+        <span class="gradient-text">NEXUS-01</span> <span style="color:var(--text3);font-weight:400;font-size:1rem">Framework — Open Source</span>
+      </p>
+      <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:1.5rem">
+        <a href="https://github.com/xosbot/nexus01-framework" target="_blank" style="color:var(--text2);text-decoration:none;font-size:0.9rem;transition:color 0.3s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--text2)'">GitHub</a>
+        <a href="#" style="color:var(--text2);text-decoration:none;font-size:0.9rem;transition:color 0.3s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--text2)'">Website</a>
+      </div>
+      <div style="display:inline-flex;align-items:center;gap:0.5rem;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;padding:6px 16px;margin-bottom:1.5rem">
+        <span style="width:8px;height:8px;background:var(--amber);border-radius:50%;display:inline-block"></span>
+        <span style="font-size:0.8rem;color:var(--text2)">Phase 1 — Building</span>
+      </div>
+      <p style="font-size:0.8rem;color:var(--text3)">&copy; 2026 NEXUS-01. Designed by Navigator.</p>
+    </div>
+  </div>
+</footer>
+
+</div><!-- /content-layer -->
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// ==========================================
+// THREE.JS PARTICLE SYSTEM
+// ==========================================
+(function() {
+  const container = document.getElementById('particle-container');
+  if (!container || typeof THREE === 'undefined') return;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  container.appendChild(renderer.domElement);
+
+  const PARTICLE_COUNT = 600;
+  const CONNECTION_DISTANCE = 1.5;
+  const MOUSE_REPULSION = 2.5;
+
+  // Particle geometry
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(PARTICLE_COUNT * 3);
+  const velocities = new Float32Array(PARTICLE_COUNT * 3);
+  const colors = new Float32Array(PARTICLE_COUNT * 3);
+
+  const colorPalette = [
+    new THREE.Color(0x00d4ff), // blue
+    new THREE.Color(0x8b5cf6), // purple
+    new THREE.Color(0xec4899), // pink
+    new THREE.Color(0x10b981), // green
+  ];
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const i3 = i * 3;
+    positions[i3]     = (Math.random() - 0.5) * 10;
+    positions[i3 + 1] = (Math.random() - 0.5) * 10;
+    positions[i3 + 2] = (Math.random() - 0.5) * 5;
+
+    velocities[i3]     = (Math.random() - 0.5) * 0.005;
+    velocities[i3 + 1] = (Math.random() - 0.5) * 0.005;
+    velocities[i3 + 2] = (Math.random() - 0.5) * 0.002;
+
+    const color = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+    colors[i3]     = color.r;
+    colors[i3 + 1] = color.g;
+    colors[i3 + 2] = color.b;
+  }
+
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const particleMaterial = new THREE.PointsMaterial({
+    size: 0.04,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: true,
+  });
+
+  const particles = new THREE.Points(geometry, particleMaterial);
+  scene.add(particles);
+
+  // Connection lines
+  const lineGeometry = new THREE.BufferGeometry();
+  const linePositions = new Float32Array(PARTICLE_COUNT * PARTICLE_COUNT * 6);
+  lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+  lineGeometry.setDrawRange(0, 0);
+
+  const lineMaterial = new THREE.LineBasicMaterial({
+    color: 0x00d4ff,
+    transparent: true,
+    opacity: 0.15,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+
+  const lines = new THREE.LineSegments(lineGeometry, lineMaterial);
+  scene.add(lines);
+
+  camera.position.z = 5;
+
+  // Mouse tracking
+  const mouse = { x: 0, y: 0, active: false };
+
+  document.addEventListener('mousemove', (e) => {
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    mouse.active = true;
+  });
+
+  document.addEventListener('mouseleave', () => { mouse.active = false; });
+
+  // Scroll fade
+  let scrollFade = 1;
+  window.addEventListener('scroll', () => {
+    const scrollPercent = window.scrollY / (document.body.scrollHeight - window.innerHeight);
+    scrollFade = Math.max(0, 1 - scrollPercent * 2.5);
+  });
+
+  // Animation loop
+  let lineIndex = 0;
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    const pos = geometry.attributes.position.array;
+    const linePos = lineGeometry.attributes.position.array;
+    lineIndex = 0;
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+
+      // Mouse repulsion
+      if (mouse.active) {
+        const dx = pos[i3] - mouse.x * 5;
+        const dy = pos[i3 + 1] - mouse.y * 5;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MOUSE_REPULSION && dist > 0.01) {
+          const force = (MOUSE_REPULSION - dist) / MOUSE_REPULSION * 0.02;
+          pos[i3]     += (dx / dist) * force;
+          pos[i3 + 1] += (dy / dist) * force;
+        }
+      }
+
+      // Apply velocity
+      pos[i3]     += velocities[i3];
+      pos[i3 + 1] += velocities[i3 + 1];
+      pos[i3 + 2] += velocities[i3 + 2];
+
+      // Wrap around
+      if (pos[i3] > 5) pos[i3] = -5;
+      if (pos[i3] < -5) pos[i3] = 5;
+      if (pos[i3 + 1] > 5) pos[i3 + 1] = -5;
+      if (pos[i3 + 1] < -5) pos[i3 + 1] = 5;
+
+      // Connection lines (check subset for performance)
+      for (let j = i + 1; j < Math.min(i + 30, PARTICLE_COUNT); j++) {
+        const j3 = j * 3;
+        const dx = pos[i3] - pos[j3];
+        const dy = pos[i3 + 1] - pos[j3 + 1];
+        const dz = pos[i3 + 2] - pos[j3 + 2];
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        if (dist < CONNECTION_DISTANCE && lineIndex < linePositions.length - 6) {
+          linePos[lineIndex++] = pos[i3];
+          linePos[lineIndex++] = pos[i3 + 1];
+          linePos[lineIndex++] = pos[i3 + 2];
+          linePos[lineIndex++] = pos[j3];
+          linePos[lineIndex++] = pos[j3 + 1];
+          linePos[lineIndex++] = pos[j3 + 2];
+        }
+      }
+    }
+
+    geometry.attributes.position.needsUpdate = true;
+    lineGeometry.setDrawRange(0, lineIndex / 3);
+    lineGeometry.attributes.position.needsUpdate = true;
+
+    // Scroll fade
+    container.style.opacity = scrollFade;
+    particles.material.opacity = 0.8 * scrollFade;
+    lines.material.opacity = 0.15 * scrollFade;
+
+    renderer.render(scene, camera);
+  }
+
+  animate();
+
+  // Resize
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+})();
+
+// ==========================================
+// INTERSECTION OBSERVER — Scroll Reveal
+// ==========================================
+(function() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry, index) => {
+      if (entry.isIntersecting) {
+        const el = entry.target;
+        const delay = el.dataset.delay || 0;
+        setTimeout(() => {
+          el.classList.add('visible');
+        }, parseInt(delay));
+        observer.unobserve(el);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+  document.querySelectorAll('.reveal').forEach((el, i) => {
+    // Stagger grid children
+    if (el.classList.contains('grid-3') || el.classList.contains('grid-4') ||
+        el.style.display === 'grid' || el.style.gridTemplateColumns) {
+      const children = el.children;
+      Array.from(children).forEach((child, j) => {
+        child.classList.add('reveal');
+        child.dataset.delay = j * 100;
+        observer.observe(child);
+      });
+    }
+    if (!el.dataset.delay) {
+      el.dataset.delay = (i % 5) * 80;
+    }
+    observer.observe(el);
+  });
+})();
+
+// ==========================================
+// NAV SCROLL EFFECT
+// ==========================================
+(function() {
+  const nav = document.querySelector('nav');
+  if (!nav) return;
+
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 50) {
+      nav.classList.add('nav-scrolled');
+    } else {
+      nav.classList.remove('nav-scrolled');
+    }
+  });
+})();
+
+// ==========================================
+// FRAMEWORK TABS
+// ==========================================
+(function() {
+  document.querySelectorAll('[data-tab-group]').forEach(group => {
+    const tabs = group.querySelectorAll('[data-tab]');
+    const panels = group.querySelectorAll('[data-panel]');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.tab;
+        tabs.forEach(t => t.classList.remove('active'));
+        panels.forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        const panel = group.querySelector(`[data-panel="${target}"]`);
+        if (panel) panel.classList.add('active');
+      });
+    });
+  });
+})();
+
+// ==========================================
+// COLD MODE TOGGLE
+// ==========================================
+(function() {
+  document.querySelectorAll('.cold-mode-toggle').forEach(toggle => {
+    toggle.addEventListener('click', () => {
+      toggle.classList.toggle('active');
+      const label = toggle.nextElementSibling;
+      if (label) {
+        label.textContent = toggle.classList.contains('active') ? 'COLD MODE: ON' : 'COLD MODE: OFF';
+      }
+    });
+  });
+})();
+
+// ==========================================
+// TIMELINE EXPAND/COLLAPSE
+// ==========================================
+(function() {
+  document.querySelectorAll('.timeline-item').forEach(item => {
+    const header = item.querySelector('.timeline-header');
+    if (!header) return;
+
+    header.addEventListener('click', () => {
+      const wasOpen = item.classList.contains('open');
+      // Close all
+      document.querySelectorAll('.timeline-item.open').forEach(i => i.classList.remove('open'));
+      if (!wasOpen) item.classList.add('open');
+    });
+  });
+})();
+
+// ==========================================
+// SMOOTH SCROLL
+// ==========================================
+(function() {
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+      e.preventDefault();
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+})();
+
+// ==========================================
+// FILTER REPOS (if applicable)
+// ==========================================
+(function() {
+  document.querySelectorAll('[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const category = btn.dataset.filter;
+      document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      document.querySelectorAll('[data-category]').forEach(item => {
+        if (category === 'all' || item.dataset.category === category) {
+          item.style.display = '';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

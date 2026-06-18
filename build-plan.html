@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS-01 — Build Plan</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+/* BUILD PLAN — PAGE-SPECIFIC STYLES */
+
+/* VERTICAL TIMELINE */
+.bp-timeline {
+  position: relative;
+  max-width: 900px;
+  margin: 48px auto 0;
+  padding-left: 60px;
+}
+.bp-timeline::before {
+  content: '';
+  position: absolute;
+  left: 23px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--blue), var(--purple), var(--pink), var(--green));
+}
+
+.bp-week {
+  position: relative;
+  margin-bottom: 32px;
+}
+.bp-week:last-child { margin-bottom: 0; }
+
+.bp-week-dot {
+  position: absolute;
+  left: -48px;
+  top: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 3px solid var(--bg);
+  z-index: 1;
+}
+.bp-week-dot.blue { background: var(--blue); box-shadow: 0 0 12px rgba(0,212,255,0.4); }
+.bp-week-dot.purple { background: var(--purple); box-shadow: 0 0 12px rgba(139,92,246,0.4); }
+.bp-week-dot.pink { background: var(--pink); box-shadow: 0 0 12px rgba(236,72,153,0.4); }
+.bp-week-dot.green { background: var(--green); box-shadow: 0 0 12px rgba(16,185,129,0.4); }
+
+.bp-week-card {
+  padding: 24px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  transition: all 0.3s;
+}
+.bp-week-card:hover {
+  border-color: rgba(0,212,255,0.2);
+  transform: translateX(4px);
+}
+.bp-week-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.bp-week-num.blue { color: var(--blue); }
+.bp-week-num.purple { color: var(--purple); }
+.bp-week-num.pink { color: var(--pink); }
+.bp-week-num.green { color: var(--green); }
+
+.bp-week-card h4 {
+  font-size: 1.05rem;
+  margin-bottom: 8px;
+}
+.bp-week-card ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.bp-week-card li {
+  font-size: 0.85rem;
+  color: var(--text2);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.bp-week-card li::before {
+  content: '•';
+  color: var(--blue);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.bp-deliverable {
+  padding: 12px 16px;
+  border-radius: var(--radius-xs);
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--glass-border);
+  font-size: 0.8rem;
+  color: var(--text2);
+}
+.bp-deliverable strong {
+  color: var(--text);
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* PHASE HEADER */
+.bp-phase-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+  padding: 16px 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+}
+.bp-phase-header.blue { border-left: 3px solid var(--blue); }
+.bp-phase-header.purple { border-left: 3px solid var(--purple); }
+.bp-phase-header.pink { border-left: 3px solid var(--pink); }
+.bp-phase-header.green { border-left: 3px solid var(--green); }
+.bp-phase-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.bp-phase-weeks {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text3);
+}
+
+/* COST BARS */
+.cost-chart {
+  max-width: 700px;
+  margin: 40px auto 0;
+}
+.cost-tier {
+  margin-bottom: 32px;
+}
+.cost-tier-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.cost-tier-name {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.cost-tier-amount {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+.cost-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.cost-bar-label {
+  width: 120px;
+  font-size: 0.8rem;
+  color: var(--text2);
+  flex-shrink: 0;
+}
+.cost-bar-track {
+  flex: 1;
+  height: 24px;
+  border-radius: var(--radius-xs);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--glass-border);
+  overflow: hidden;
+  position: relative;
+}
+.cost-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 10px;
+  font-size: 0.7rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: #fff;
+  animation: barGrow 1.5s cubic-bezier(0.16,1,0.3,1) forwards;
+  width: 0;
+}
+.cost-bar-fill.blue { background: linear-gradient(90deg, var(--blue), var(--cyan)); }
+.cost-bar-fill.purple { background: linear-gradient(90deg, var(--purple), var(--pink)); }
+.cost-bar-fill.green { background: linear-gradient(90deg, var(--green), var(--blue)); }
+.cost-bar-fill.pink { background: linear-gradient(90deg, var(--pink), var(--amber)); }
+.cost-bar-fill.amber { background: linear-gradient(90deg, var(--amber), var(--pink)); }
+
+/* TIME INVESTMENT BARS */
+.time-bars {
+  max-width: 700px;
+  margin: 40px auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.time-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.time-label {
+  width: 180px;
+  font-size: 0.8rem;
+  color: var(--text2);
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.time-label .week {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: var(--text);
+}
+.time-bar-track {
+  flex: 1;
+  height: 20px;
+  border-radius: var(--radius-xs);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--glass-border);
+  overflow: hidden;
+}
+.time-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  font-size: 0.7rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: #fff;
+  animation: barGrow 1.5s cubic-bezier(0.16,1,0.3,1) forwards;
+  width: 0;
+}
+.time-total {
+  text-align: center;
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  font-size: 0.9rem;
+  color: var(--text2);
+}
+.time-total strong {
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+/* PHASE GATE CARDS */
+.gate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin-top: 40px;
+}
+.gate-card {
+  padding: 28px;
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  position: relative;
+  overflow: hidden;
+}
+.gate-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+.gate-card.blue::before { background: linear-gradient(90deg, var(--blue), var(--cyan)); }
+.gate-card.purple::before { background: linear-gradient(90deg, var(--purple), var(--pink)); }
+.gate-card.pink::before { background: linear-gradient(90deg, var(--pink), var(--amber)); }
+.gate-card.green::before { background: linear-gradient(90deg, var(--green), var(--blue)); }
+.gate-card h4 {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+.gate-card .gate-phase {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text3);
+  margin-bottom: 16px;
+}
+.gate-checklist {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gate-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--text2);
+}
+.gate-checklist .icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+@media(max-width:768px) {
+  .bp-timeline { padding-left: 44px; }
+  .bp-timeline::before { left: 16px; }
+  .bp-week-dot { left: -38px; width: 16px; height: 16px; }
+  .gate-grid { grid-template-columns: 1fr; }
+  .cost-bar-label { width: 90px; font-size: 0.75rem; }
+  .time-label { width: 130px; font-size: 0.75rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+  <div class="container">
+    <a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="frameworks.html">Frameworks</a></li>
+      <li><a href="agents.html">Agents</a></li>
+      <li><a href="build-plan.html" class="active">Build Plan</a></li>
+      <li><a href="repos.html">Repos</a></li>
+      <li><a href="research.html">Research</a></li>
+      <li><a href="skills.html">Skills</a></li>
+      <li><a href="use-cases.html">Use Cases</a></li>
+      <li><a href="costs.html">Costs</a></li>
+      <li><a href="https://github.com/xosbot/nexus01-framework" class="nav-cta" target="_blank">GitHub</a></li>
+    </ul>
+    <button class="nav-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</button>
+  </div>
+</nav>
+
+<!-- PAGE HERO -->
+<section class="page-hero">
+  <div class="container">
+    <div class="breadcrumb reveal"><a href="index.html">Home</a> / Build Plan</div>
+    <h1 class="reveal">The <span class="gradient-text">Build Plan</span></h1>
+    <p class="subtitle reveal">12 weeks from zero to production. Every week has a deliverable.</p>
+  </div>
+</section>
+
+<!-- TIMELINE -->
+<section class="section">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Week-by-Week <span class="gradient-text">Roadmap</span></h2>
+      <p>Four phases. Twelve weeks. Zero ambiguity. Every week ends with something working.</p>
+    </div>
+
+    <div class="bp-timeline">
+
+      <!-- PHASE 1 -->
+      <div class="bp-phase-header blue reveal">
+        <div>
+          <div class="bp-phase-title">Phase 1: The Skeleton</div>
+          <div class="bp-phase-weeks">Weeks 1–3</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot blue"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num blue">WEEK 1</div>
+          <h4>Infrastructure & Bootstrap</h4>
+          <ul>
+            <li>Provision VPS (Hetzner CX22, €4.50/mo)</li>
+            <li>SSH hardening (ED25519 keys only)</li>
+            <li>Initialize /opt/nexus/ project structure</li>
+            <li>Docker Compose for local dev</li>
+            <li>Deploy CI/CD skeleton (GitHub Actions)</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> VPS accessible, project structure ready</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot blue"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num blue">WEEK 2</div>
+          <h4>Core Messaging</h4>
+          <ul>
+            <li>Extract XClaw core modules (LLM Router, Agent Loop, Tool Registry)</li>
+            <li>Implement Redis pub/sub message bus</li>
+            <li>Agent base class with lifecycle hooks</li>
+            <li>Heartbeat/health check system</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> 2 agents can exchange typed messages via Redis</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot blue"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num blue">WEEK 3</div>
+          <h4>Config & Cold Mode</h4>
+          <ul>
+            <li>Centralized config (pydantic-settings, .env + YAML)</li>
+            <li>Cold Mode protocol implementation</li>
+            <li>Structured logging (structlog → journald)</li>
+            <li>Phase 1 integration tests</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> Cold Mode gates all agent decisions</div>
+        </div>
+      </div>
+
+      <!-- PHASE 2 -->
+      <div class="bp-phase-header purple reveal">
+        <div>
+          <div class="bp-phase-title">Phase 2: The Brain</div>
+          <div class="bp-phase-weeks">Weeks 4–6</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot purple"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num purple">WEEK 4</div>
+          <h4>LLM Integration</h4>
+          <ul>
+            <li>Unified LLM client with provider abstraction</li>
+            <li>Gemini Pro (primary), Claude 3.5 (reasoning), Perplexity (search)</li>
+            <li>Retry logic with exponential backoff + circuit breaker</li>
+            <li>Token counting and cost tracking</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> LLM routing works with 3 providers</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot purple"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num purple">WEEK 5</div>
+          <h4>RAG Infrastructure</h4>
+          <ul>
+            <li>Supabase project with pgvector extension</li>
+            <li>Document ingestion pipeline (chunking → embedding → storage)</li>
+            <li>Embed text-embedding-3-large (OpenAI)</li>
+            <li>Ingest all tradecraft docs</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> Query "What is Cold Mode?" returns relevant chunks</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot purple"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num purple">WEEK 6</div>
+          <h4>Agent Memory</h4>
+          <ul>
+            <li>Short-term: Redis conversation buffer</li>
+            <li>Long-term: Supabase vector store</li>
+            <li>Working memory: Agent-scoped scratchpad</li>
+            <li>Memory consolidation: periodic summarization</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> Agent memory persists across restarts</div>
+        </div>
+      </div>
+
+      <!-- PHASE 3 -->
+      <div class="bp-phase-header pink reveal">
+        <div>
+          <div class="bp-phase-title">Phase 3: The Hands & Eyes</div>
+          <div class="bp-phase-weeks">Weeks 7–10</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot pink"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num pink">WEEK 7</div>
+          <h4>OSINT Agent</h4>
+          <ul>
+            <li>Web scraping (httpx + BeautifulSoup4)</li>
+            <li>Social media monitoring</li>
+            <li>Financial intelligence integration</li>
+            <li>Structured intelligence reports</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> Agent gathers and structures intelligence</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot pink"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num pink">WEEK 8</div>
+          <h4>Execution Agent + Telegram</h4>
+          <ul>
+            <li>Shell command execution with permission levels</li>
+            <li>Sandboxed execution environments</li>
+            <li>Telegram bot interface</li>
+            <li>Human-in-the-loop approval</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> Telegram command → agent receives → response</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot pink"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num pink">WEEK 9</div>
+          <h4>Analytics Agent</h4>
+          <ul>
+            <li>Pattern recognition on collected data</li>
+            <li>Anomaly detection (Z-score on rolling windows)</li>
+            <li>Daily summary generation</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> Analytics detects synthetic anomalies</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot pink"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num pink">WEEK 10</div>
+          <h4>Protocol Alpha + Integration</h4>
+          <ul>
+            <li>Timing Engine (See → Sense → Decide → Act)</li>
+            <li>Full Cold Mode wiring across all agents</li>
+            <li>End-to-end integration tests</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> Full pipeline: Telegram → OSINT → Analytics → Execution</div>
+        </div>
+      </div>
+
+      <!-- PHASE 4 -->
+      <div class="bp-phase-header green reveal">
+        <div>
+          <div class="bp-phase-title">Phase 4: Harden & Ship</div>
+          <div class="bp-phase-weeks">Weeks 11–12</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot green"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num green">WEEK 11</div>
+          <h4>Observability & Security</h4>
+          <ul>
+            <li>Prometheus + Grafana monitoring</li>
+            <li>Security audit (no secrets in code)</li>
+            <li>RBAC implementation</li>
+            <li>Audit trail logging</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> Monitoring dashboard, security hardened</div>
+        </div>
+      </div>
+
+      <div class="bp-week reveal">
+        <div class="bp-week-dot green"></div>
+        <div class="bp-week-card glass">
+          <div class="bp-week-num green">WEEK 12</div>
+          <h4>Documentation & Deploy</h4>
+          <ul>
+            <li>Operational runbook</li>
+            <li>Automated backup strategy</li>
+            <li>Deployment script (zero-downtime)</li>
+            <li>Final integration test suite</li>
+          </ul>
+          <div class="bp-deliverable"><strong>Deliverable</strong> Production-ready framework</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- COST SUMMARY -->
+<section class="section" style="border-top:1px solid var(--glass-border)">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Investment <span class="gradient-text">Summary</span></h2>
+      <p>Local-first means cost-last. Start free. Scale cheaply when you need to.</p>
+    </div>
+
+    <div class="cost-chart reveal">
+      <div class="cost-tier">
+        <div class="cost-tier-header">
+          <span class="cost-tier-name">MVP (Local)</span>
+          <span class="cost-tier-amount" style="color:var(--green)">$0/month</span>
+        </div>
+        <div class="cost-bar-row">
+          <span class="cost-bar-label">Ollama</span>
+          <div class="cost-bar-track"><div class="cost-bar-fill green" style="--w:10%">$0</div></div>
+        </div>
+        <div class="cost-bar-row">
+          <span class="cost-bar-label">SQLite</span>
+          <div class="cost-bar-track"><div class="cost-bar-fill green" style="--w:10%">$0</div></div>
+        </div>
+        <div class="cost-bar-row">
+          <span class="cost-bar-label">ChromaDB</span>
+          <div class="cost-bar-track"><div class="cost-bar-fill green" style="--w:10%">$0</div></div>
+        </div>
+        <div class="cost-bar-row">
+          <span class="cost-bar-label">Telegram Bot</span>
+          <div class="cost-bar-track"><div class="cost-bar-fill green" style="--w:10%">$0</div></div>
+        </div>
+      </div>
+
+      <div class="cost-tier">
+        <div class="cost-tier-header">
+          <span class="cost-tier-name">Production</span>
+          <span class="cost-tier-amount" style="color:var(--blue)">~$42/month</span>
+        </div>
+        <div class="cost-bar-row">
+          <span class="cost-bar-label">VPS</span>
+          <div class="cost-bar-track"><div class="cost-bar-fill blue" style="--w:12%">$5</div></div>
+        </div>
+        <div class="cost-bar-row">
+          <span class="cost-bar-label">Claude API</span>
+          <div class="cost-bar-track"><div class="cost-bar-fill purple" style="--w:36%">$15</div></div>
+        </div>
+        <div class="cost-bar-row">
+          <span class="cost-bar-label">Perplexity</span>
+          <div class="cost-bar-track"><div class="cost-bar-fill pink" style="--w:48%">$20</div></div>
+        </div>
+        <div class="cost-bar-row">
+          <span class="cost-bar-label">Embeddings</span>
+          <div class="cost-bar-track"><div class="cost-bar-fill amber" style="--w:3%">$1</div></div>
+        </div>
+        <div class="cost-bar-row">
+          <span class="cost-bar-label">Supabase</span>
+          <div class="cost-bar-track"><div class="cost-bar-fill green" style="--w:10%">$0</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TIME INVESTMENT -->
+<section class="section" style="border-top:1px solid var(--glass-border)">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Time <span class="gradient-text">Investment</span></h2>
+      <p>Realistic hours per week. Not a sprint — a sustained cadence.</p>
+    </div>
+
+    <div class="time-bars reveal" id="timeBars">
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 1</span> Infrastructure</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:67%;background:linear-gradient(90deg,var(--blue),var(--cyan))">15-20h</div></div>
+      </div>
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 2</span> Core messaging</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:83%;background:linear-gradient(90deg,var(--blue),var(--cyan))">20-25h</div></div>
+      </div>
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 3</span> Config + Cold Mode</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:67%;background:linear-gradient(90deg,var(--blue),var(--cyan))">15-20h</div></div>
+      </div>
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 4</span> LLM integration</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:83%;background:linear-gradient(90deg,var(--purple),var(--pink))">20-25h</div></div>
+      </div>
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 5</span> RAG setup</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:67%;background:linear-gradient(90deg,var(--purple),var(--pink))">15-20h</div></div>
+      </div>
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 6</span> Memory systems</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:67%;background:linear-gradient(90deg,var(--purple),var(--pink))">15-20h</div></div>
+      </div>
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 7</span> OSINT agent</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:100%;background:linear-gradient(90deg,var(--pink),var(--amber))">25-30h</div></div>
+      </div>
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 8</span> Execution + Telegram</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:100%;background:linear-gradient(90deg,var(--pink),var(--amber))">25-30h</div></div>
+      </div>
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 9</span> Analytics agent</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:83%;background:linear-gradient(90deg,var(--pink),var(--amber))">20-25h</div></div>
+      </div>
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 10</span> Protocol Alpha</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:83%;background:linear-gradient(90deg,var(--pink),var(--amber))">20-25h</div></div>
+      </div>
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 11</span> Hardening</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:67%;background:linear-gradient(90deg,var(--green),var(--blue))">15-20h</div></div>
+      </div>
+      <div class="time-row">
+        <div class="time-label"><span class="week">Week 12</span> Documentation</div>
+        <div class="time-bar-track"><div class="time-bar-fill" style="--w:50%;background:linear-gradient(90deg,var(--green),var(--blue))">10-15h</div></div>
+      </div>
+      <div class="time-total">
+        Total: <strong>~220–275 hours</strong> over 12 weeks
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SUCCESS CRITERIA -->
+<section class="section" style="border-top:1px solid var(--glass-border)">
+  <div class="container">
+    <div class="section-header center reveal">
+      <h2>Phase Gate <span class="gradient-text">Criteria</span></h2>
+      <p>Every phase ends with a gate. Pass all criteria or don't ship.</p>
+    </div>
+
+    <div class="gate-grid reveal">
+      <div class="gate-card blue glass">
+        <h4>Phase 1: The Skeleton</h4>
+        <div class="gate-phase">Weeks 1–3</div>
+        <ul class="gate-checklist">
+          <li><span class="icon" style="color:var(--blue)">●</span> VPS accessible via SSH (ED25519)</li>
+          <li><span class="icon" style="color:var(--blue)">●</span> Redis pub/sub working between agents</li>
+          <li><span class="icon" style="color:var(--blue)">●</span> Cold Mode gates all agent decisions</li>
+          <li><span class="icon" style="color:var(--blue)">●</span> Integration tests passing</li>
+          <li><span class="icon" style="color:var(--blue)">●</span> Docker Compose starts all services</li>
+        </ul>
+      </div>
+
+      <div class="gate-card purple glass">
+        <h4>Phase 2: The Brain</h4>
+        <div class="gate-phase">Weeks 4–6</div>
+        <ul class="gate-checklist">
+          <li><span class="icon" style="color:var(--purple)">●</span> LLM routing works with 3 providers</li>
+          <li><span class="icon" style="color:var(--purple)">●</span> Documents ingested and queryable via RAG</li>
+          <li><span class="icon" style="color:var(--purple)">●</span> Agent memory persists across restarts</li>
+          <li><span class="icon" style="color:var(--purple)">●</span> Token costs tracked per request</li>
+          <li><span class="icon" style="color:var(--purple)">●</span> Structured logging to journald</li>
+        </ul>
+      </div>
+
+      <div class="gate-card pink glass">
+        <h4>Phase 3: Hands & Eyes</h4>
+        <div class="gate-phase">Weeks 7–10</div>
+        <ul class="gate-checklist">
+          <li><span class="icon" style="color:var(--pink)">●</span> OSINT Agent gathers and structures intel</li>
+          <li><span class="icon" style="color:var(--pink)">●</span> Telegram → agent → response working</li>
+          <li><span class="icon" style="color:var(--pink)">●</span> Analytics detects synthetic anomalies</li>
+          <li><span class="icon" style="color:var(--pink)">●</span> Full pipeline: Telegram → OSINT → Analytics → Execution</li>
+          <li><span class="icon" style="color:var(--pink)">●</span> Human-in-the-loop approval for high-risk actions</li>
+        </ul>
+      </div>
+
+      <div class="gate-card green glass">
+        <h4>Phase 4: Harden & Ship</h4>
+        <div class="gate-phase">Weeks 11–12</div>
+        <ul class="gate-checklist">
+          <li><span class="icon" style="color:var(--green)">●</span> Prometheus + Grafana monitoring active</li>
+          <li><span class="icon" style="color:var(--green)">●</span> Security audit complete (no secrets in code)</li>
+          <li><span class="icon" style="color:var(--green)">●</span> Automated backups configured and tested</li>
+          <li><span class="icon" style="color:var(--green)">●</span> Zero-downtime deployment script working</li>
+          <li><span class="icon" style="color:var(--green)">●</span> Operational runbook documented</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand"><a href="index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a><p>A minimal, modular agentic AI framework.</p></div>
+      <div class="footer-col"><h4>Pages</h4><a href="architecture.html">Architecture</a><a href="frameworks.html">Frameworks</a><a href="agents.html">Agents</a><a href="build-plan.html">Build Plan</a></div>
+      <div class="footer-col"><h4>Research</h4><a href="repos.html">Repositories</a><a href="research.html">Starred Repos</a><a href="skills.html">Skills System</a><a href="use-cases.html">Use Cases</a></div>
+      <div class="footer-col"><h4>Connect</h4><a href="https://github.com/xosbot/nexus01-framework" target="_blank">GitHub</a></div>
+    </div>
+    <div class="footer-bottom"><span>Built with precision. Powered by agents.</span><span>© 2026 NEXUS-01</span></div>
+  </div>
+</footer>
+
+<script>
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Nav scroll
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 40);
+});
+
+// Animate cost/time bars on scroll
+const barObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('[style*="--w"]').forEach(bar => {
+        bar.style.width = bar.style.getPropertyValue('--w');
+      });
+    }
+  });
+}, { threshold: 0.2 });
+document.querySelectorAll('.cost-chart, .time-bars').forEach(el => barObserver.observe(el));
+</script>
+</body>
+</html>
