@@ -1,0 +1,8 @@
+# NEXUS-01 Configuration
+# Copy to config.yaml and adjust as needed
+
+ollama_url: "http://localhost:11434"
+ollama_model: "llama3.2"
+cold_mode_enabled: true
+max_history: 50
+# telegram_token: ""  # Optional: enable Telegram control
