@@ -1,0 +1,29 @@
+---
+description: "NEXUS-01 architecture rules — bus, agents, gateway patterns"
+alwaysApply: true
+---
+
+# Architecture Rules
+
+## Message Bus Pattern
+- All inter-agent communication goes through the message bus
+- Never call agent methods directly from other agents — use `bus.request()`
+- Messages are `Message(sender, recipient, type, payload)` dataclasses
+- Use `bus.request()` for request/response, `bus.publish()` for fire-and-forget
+
+## Agent Structure
+- Agents inherit from a base class with `handle(message)` method
+- Agents must not import or reference other agents directly
+- Agent state lives in Memory, not in agent instance variables
+- Agent tools are registered via `ToolRegistry`, not hardcoded
+
+## Gateway Pattern
+- Gateway receives `InboundMessage` from channels, routes to bus
+- Gateway handles approval flows (HITL) via `approval_id` correlation
+- Channels are adapters — they translate platform-specific formats to `InboundMessage`
+- Never put business logic in channel adapters
+
+## Cold Mode Gate
+- Every destructive action must pass Cold Mode's 5-step checklist
+- Cold Mode is a hard gate, not a suggestion
+- If Cold Mode blocks an action, log the reason and return error to user

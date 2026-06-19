@@ -1,0 +1,42 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "default_agent": "nexus-dev",
+  "agent": {
+    "nexus-dev": {
+      "description": "NEXUS-01 framework developer. Writes Python, manages bus/agents/gateway, enforces cold mode.",
+      "mode": "primary",
+      "permission": {
+        "bash": {
+          "pytest *": "allow",
+          "ruff *": "allow",
+          "mypy *": "allow",
+          "pip *": "ask",
+          "*": "ask"
+        }
+      }
+    },
+    "devops": {
+      "description": "DevOps agent for Docker, CI/CD, VPS provisioning, deployment scripts.",
+      "mode": "subagent",
+      "permission": {
+        "bash": {
+          "docker *": "allow",
+          "python scripts/*": "allow",
+          "*": "ask"
+        }
+      }
+    },
+    "reviewer": {
+      "description": "Code reviewer. Checks for security, cold mode compliance, bus pattern adherence.",
+      "mode": "subagent",
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "pytest *": "allow",
+          "ruff *": "allow"
+        }
+      }
+    }
+  }
+}

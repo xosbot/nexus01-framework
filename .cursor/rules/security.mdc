@@ -1,0 +1,25 @@
+---
+description: "Security rules — secrets, sandboxing, approval gates"
+globs: "**/*.py"
+alwaysApply: true
+---
+
+# Security Rules
+
+## Secrets
+- All secrets in env vars or `config.yaml` (gitignored)
+- Never commit API keys, tokens, passwords
+- Use `${ENV_VAR}` syntax in YAML for env expansion
+- `.gitignore` must include `config.yaml`, `*.db`, `data/`
+
+## Executor Sandboxing
+- All executor agent commands run inside Docker containers
+- Containers must have: CPU limit, memory limit, network disabled, read-only root
+- Timeout on every execution (default 30s)
+- No `--privileged` or `--cap-add` unless explicitly approved
+
+## Approval Gates (HITL)
+- Destructive operations require human approval via Telegram
+- Approval flow: agent requests → gateway sends approval prompt → user responds
+- Timeout on approvals (5 min default) — auto-deny on expiry
+- Log every approval decision (approved/denied/expired)

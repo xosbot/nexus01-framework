@@ -1,0 +1,73 @@
+# NEXUS-01 LLM Router — Ollama-first with cloud fallback
+# Adapted from XClaw/brain/llm_router.py
+
+routing:
+  cheap_max_words: 30
+  standard_max_words: 120
+  premium_keywords: [implement, architect, refactor, comprehensive, debug, "step by step"]
+  standard_keywords: [research, analyse, analyze, summarize, explain, search, investigate]
+
+providers:
+  - name: ollama_local
+    provider: ollama
+    model: "${OLLAMA_MODEL:-llama3.1}"
+    base_url: "${OLLAMA_URL:-http://localhost:11434}/v1"
+    api_key: ollama
+    timeout_seconds: 120
+    tier: cheap
+    cost_per_1m_tokens: 0.0
+    supports_tool_calling: false
+    supports_streaming: true
+
+  - name: gemini_flash
+    provider: gemini
+    model: gemini-2.0-flash
+    api_key: "${GEMINI_API_KEY}"
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
+    timeout_seconds: 30
+    tier: cheap
+    cost_per_1m_tokens: 0.075
+    supports_tool_calling: true
+    supports_streaming: true
+
+  - name: groq_fast
+    provider: groq
+    model: llama-3.1-8b-instant
+    api_key: "${GROQ_API_KEY}"
+    timeout_seconds: 15
+    tier: standard
+    cost_per_1m_tokens: 0.05
+    supports_tool_calling: true
+    supports_streaming: true
+
+  - name: openai_mini
+    provider: openai
+    model: gpt-4o-mini
+    api_key: "${OPENAI_API_KEY}"
+    timeout_seconds: 30
+    tier: standard
+    cost_per_1m_tokens: 0.15
+    supports_tool_calling: true
+    supports_streaming: true
+
+  - name: claude_sonnet
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+    api_key: "${ANTHROPIC_API_KEY}"
+    timeout_seconds: 45
+    max_tokens: 4096
+    tier: premium
+    cost_per_1m_tokens: 3.0
+    supports_tool_calling: true
+    supports_streaming: false
+
+tier_order:
+  cheap: [ollama_local, gemini_flash]
+  standard: [ollama_local, gemini_flash, groq_fast, openai_mini]
+  premium: [claude_sonnet, gemini_flash, groq_fast, openai_mini, ollama_local]
+
+agent_loop:
+  default_tier: standard
+
+system_prompt: |
+  You are NEXUS-01, a precise agentic AI assistant. Be direct, structured, and action-oriented.

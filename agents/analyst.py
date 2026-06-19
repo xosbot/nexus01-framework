@@ -5,8 +5,8 @@ from core.memory import Memory
 from core.llm import OllamaClient
 
 class AnalystAgent(BaseAgent):
-    def __init__(self, llm: OllamaClient, memory: Memory):
-        super().__init__("analyst", llm, memory)
+    def __init__(self, llm, memory, rag=None):
+        super().__init__("analyst", llm, memory, rag)
         self.tools = {
             "analyze_data": self._analyze_data,
             "detect_anomaly": self._detect_anomaly,
@@ -17,7 +17,8 @@ class AnalystAgent(BaseAgent):
         data = message.payload.get("data", {})
         query = message.payload.get("query", "analyze")
 
-        self.memory.save_conversation(self.name, "user", str(data))
+        session_id = message.payload.get("session_id")
+        self.memory.save_conversation(self.name, "user", str(data), session_id)
 
         analysis_prompt = f"""Analyze this data and provide insights:
 Data: {data}
@@ -28,7 +29,7 @@ Provide:
 3. Key insights
 4. Recommended actions"""
 
-        analysis = await self.think(analysis_prompt)
+        analysis = await self.think(analysis_prompt, session_id=session_id)
 
         anomalies = self._detect_anomaly(data) if isinstance(data, dict) else {"anomalies": []}
 
@@ -38,7 +39,7 @@ Provide:
             "status": "complete"
         }
 
-        self.memory.save_conversation(self.name, "assistant", analysis)
+        self.memory.save_conversation(self.name, "assistant", analysis, session_id)
         self.memory.save_knowledge(f"analysis_{query}", str(report), {"agent": self.name})
 
         return report

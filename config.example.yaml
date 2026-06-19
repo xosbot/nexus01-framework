@@ -1,8 +1,54 @@
-# NEXUS-01 Configuration
-# Copy to config.yaml and adjust as needed
+# NEXUS-01 Agentic OS Configuration
+# Copy to config.yaml
 
 ollama_url: "http://localhost:11434"
 ollama_model: "llama3.2"
 cold_mode_enabled: true
-max_history: 50
-# telegram_token: ""  # Optional: enable Telegram control
+require_approval_for_exec: true
+
+# Web OS + API
+enable_web_ui: true
+enable_cli: true
+api_host: "0.0.0.0"
+api_port: 8765
+
+# Channels (telegram is primary)
+enabled_channels:
+  - telegram
+
+# --- Telegram (primary) ---
+# telegram_token: ""
+# telegram_allowed_users: []
+
+# --- WhatsApp ---
+# whatsapp_token: ""
+# whatsapp_phone_number_id: ""
+# whatsapp_verify_token: "nexus-verify"
+
+# --- Discord ---
+# discord_token: ""
+
+# --- Slack ---
+# slack_bot_token: ""
+# slack_signing_secret: ""
+
+# --- Signal (signal-cli HTTP daemon) ---
+# signal_api_url: "http://127.0.0.1:8090"
+# signal_account: "+1234567890"
+
+# --- Microsoft Teams ---
+# teams_app_id: ""
+# teams_app_password: ""
+
+# --- Cloud LLM fallback (optional) ---
+# GEMINI_API_KEY, GROQ_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY
+
+# --- Phase 2: Cloud Brain ---
+bus_backend: local          # local | redis
+redis_url: "redis://localhost:6379"
+use_react_loop: true
+rag_enabled: true
+auto_ingest_docs: true
+docs_path: ".."
+# supabase_url: ""
+# supabase_key: ""

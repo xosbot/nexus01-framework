@@ -1,0 +1,19 @@
+[Unit]
+Description=NEXUS-01 Agentic AI OS
+After=network.target ollama.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+User=nexus
+WorkingDirectory=/opt/nexus/nexus01-framework
+Environment=PATH=/opt/nexus/nexus01-framework/.venv/bin:/usr/bin
+ExecStart=/opt/nexus/nexus01-framework/.venv/bin/python main.py --no-cli
+Restart=always
+RestartSec=5
+
+# Load secrets from env file
+EnvironmentFile=-/opt/nexus/nexus01-framework/.env
+
+[Install]
+WantedBy=multi-user.target

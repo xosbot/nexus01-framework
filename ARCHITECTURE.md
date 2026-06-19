@@ -71,9 +71,8 @@ Once this works, you scale by:
 | OSINT Agent | `agents/osint.py` | ~80 | Web scraping intelligence |
 | Executor Agent | `agents/executor.py` | ~70 | Command execution |
 | Analyst Agent | `agents/analyst.py` | ~70 | Pattern analysis |
-| Web Scraper | `tools/web_scraper.py` | ~50 | httpx + BeautifulSoup |
-| Shell Exec | `tools/shell_exec.py` | ~40 | subprocess wrapper |
-| Search | `tools/search.py` | ~40 | DuckDuckGo search |
+| Orchestrator | `agents/orchestrator.py` | ~90 | Intent routing + agent chains |
+| Web Scraper | `tools/web_scraper.py` | ~50 | httpx + BeautifulSoup + search |
 | Config | `config.py` | ~30 | YAML config loader |
 | Main | `main.py` | ~80 | Entry point + CLI |
 

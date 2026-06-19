@@ -5,3 +5,15 @@ sentence-transformers>=3.0.0
 python-telegram-bot>=21.0
 pyyaml>=6.0
 duckduckgo-search>=6.0
+redis>=5.0.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+aiohttp>=3.9.0
+pytest>=8.0
+pytest-asyncio>=0.24
+discord.py>=2.3.0
+
+# Phase 3 — Deploy & Control
+docker>=7.0.0
+hcloud>=2.0.0
+structlog>=24.0.0

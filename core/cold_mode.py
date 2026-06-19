@@ -1,6 +1,10 @@
 import statistics
 from dataclasses import dataclass
 
+READ_ACTIONS = frozenset({"read_file", "list", "query"})
+EXECUTE_ACTIONS = frozenset({"run_command", "write_file", "delete"})
+HIGH_RISK_PERMISSIONS = frozenset({"EXECUTE", "ADMIN"})
+
 @dataclass
 class CheckResult:
     passed: bool
@@ -8,8 +12,39 @@ class CheckResult:
     reason: str
 
 class ColdMode:
+    CONFIDENCE_THRESHOLD = 0.75
+
     def __init__(self, enabled: bool = True):
         self.enabled = enabled
+
+    @staticmethod
+    def build_context(
+        action: str = "",
+        permission: str = "READ",
+        confidence: float | None = None,
+        source_reliability: float | None = None,
+        numeric_values: list | None = None,
+        fallback_script: str | None = None,
+        reversible: bool | None = None,
+    ) -> dict:
+        requires_fallback = permission in HIGH_RISK_PERMISSIONS or action in EXECUTE_ACTIONS
+        if confidence is None:
+            confidence = 0.95 if permission == "READ" else 0.8
+        if reversible is None:
+            if fallback_script and action in EXECUTE_ACTIONS:
+                reversible = True
+            else:
+                reversible = action not in {"delete", "run_command"} or permission == "READ"
+        return {
+            "action": action,
+            "permission": permission,
+            "confidence": confidence,
+            "source_reliability": source_reliability if source_reliability is not None else 0.8,
+            "numeric_values": numeric_values or [],
+            "fallback_script": fallback_script,
+            "requires_fallback": requires_fallback,
+            "reversible": reversible,
+        }
 
     def evaluate(self, context: dict) -> list[CheckResult]:
         if not self.enabled:
@@ -43,7 +78,7 @@ class ColdMode:
 
     def _check_confidence(self, ctx: dict) -> CheckResult:
         confidence = ctx.get("confidence", 0)
-        if confidence < 0.7:
+        if confidence < self.CONFIDENCE_THRESHOLD:
             return CheckResult(False, "confidence", f"Confidence too low: {confidence:.2f}")
         return CheckResult(True, "confidence", f"Confidence adequate: {confidence:.2f}")
 
@@ -54,6 +89,8 @@ class ColdMode:
         return CheckResult(True, "risk", "Action is reversible")
 
     def _check_fallback(self, ctx: dict) -> CheckResult:
+        if not ctx.get("requires_fallback", False):
+            return CheckResult(True, "fallback", "Fallback not required for this action")
         has_fallback = ctx.get("fallback_script") is not None
         if not has_fallback:
             return CheckResult(False, "fallback", "No fallback script available")

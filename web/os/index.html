@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS-01 OS</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <div class="os-shell">
+    <aside class="sidebar">
+      <div class="logo"><span class="logo-dot"></span> NEXUS-01</div>
+      <div class="nav-section">Core</div>
+      <button class="nav-item active" data-panel="overview">📊 Overview</button>
+      <button class="nav-item" data-panel="chat">💬 Terminal / Chat</button>
+      <div class="nav-section">Workspace</div>
+      <button class="nav-item" data-panel="projects">📁 Projects</button>
+      <button class="nav-item" data-panel="sessions">🗂 Sessions</button>
+      <button class="nav-item" data-panel="memory">🧠 Memory</button>
+      <button class="nav-item" data-panel="rag">📚 RAG / Tradecraft</button>
+      <button class="nav-item" data-panel="costs">💰 LLM Costs</button>
+      <div class="nav-section">System</div>
+      <button class="nav-item" data-panel="agents">🤖 Agents</button>
+      <button class="nav-item" data-panel="channels">📡 Channels</button>
+      <button class="nav-item" data-panel="settings">⚙️ Settings</button>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <h1 id="panel-title">Overview</h1>
+        <div class="status-pill"><span class="status-dot" id="status-dot"></span><span id="status-text">Connecting...</span></div>
+      </header>
+
+      <div class="content">
+        <!-- Overview -->
+        <section class="panel active" id="panel-overview">
+          <div class="stats-grid" id="stats-grid"></div>
+          <div class="grid-2">
+            <div class="card">
+              <h3>Agent Activity</h3>
+              <canvas id="agent-chart" height="180"></canvas>
+            </div>
+            <div class="card">
+              <h3>LLM Providers</h3>
+              <div class="provider-list" id="provider-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Chat -->
+        <section class="panel" id="panel-chat">
+          <div class="chat-layout">
+            <div class="chat-sessions" id="chat-sessions"></div>
+            <div class="chat-main">
+              <div class="chat-messages" id="chat-messages">
+                <div class="empty">Start a conversation with NEXUS-01</div>
+              </div>
+              <div class="approval-bar" id="approval-bar">
+                <span>⚠️ Execution requires approval</span>
+                <div>
+                  <button class="btn btn-sm" id="btn-reject">Cancel</button>
+                  <button class="btn btn-sm btn-primary" id="btn-approve">Approve</button>
+                </div>
+              </div>
+              <div class="chat-input-row">
+                <input class="input" id="chat-input" placeholder="Ask anything — osint, analyze, exec..." autocomplete="off">
+                <button class="btn btn-primary" id="btn-send">Send</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Projects -->
+        <section class="panel" id="panel-projects">
+          <div class="toolbar">
+            <input class="input" id="project-name" placeholder="New project name">
+            <input class="input" id="project-desc" placeholder="Description (optional)">
+            <button class="btn btn-primary" id="btn-new-project">Create Project</button>
+          </div>
+          <div class="card"><table><thead><tr><th>Name</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody id="projects-table"></tbody></table></div>
+        </section>
+
+        <!-- Sessions -->
+        <section class="panel" id="panel-sessions">
+          <div class="card"><table><thead><tr><th>Title</th><th>Channel</th><th>Project</th><th>Updated</th><th></th></tr></thead><tbody id="sessions-table"></tbody></table></div>
+        </section>
+
+        <!-- Memory -->
+        <section class="panel" id="panel-memory">
+          <div class="toolbar">
+            <input class="input" id="memory-search" placeholder="Semantic search memory...">
+            <button class="btn" id="btn-memory-search">Search</button>
+          </div>
+          <div class="grid-2">
+            <div class="card">
+              <h3>Knowledge Store</h3>
+              <table><thead><tr><th>Key</th><th>Preview</th><th></th></tr></thead><tbody id="knowledge-table"></tbody></table>
+            </div>
+            <div class="card">
+              <h3>Search Results</h3>
+              <div id="search-results" class="empty">Enter a query to search vector memory</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- RAG -->
+        <section class="panel" id="panel-rag">
+          <div class="stats-grid" id="rag-stats"></div>
+          <div class="toolbar">
+            <input class="input" id="rag-query" placeholder="Search tradecraft knowledge...">
+            <button class="btn" id="btn-rag-search">Search</button>
+            <button class="btn btn-primary" id="btn-rag-ingest">Re-ingest Docs</button>
+          </div>
+          <div class="card"><div id="rag-results" class="empty">Search the tradecraft knowledge base</div></div>
+        </section>
+
+        <!-- Costs -->
+        <section class="panel" id="panel-costs">
+          <div class="stats-grid" id="cost-stats"></div>
+          <div class="card">
+            <h3>Recent LLM Usage</h3>
+            <table><thead><tr><th>Time</th><th>Provider</th><th>Model</th><th>Tokens</th><th>Cost</th><th>Agent</th></tr></thead>
+            <tbody id="costs-table"></tbody></table>
+          </div>
+        </section>
+
+        <!-- Agents -->
+        <section class="panel" id="panel-agents">
+          <div class="agent-grid" id="agent-grid"></div>
+        </section>
+
+        <!-- Channels -->
+        <section class="panel" id="panel-channels">
+          <div class="card"><div class="provider-list" id="channel-list"></div></div>
+        </section>
+
+        <!-- Settings -->
+        <section class="panel" id="panel-settings">
+          <div class="card">
+            <h3>NEXUS-01 Agentic OS</h3>
+            <p style="color:var(--text2);margin-top:8px;line-height:1.6">
+              Terminal: <code class="mono">python main.py</code> or <code class="mono">python nexus_cli.py</code><br>
+              Telegram: primary channel — set TELEGRAM_TOKEN<br>
+              API: <span class="mono" id="api-url"></span><br>
+              WebSocket: <span class="mono" id="ws-url"></span>
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+---
+description: "Testing conventions for NEXUS-01"
+globs: "tests/**/*.py"
+alwaysApply: false
+---
+
+# Testing Rules
+
+- Framework: `pytest` + `pytest-asyncio`
+- File naming: `test_<module>.py`
+- Function naming: `test_<what_it_tests>`
+- Mock all external services: LLM, Redis, Docker, Telegram API
+- Never hit real APIs or spin up real containers in unit tests
+- Test cold mode gate: both pass and block scenarios
+- Test bus routing: request/response and error propagation
+- Use `@pytest.mark.asyncio` for async test functions
+- Assert on specific values, not just "is not None"
+- Each test should be independent — no shared mutable state

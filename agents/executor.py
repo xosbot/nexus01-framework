@@ -7,12 +7,16 @@ from core.cold_mode import ColdMode
 from core.memory import Memory
 from core.llm import OllamaClient
 
+SANDBOX_ENABLED = True
+
+
 class ExecutorAgent(BaseAgent):
     PERMISSIONS = {"READ": 0, "WRITE": 1, "EXECUTE": 2, "ADMIN": 3}
 
-    def __init__(self, llm: OllamaClient, memory: Memory, cold_mode: ColdMode):
-        super().__init__("executor", llm, memory)
+    def __init__(self, llm, memory, cold_mode: ColdMode, rag=None, sandbox=None):
+        super().__init__("executor", llm, memory, rag)
         self.cold_mode = cold_mode
+        self._sandbox = sandbox
         self.tools = {
             "run_command": self._run_command,
             "read_file": self._read_file,
@@ -23,15 +27,14 @@ class ExecutorAgent(BaseAgent):
         action = message.payload.get("action", "")
         params = message.payload.get("params", {})
         permission_level = message.payload.get("permission", "READ")
-        required_level = self.PERMISSIONS.get(permission_level, 0)
 
-        context = {
-            "confidence": message.payload.get("confidence", 0.8),
-            "reversible": action != "delete",
-            "source_reliability": 0.8,
-            "fallback_script": params.get("fallback"),
-            "numeric_values": [],
-        }
+        context = ColdMode.build_context(
+            action=action,
+            permission=permission_level,
+            confidence=message.payload.get("confidence"),
+            fallback_script=params.get("fallback"),
+            numeric_values=message.payload.get("numeric_values", []),
+        )
 
         if self.cold_mode.should_block(context):
             reasons = self.cold_mode.get_failure_reasons(context)
@@ -48,6 +51,14 @@ class ExecutorAgent(BaseAgent):
         dangerous = ["rm -rf /", "chmod 777", "mkfs", "> /dev/sda", ":(){ :|:& };:"]
         if any(d in cmd for d in dangerous):
             return {"error": "Command blocked for safety", "exit_code": -1}
+
+        if self._sandbox and SANDBOX_ENABLED:
+            try:
+                result = await self._sandbox.run_command(cmd)
+                return result.to_dict()
+            except Exception as exc:
+                return {"error": f"Sandbox error: {exc}", "exit_code": -1}
+
         try:
             proc = await asyncio.create_subprocess_shell(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE

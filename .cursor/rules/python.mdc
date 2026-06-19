@@ -1,0 +1,20 @@
+---
+description: "Python code style for NEXUS-01"
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Python Style
+
+- `from __future__ import annotations` at top of every file
+- Type hints on all function signatures and return types
+- Use `dataclass` or `NamedTuple` for structured data, not raw dicts
+- Prefer `pathlib.Path` over `os.path`
+- f-strings for formatting, no `.format()` or `%`
+- One blank line between import groups: stdlib / third-party / local
+- Logger per module: `logger = logging.getLogger(__name__)`
+- No `print()` — use `logger.info()` / `logger.warning()` / `logger.error()`
+- Max function length ~50 lines. Break longer functions.
+- No bare `except:` — always catch specific exceptions
+- Use `async def` / `await` for all I/O — never blocking calls in async context
+- Docstrings: only on public API functions. One line. No obvious comments.
