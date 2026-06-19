@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS-01 — API Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--blue:#00d4ff;--purple:#8b5cf6;--pink:#ec4899;--green:#10b981;--amber:#f59e0b;--cyan:#06b6d4;--bg:#0a0a0f;--bg2:#0f0f18;--bg3:#14141f;--glass:rgba(255,255,255,0.03);--glass-border:rgba(255,255,255,0.06);--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--text4:#475569;--radius:16px;--radius-sm:12px;--radius-xs:8px;--nav-height:72px}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;line-height:1.7;overflow-x:hidden}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+.gradient-text{background:linear-gradient(135deg,var(--blue),var(--purple),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+code{font-family:'JetBrains Mono',monospace;font-size:0.88em;background:rgba(0,212,255,0.08);padding:2px 8px;border-radius:4px;color:var(--blue)}
+pre{background:var(--bg2);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:20px 24px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:0.85rem;line-height:1.7;margin:16px 0;color:var(--text2)}
+pre code{background:none;padding:0;color:inherit}
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;height:var(--nav-height);display:flex;align-items:center;backdrop-filter:blur(20px);background:rgba(10,10,15,0.8);border-bottom:1px solid transparent}
+.nav .container{display:flex;align-items:center;justify-content:space-between;width:100%}
+.nav-logo{font-weight:800;font-size:1.1rem;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace}
+.nav-logo-dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple))}
+.nav-links{display:flex;list-style:none;gap:6px;align-items:center}
+.nav-links a{color:var(--text2);text-decoration:none;font-size:0.85rem;padding:8px 12px;border-radius:var(--radius-xs);transition:all 0.2s;font-weight:500}
+.nav-links a:hover,.nav-links a.active{color:var(--text);background:rgba(255,255,255,0.05)}
+.layout{display:grid;grid-template-columns:240px 1fr;gap:48px;padding-top:var(--nav-height);min-height:100vh}
+.sidebar{position:sticky;top:var(--nav-height);height:calc(100vh - var(--nav-height));overflow-y:auto;padding:32px 0;border-right:1px solid var(--glass-border)}
+.sidebar-section{margin-bottom:24px}
+.sidebar-section h4{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text4);margin-bottom:8px;padding-left:16px}
+.sidebar a{display:block;padding:8px 16px;font-size:0.88rem;color:var(--text3);text-decoration:none;border-radius:var(--radius-xs);transition:all 0.2s;border-left:2px solid transparent}
+.sidebar a:hover{color:var(--text);background:rgba(255,255,255,0.03)}
+.sidebar a.active{color:var(--blue);border-left-color:var(--blue);background:rgba(0,212,255,0.05)}
+.content{padding:48px 0 80px}
+.content h1{font-size:2.5rem;font-weight:800;letter-spacing:-1px;margin-bottom:16px}
+.content h2{font-size:1.6rem;font-weight:700;margin:48px 0 16px;padding-top:24px;border-top:1px solid var(--glass-border)}
+.content h3{font-size:1.2rem;font-weight:600;margin:32px 0 12px}
+.content p{color:var(--text2);margin-bottom:16px;font-size:0.95rem}
+.content ul,.content ol{color:var(--text2);margin:0 0 16px 20px;font-size:0.95rem}
+.content li{margin-bottom:6px}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:0.88rem}
+th{text-align:left;padding:12px 16px;background:var(--bg2);color:var(--text);font-weight:600;border-bottom:1px solid var(--glass-border)}
+td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--text2)}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.callout{padding:16px 20px;border-radius:var(--radius-sm);margin:16px 0;font-size:0.9rem;border-left:3px solid}
+.callout.info{background:rgba(0,212,255,0.05);border-color:var(--blue);color:var(--text2)}
+.callout.warn{background:rgba(245,158,11,0.05);border-color:var(--amber);color:var(--text2)}
+.method{display:inline-block;padding:4px 10px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.75rem;font-weight:700;margin-right:8px}
+.method-get{background:rgba(16,185,129,0.15);color:var(--green)}
+.method-async{background:rgba(139,92,246,0.15);color:var(--purple)}
+.method-class{background:rgba(0,212,255,0.15);color:var(--blue)}
+@media(max-width:768px){.layout{grid-template-columns:1fr}.sidebar{display:none}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="container">
+    <a href="../index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Docs</a></li>
+      <li><a href="quickstart.html">Quickstart</a></li>
+      <li><a href="api.html" class="active">API</a></li>
+      <li><a href="agents.html">Agents</a></li>
+      <li><a href="../index.html">Home</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <h4>Getting Started</h4>
+      <a href="index.html">Overview</a>
+      <a href="quickstart.html">Quickstart</a>
+    </div>
+    <div class="sidebar-section">
+      <h4>Core</h4>
+      <a href="#bus">Message Bus</a>
+      <a href="#cold-mode">Cold Mode</a>
+      <a href="#llm-router">LLM Router</a>
+      <a href="#rag">RAG Pipeline</a>
+      <a href="#memory">Memory</a>
+    </div>
+    <div class="sidebar-section">
+      <h4>Phase 3</h4>
+      <a href="#sandbox">Docker Sandbox</a>
+      <a href="#hitl">Telegram HITL</a>
+      <a href="#logging">Structured Logging</a>
+      <a href="#provisioning">VPS Provisioning</a>
+    </div>
+    <div class="sidebar-section">
+      <h4>Reference</h4>
+      <a href="#config">Configuration</a>
+      <a href="#env">Environment Variables</a>
+    </div>
+  </aside>
+
+  <main class="content">
+    <h1>API <span class="gradient-text">Reference</span></h1>
+    <p>Core modules, classes, and interfaces in NEXUS-01.</p>
+
+    <!-- MESSAGE BUS -->
+    <h2 id="bus">Message Bus</h2>
+    <p>Inter-agent communication via publish/subscribe or request/response.</p>
+    <pre><code>from core.bus import Message, MessageBus
+
+# Create a message
+msg = Message(
+    sender="orchestrator",
+    recipient="osint",
+    type="task",
+    payload={"query": "AI agent frameworks 2026"}
+)
+
+# Request/response (waits for reply)
+reply = await bus.request(msg, timeout=30.0)
+
+# Fire and forget
+await bus.publish(msg)
+
+# Subscribe to messages
+bus.subscribe("osint", handler_fn)</code></pre>
+
+    <table>
+      <tr><th>Class</th><th>Description</th></tr>
+      <tr><td><code>Message</code></td><td>sender, recipient, type, payload, timestamp, priority</td></tr>
+      <tr><td><code>MessageBus</code></td><td>publish(), request(), subscribe(), handle_reply()</td></tr>
+      <tr><td><code>RedisMessageBus</code></td><td>Durable Redis Streams implementation</td></tr>
+    </table>
+
+    <!-- COLD MODE -->
+    <h2 id="cold-mode">Cold Mode Gate</h2>
+    <p>5-step risk verification before any critical action.</p>
+    <pre><code>from core.cold_mode import ColdMode
+
+cold_mode = ColdMode(enabled=True)
+
+context = ColdMode.build_context(
+    action="execute_command",
+    permission="EXECUTE",
+    confidence=0.85,
+    fallback_script="echo rollback",
+    numeric_values=[100, 200]
+)
+
+if cold_mode.should_block(context):
+    reasons = cold_mode.get_failure_reasons(context)
+    print(f"Blocked: {reasons}")</code></pre>
+
+    <table>
+      <tr><th>Check</th><th>Description</th></tr>
+      <tr><td>Data Verification</td><td>Is source reliable?</td></tr>
+      <tr><td>Parameter Validation</td><td>Within normal ranges?</td></tr>
+      <tr><td>Confidence Assessment</td><td>Model confidence ≥ 0.75?</td></tr>
+      <tr><td>Risk Evaluation</td><td>What happens if wrong?</td></tr>
+      <tr><td>Fallback Determination</td><td>Is there a safe default?</td></tr>
+    </table>
+
+    <!-- LLM ROUTER -->
+    <h2 id="llm-router">LLM Router</h2>
+    <p>Multi-provider LLM with tiered routing and circuit breaker.</p>
+    <pre><code>from core.llm_router import LLMRouter
+
+router = LLMRouter(config_path="core/llm_config.yaml")
+
+# Simple chat
+response = await router.chat(messages, tier="standard")
+
+# With tool calling
+response = await router.complete_with_tools(
+    messages, tools=tools_schema, tier="standard"
+)
+
+# Streaming
+async for token in router.stream(messages):
+    print(token, end="", flush=True)
+
+# Provider status
+status = router.provider_status()</code></pre>
+
+    <table>
+      <tr><th>Tier</th><th>Providers</th><th>Use Case</th></tr>
+      <tr><td><code>cheap</code></td><td>Ollama, Groq</td><td>Simple queries, classification</td></tr>
+      <tr><td><code>standard</code></td><td>Gemini, OpenAI</td><td>General reasoning, analysis</td></tr>
+      <tr><td><code>premium</code></td><td>Claude, GPT-4</td><td>Complex reasoning, code gen</td></tr>
+    </table>
+
+    <!-- RAG -->
+    <h2 id="rag">RAG Pipeline</h2>
+    <p>Document ingestion and semantic search via ChromaDB.</p>
+    <pre><code>from core.rag import RAGStore
+
+rag = RAGStore(chroma_path="./data/chromadb")
+
+# Ingest documents
+rag.ingest_file(Path("playbook.md"))
+rag.ingest_directory(Path("./docs"), "**/*.md")
+
+# Search
+results = rag.search("cold mode protocol", n=5)
+
+# Format for LLM context
+context = rag.format_context("cold mode protocol", n=3)</code></pre>
+
+    <!-- MEMORY -->
+    <h2 id="memory">Memory</h2>
+    <p>SQLite + ChromaDB persistence for conversations and knowledge.</p>
+    <pre><code>from core.memory import Memory
+
+memory = Memory("./data/nexus.db", "./data/chromadb")
+
+# Save conversation
+memory.save_conversation("osint", "user", "research AI agents")
+memory.save_conversation("osint", "assistant", "Here are the findings...")
+
+# Get context for agent
+history = memory.get_context("osint", last_n=6, session_id="chat-123")
+
+# Save knowledge
+memory.save_knowledge("ai_agents_2026", "Research data...", {"agent": "osint"})</code></pre>
+
+    <!-- DOCKER SANDBOX -->
+    <h2 id="sandbox">Docker Sandbox</h2>
+    <p>Isolated container execution for the Executor agent.</p>
+    <pre><code>from core.sandbox import DockerSandbox, SandboxConfig
+
+config = SandboxConfig(
+    image="python:3.12-slim",
+    cpu_limit=0.5,        # 0.5 CPU cores
+    memory_limit="256m",  # 256MB RAM
+    timeout_seconds=30,   # 30s hard limit
+    network_disabled=True,
+    read_only_root=True,
+)
+
+sandbox = DockerSandbox(config)
+
+# Execute Python code
+result = await sandbox.execute("print('hello')", language="python")
+
+# Run a shell command
+result = await sandbox.run_command("ls -la /tmp")
+
+print(result.stdout, result.exit_code, result.duration_ms)</code></pre>
+
+    <div class="callout warn">
+      <strong>Security:</strong> Sandbox containers have no network access, read-only root filesystem, and strict CPU/memory limits. The container is auto-removed after execution.
+    </div>
+
+    <!-- HITL -->
+    <h2 id="hitl">Telegram HITL</h2>
+    <p>Human-in-the-loop approval management for destructive operations.</p>
+    <pre><code>from gateway.hitl import ApprovalManager, ApprovalRequest
+
+manager = ApprovalManager()
+
+# Create approval request
+req = manager.create(
+    action="exec",
+    description="Delete production database",
+    command="rm -rf /data/prod/*",
+    requester="user:123",
+    channel="telegram",
+    session_id="chat-456"
+)
+
+# Check status
+pending = manager.get(req.id)
+
+# Approve or deny
+manager.approve(req.id)
+# or
+manager.deny(req.id)
+
+# Cleanup expired
+expired_count = manager.cleanup_expired()</code></pre>
+
+    <!-- STRUCTURED LOGGING -->
+    <h2 id="logging">Structured Logging</h2>
+    <p>JSON and human-readable log formatters for production.</p>
+    <pre><code>from core.structured_logging import setup_logging, log_structured
+
+# Setup (call once at startup)
+setup_logging(level="INFO", json_output=True)
+
+# Or via CLI
+# python main.py --json-logs
+
+# Structured log entry
+logger = logging.getLogger("nexus.osint")
+log_structured(logger, "info", "OSINT search completed",
+    query="AI agents",
+    results_count=8,
+    duration_ms=1250
+)</code></pre>
+
+    <!-- PROVISIONING -->
+    <h2 id="provisioning">VPS Provisioning</h2>
+    <p>Hetzner CX22 provisioning and hardening script.</p>
+    <pre><code># Provision a new VPS
+export HCLOUD_TOKEN="your-hetzner-api-token"
+python scripts/provision_hetzner.py --name nexus-prod --type cx22
+
+# Dry run (preview only)
+python scripts/provision_hetzner.py --name nexus-prod --dry-run
+
+# Skip hardening
+python scripts/provision_hetzner.py --name nexus-prod --skip-hardening</code></pre>
+
+    <table>
+      <tr><th>Flag</th><th>Description</th><th>Default</th></tr>
+      <tr><td><code>--name</code></td><td>Server name</td><td>nexus-prod</td></tr>
+      <tr><td><code>--type</code></td><td>Hetzner server type</td><td>cx22 (2 vCPU, 4GB)</td></tr>
+      <tr><td><code>--location</code></td><td>Datacenter location</td><td>fsn1</td></tr>
+      <tr><td><code>--dry-run</code></td><td>Preview without creating</td><td>false</td></tr>
+    </table>
+
+    <!-- CONFIG -->
+    <h2 id="config">Configuration</h2>
+    <p>Full config.yaml reference.</p>
+    <pre><code># config.yaml
+ollama_url: "http://localhost:11434"
+ollama_model: "llama3.1"
+cold_mode_enabled: true
+require_approval_for_exec: true
+
+# API + Web OS
+enable_web_ui: true
+enable_cli: true
+api_host: "0.0.0.0"
+api_port: 8765
+
+# Channels
+enabled_channels:
+  - telegram
+
+# Telegram
+telegram_token: ""
+telegram_allowed_users: []
+
+# Phase 2
+bus_backend: local          # local | redis
+redis_url: "redis://localhost:6379"
+use_react_loop: true
+rag_enabled: true
+auto_ingest_docs: true
+docs_path: ".."
+
+# Phase 3
+executor_sandbox_enabled: true
+structured_log_json: false
+
+# Cloud LLM (optional)
+# GEMINI_API_KEY, GROQ_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY</code></pre>
+
+    <!-- ENV VARS -->
+    <h2 id="env">Environment Variables</h2>
+    <table>
+      <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      <tr><td><code>OLLAMA_URL</code></td><td>http://localhost:11434</td><td>Ollama server URL</td></tr>
+      <tr><td><code>OLLAMA_MODEL</code></td><td>llama3.1</td><td>Default LLM model</td></tr>
+      <tr><td><code>DATABASE_PATH</code></td><td>./data/nexus.db</td><td>SQLite database path</td></tr>
+      <tr><td><code>CHROMA_PATH</code></td><td>./data/chromadb</td><td>ChromaDB storage path</td></tr>
+      <tr><td><code>COLD_MODE_ENABLED</code></td><td>true</td><td>Enable Cold Mode gate</td></tr>
+      <tr><td><code>REQUIRE_APPROVAL_FOR_EXEC</code></td><td>true</td><td>Require HITL for exec</td></tr>
+      <tr><td><code>TELEGRAM_TOKEN</code></td><td></td><td>Telegram bot token</td></tr>
+      <tr><td><code>TELEGRAM_ALLOWED_USERS</code></td><td></td><td>Comma-separated user IDs</td></tr>
+      <tr><td><code>BUS_BACKEND</code></td><td>local</td><td>Message bus: local | redis</td></tr>
+      <tr><td><code>REDIS_URL</code></td><td>redis://localhost:6379</td><td>Redis connection URL</td></tr>
+      <tr><td><code>EXECUTOR_SANDBOX_ENABLED</code></td><td>true</td><td>Enable Docker sandbox</td></tr>
+      <tr><td><code>STRUCTURED_LOG_JSON</code></td><td>false</td><td>JSON log output</td></tr>
+      <tr><td><code>GEMINI_API_KEY</code></td><td></td><td>Google Gemini API key</td></tr>
+      <tr><td><code>GROQ_API_KEY</code></td><td></td><td>Groq API key</td></tr>
+      <tr><td><code>OPENAI_API_KEY</code></td><td></td><td>OpenAI API key</td></tr>
+      <tr><td><code>ANTHROPIC_API_KEY</code></td><td></td><td>Anthropic API key</td></tr>
+      <tr><td><code>FIRECRAWL_API_KEY</code></td><td></td><td>Firecrawl API key</td></tr>
+      <tr><td><code>HCLOUD_TOKEN</code></td><td></td><td>Hetzner Cloud API token</td></tr>
+    </table>
+  </main>
+</div>
+</body>
+</html>

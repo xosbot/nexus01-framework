@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS-01 — Documentation</title>
+<meta name="description" content="Documentation for the NEXUS-01 agentic AI framework. Quickstart, API reference, and guides.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--blue:#00d4ff;--purple:#8b5cf6;--pink:#ec4899;--green:#10b981;--amber:#f59e0b;--cyan:#06b6d4;--bg:#0a0a0f;--bg2:#0f0f18;--bg3:#14141f;--glass:rgba(255,255,255,0.03);--glass-border:rgba(255,255,255,0.06);--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--text4:#475569;--radius:16px;--radius-sm:12px;--radius-xs:8px;--nav-height:72px}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;line-height:1.7;overflow-x:hidden}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+.gradient-text{background:linear-gradient(135deg,var(--blue),var(--purple),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.glass{background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius)}
+code{font-family:'JetBrains Mono',monospace;font-size:0.88em;background:rgba(0,212,255,0.08);padding:2px 8px;border-radius:4px;color:var(--blue)}
+pre{background:var(--bg2);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:20px 24px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:0.85rem;line-height:1.7;margin:16px 0;color:var(--text2)}
+pre code{background:none;padding:0;color:inherit}
+
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;height:var(--nav-height);display:flex;align-items:center;transition:all 0.3s;backdrop-filter:blur(20px);background:rgba(10,10,15,0.8);border-bottom:1px solid transparent}
+.nav.scrolled{border-bottom-color:var(--glass-border)}
+.nav .container{display:flex;align-items:center;justify-content:space-between;width:100%}
+.nav-logo{font-weight:800;font-size:1.1rem;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace}
+.nav-logo-dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple))}
+.nav-links{display:flex;list-style:none;gap:6px;align-items:center}
+.nav-links a{color:var(--text2);text-decoration:none;font-size:0.85rem;padding:8px 12px;border-radius:var(--radius-xs);transition:all 0.2s;font-weight:500}
+.nav-links a:hover,.nav-links a.active{color:var(--text);background:rgba(255,255,255,0.05)}
+.nav-links .nav-cta{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff!important;font-weight:600!important}
+.nav-toggle{display:none;background:none;border:none;color:var(--text);font-size:1.5rem;cursor:pointer}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:240px 1fr;gap:48px;padding-top:var(--nav-height);min-height:100vh}
+.sidebar{position:sticky;top:var(--nav-height);height:calc(100vh - var(--nav-height));overflow-y:auto;padding:32px 0;border-right:1px solid var(--glass-border)}
+.sidebar-section{margin-bottom:24px}
+.sidebar-section h4{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text4);margin-bottom:8px;padding-left:16px}
+.sidebar a{display:block;padding:8px 16px;font-size:0.88rem;color:var(--text3);text-decoration:none;border-radius:var(--radius-xs);transition:all 0.2s;border-left:2px solid transparent}
+.sidebar a:hover{color:var(--text);background:rgba(255,255,255,0.03)}
+.sidebar a.active{color:var(--blue);border-left-color:var(--blue);background:rgba(0,212,255,0.05)}
+
+/* CONTENT */
+.content{padding:48px 0 80px}
+.content h1{font-size:2.5rem;font-weight:800;letter-spacing:-1px;margin-bottom:16px}
+.content h2{font-size:1.6rem;font-weight:700;margin:48px 0 16px;padding-top:24px;border-top:1px solid var(--glass-border)}
+.content h3{font-size:1.2rem;font-weight:600;margin:32px 0 12px}
+.content p{color:var(--text2);margin-bottom:16px;font-size:0.95rem}
+.content ul,.content ol{color:var(--text2);margin:0 0 16px 20px;font-size:0.95rem}
+.content li{margin-bottom:6px}
+.content > *:first-child{margin-top:0}
+
+/* CARDS */
+.card-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin:24px 0}
+.card{padding:24px;border-radius:var(--radius-sm);background:var(--glass);border:1px solid var(--glass-border);transition:all 0.3s;text-decoration:none;color:inherit}
+.card:hover{border-color:rgba(0,212,255,0.2);transform:translateY(-2px);text-decoration:none}
+.card h4{font-size:1rem;margin-bottom:6px;color:var(--text)}
+.card p{font-size:0.85rem;color:var(--text3);margin:0}
+.card .card-icon{font-size:1.5rem;margin-bottom:12px}
+
+/* CALLOUT */
+.callout{padding:16px 20px;border-radius:var(--radius-sm);margin:16px 0;font-size:0.9rem;border-left:3px solid}
+.callout.info{background:rgba(0,212,255,0.05);border-color:var(--blue);color:var(--text2)}
+.callout.warn{background:rgba(245,158,11,0.05);border-color:var(--amber);color:var(--text2)}
+.callout.success{background:rgba(16,185,129,0.05);border-color:var(--green);color:var(--text2)}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:0.88rem}
+th{text-align:left;padding:12px 16px;background:var(--bg2);color:var(--text);font-weight:600;border-bottom:1px solid var(--glass-border)}
+td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--text2)}
+tr:hover td{background:rgba(255,255,255,0.02)}
+
+@media(max-width:768px){
+  .layout{grid-template-columns:1fr}
+  .sidebar{display:none;position:fixed;top:var(--nav-height);left:0;right:0;bottom:0;z-index:99;background:rgba(10,10,15,0.98);padding:24px;border-right:none}
+  .sidebar.open{display:block}
+  .nav-toggle{display:block}
+  .card-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <div class="container">
+    <a href="../index.html" class="nav-logo"><span class="nav-logo-dot"></span> NEXUS-01</a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="index.html" class="active">Docs</a></li>
+      <li><a href="quickstart.html">Quickstart</a></li>
+      <li><a href="api.html">API</a></li>
+      <li><a href="agents.html">Agents</a></li>
+      <li><a href="../index.html">Home</a></li>
+      <li><a href="https://github.com/xosbot/nexus01-framework" class="nav-cta" target="_blank">GitHub</a></li>
+    </ul>
+    <button class="nav-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <h4>Getting Started</h4>
+      <a href="index.html" class="active">Overview</a>
+      <a href="quickstart.html">Quickstart</a>
+      <a href="quickstart.html#install">Installation</a>
+      <a href="quickstart.html#config">Configuration</a>
+    </div>
+    <div class="sidebar-section">
+      <h4>Core Concepts</h4>
+      <a href="agents.html">Agents</a>
+      <a href="api.html#bus">Message Bus</a>
+      <a href="api.html#cold-mode">Cold Mode</a>
+      <a href="api.html#rag">RAG Pipeline</a>
+      <a href="api.html#llm-router">LLM Router</a>
+    </div>
+    <div class="sidebar-section">
+      <h4>Phase 3 — Deploy</h4>
+      <a href="api.html#sandbox">Docker Sandbox</a>
+      <a href="api.html#hitl">Telegram HITL</a>
+      <a href="api.html#logging">Structured Logging</a>
+      <a href="api.html#provisioning">VPS Provisioning</a>
+    </div>
+    <div class="sidebar-section">
+      <h4>Reference</h4>
+      <a href="api.html">API Reference</a>
+      <a href="api.html#config">Configuration</a>
+      <a href="api.html#env">Environment Variables</a>
+    </div>
+  </aside>
+
+  <main class="content">
+    <h1>NEXUS-01 <span class="gradient-text">Documentation</span></h1>
+    <p>Everything you need to build, deploy, and operate autonomous AI agents with NEXUS-01.</p>
+
+    <div class="card-grid">
+      <a href="quickstart.html" class="card">
+        <div class="card-icon">🚀</div>
+        <h4>Quickstart</h4>
+        <p>Get running in 3 commands. Install, configure, launch.</p>
+      </a>
+      <a href="agents.html" class="card">
+        <div class="card-icon">🤖</div>
+        <h4>Agents</h4>
+        <p>OSINT, Executor, Analyst, Orchestrator — how they work.</p>
+      </a>
+      <a href="api.html" class="card">
+        <div class="card-icon">📡</div>
+        <h4>API Reference</h4>
+        <p>Bus, Memory, LLM Router, RAG, Sandbox, HITL.</p>
+      </a>
+      <a href="api.html#config" class="card">
+        <div class="card-icon">⚙️</div>
+        <h4>Configuration</h4>
+        <p>Environment variables, config.yaml, channel setup.</p>
+      </a>
+    </div>
+
+    <h2>Architecture Overview</h2>
+    <p>NEXUS-01 is a layered system where each component is swappable:</p>
+    <table>
+      <tr><th>Layer</th><th>Component</th><th>File</th></tr>
+      <tr><td>Control</td><td>Telegram Bot / CLI / Web</td><td><code>gateway/</code></td></tr>
+      <tr><td>Routing</td><td>Gateway + Approvals</td><td><code>gateway/gateway.py</code></td></tr>
+      <tr><td>Messaging</td><td>asyncio.Queue / Redis</td><td><code>core/bus.py</code></td></tr>
+      <tr><td>Agents</td><td>OSINT, Executor, Analyst</td><td><code>agents/</code></td></tr>
+      <tr><td>Reasoning</td><td>ReAct Loop + Tools</td><td><code>core/agent_loop.py</code></td></tr>
+      <tr><td>Safety</td><td>Cold Mode Gate</td><td><code>core/cold_mode.py</code></td></tr>
+      <tr><td>Inference</td><td>LLM Router (multi-provider)</td><td><code>core/llm_router.py</code></td></tr>
+      <tr><td>Knowledge</td><td>RAG + Memory</td><td><code>core/rag.py</code></td></tr>
+      <tr><td>Execution</td><td>Docker Sandbox</td><td><code>core/sandbox.py</code></td></tr>
+    </table>
+
+    <h2>Phase Progress</h2>
+    <p>NEXUS-01 is built in 4 phases, each gated by acceptance criteria:</p>
+    <table>
+      <tr><th>Phase</th><th>Name</th><th>Status</th><th>Cost</th></tr>
+      <tr><td>0-1</td><td>Local Seed + Agentic OS</td><td style="color:var(--green)">✅ Complete</td><td>$0/mo</td></tr>
+      <tr><td>2</td><td>Cloud Brain</td><td style="color:var(--green)">✅ Complete</td><td>~$15/mo</td></tr>
+      <tr><td>3</td><td>Deploy & Control</td><td style="color:var(--blue)">🔄 In Progress</td><td>~$42/mo</td></tr>
+      <tr><td>4</td><td>Freedom Layer</td><td style="color:var(--text4)">⏳ Deferred</td><td>~€950/mo</td></tr>
+    </table>
+
+    <div class="callout info">
+      <strong>New to NEXUS-01?</strong> Start with the <a href="quickstart.html">Quickstart guide</a> — you'll have a working agent in 3 commands.
+    </div>
+  </main>
+</div>
+
+<script>
+window.addEventListener('scroll',function(){
+  document.getElementById('nav').classList.toggle('scrolled',window.scrollY>50);
+});
+</script>
+</body>
+</html>
