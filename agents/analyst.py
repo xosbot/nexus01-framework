@@ -22,7 +22,7 @@ class AnalystAgent(BaseAgent):
 
         input_text = data.get("input", str(data)) if isinstance(data, dict) else str(data)
 
-        if not isinstance(data, dict) or "prior" not in data:
+        if not isinstance(data, dict) or data.get("prior") is None:
             analysis = await self.think(input_text, session_id=session_id)
             report = {"analysis": analysis, "status": "complete"}
             self.memory.save_conversation(self.name, "assistant", analysis, session_id)
