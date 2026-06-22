@@ -113,12 +113,15 @@ class ReasoningEngine:
         lower = query.lower()
 
         if any(p in lower for p in _SIMPLE_PATTERNS) and len(words) < 10:
-            return ReasoningDepth.SIMPLE
+            depth = ReasoningDepth.SIMPLE
+        elif len(words) > 30 or any(p in lower for p in _COMPLEX_PATTERNS):
+            depth = ReasoningDepth.COMPLEX
+        else:
+            depth = ReasoningDepth.STANDARD
 
-        if len(words) > 30 or any(p in lower for p in _COMPLEX_PATTERNS):
-            return ReasoningDepth.COMPLEX
-
-        return ReasoningDepth.STANDARD
+        if depth.value > self.max_depth:
+            return ReasoningDepth(self.max_depth)
+        return depth
 
     async def _prelude(self, query: str, context: str, session_id: str) -> str:
         ctx_hint = f"\nContext: {context[:500]}" if context else ""

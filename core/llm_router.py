@@ -244,11 +244,11 @@ class LLMProvider:
         else:
             msgs.insert(0, {"role": "system", "content": prefix})
         resp = await self.complete(msgs, **kwargs)
-        m = re.search(r"TOOL_CALL:\s*(\w+)\s*\nARGS:\s*(\{.*?\})", resp.text, re.DOTALL)
+        m = re.search(r"TOOL_CALL:\s*(\w+)\s*\nARGS:\s*(.*)", resp.text)
         if m:
             return LLMResponse(
                 content=None,
-                tool_calls=[ToolCall(id="sim_0", name=m.group(1), arguments=m.group(2))],
+                tool_calls=[ToolCall(id="sim_0", name=m.group(1), arguments=m.group(2).strip())],
                 finish_reason="tool_calls",
                 provider_used=resp.provider_used,
                 model_used=resp.model_used,

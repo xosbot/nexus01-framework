@@ -1,6 +1,6 @@
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from core.stores import ProjectStore, SessionStore
@@ -85,10 +85,10 @@ class Memory:
             self._collection = None
 
     def cleanup_expired_sessions(self, max_age_hours: int = 24) -> int:
-        cutoff = datetime.now().isoformat()
+        cutoff = (datetime.now() - timedelta(hours=max_age_hours)).isoformat()
         count = self._conn.execute(
-            "DELETE FROM sessions WHERE expires_at IS NOT NULL AND expires_at < ?",
-            (cutoff,),
+            "DELETE FROM sessions WHERE (expires_at IS NOT NULL AND expires_at < ?) OR (expires_at IS NULL AND updated_at < ?)",
+            (datetime.now().isoformat(), cutoff),
         ).rowcount
         if count:
             self._conn.commit()
@@ -97,7 +97,6 @@ class Memory:
         return count
 
     def set_session_expiry(self, session_id: str, hours: int = 24) -> None:
-        from datetime import timedelta
         expires = (datetime.now() + timedelta(hours=hours)).isoformat()
         self._conn.execute(
             "UPDATE sessions SET expires_at = ? WHERE id = ?",
@@ -107,6 +106,12 @@ class Memory:
 
     def save_conversation(self, agent: str, role: str, content: str, session_id: str | None = None):
         now = datetime.now().isoformat()
+        if session_id:
+            row = self._conn.execute(
+                "SELECT expires_at FROM sessions WHERE id = ?", (session_id,)
+            ).fetchone()
+            if row and row["expires_at"] and row["expires_at"] < now:
+                return
         self._conn.execute(
             "INSERT INTO conversations (session_id, agent, role, content, timestamp) VALUES (?, ?, ?, ?, ?)",
             (session_id, agent, role, content, now),

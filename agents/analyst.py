@@ -2,7 +2,6 @@ import statistics
 from agents.base import BaseAgent, AgentStatus
 from core.bus import Message
 from core.memory import Memory
-from core.llm import OllamaClient
 
 class AnalystAgent(BaseAgent):
     def __init__(self, llm, memory, rag=None):
