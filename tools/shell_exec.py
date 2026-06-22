@@ -7,7 +7,7 @@ import os
 import shutil
 import subprocess
 
-logger = __import__("logging").getlogger(__name__)
+logger = logging.getLogger(__name__)
 
 ALLOWED_COMMANDS = {
     "ls", "cat", "head", "tail", "grep", "find", "wc", "echo", "date",
