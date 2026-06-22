@@ -91,7 +91,7 @@ async def main():
     from core.proactive import ProactiveIntelligence
 
     app.brain = IVABrain(app.memory, app.rag)
-    app.copilot = ExecutionCopilot(app.memory, app.rag, app.agents)
+    app.copilot = ExecutionCopilot(app.memory, app.rag, {})
     app.integrations = IntegrationHub(app.memory, app.brain)
     app.proactive = ProactiveIntelligence(app.memory, app.brain)
 
