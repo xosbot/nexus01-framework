@@ -8,7 +8,8 @@ import logging
 from collections import defaultdict
 from typing import Callable
 
-from fastapi import Request, Response, HTTPException
+from fastapi import Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
@@ -38,9 +39,9 @@ _rate_limiter = RateLimiter()
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    EXEMPT_PATHS = {"/health", "/assets", "/", "/docs", "/openapi.json", "/redoc"}
+    EXEMPT_PATHS = {"/health", "/", "/docs", "/openapi.json", "/redoc"}
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next):
         path = request.url.path
 
         if path in self.EXEMPT_PATHS or path.startswith("/assets"):
@@ -58,11 +59,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 token = ""
 
             if token != API_KEY:
-                raise HTTPException(status_code=401, detail="Invalid or missing API key")
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Invalid or missing API key"},
+                )
 
         client_ip = request.client.host if request.client else "unknown"
         if not _rate_limiter.is_allowed(client_ip):
-            raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded. Try again later."},
+            )
 
         return await call_next(request)
 
