@@ -15,7 +15,7 @@ import hashlib
 import hmac
 import logging
 from datetime import datetime, timezone
-from typing import Any, Callable, Awaitable
+from typing import Any, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 

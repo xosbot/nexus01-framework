@@ -110,55 +110,96 @@ class ExecutionCopilot:
 
     def _load_patterns(self) -> None:
         try:
-            patterns = self.memory.get_knowledge("workflow_patterns")
-            if patterns:
-                self.patterns = json.loads(patterns) if isinstance(patterns, str) else patterns
-        except Exception:
-            self.patterns = []
+            knowledge = self.memory.list_knowledge(limit=1000)
+            for item in knowledge:
+                if "workflow_pattern" in item.get("key", ""):
+                    value = item.get("value", "")
+                    if isinstance(value, str):
+                        parsed = json.loads(value)
+                        if isinstance(parsed, list):
+                            self.patterns.extend(parsed)
+        except Exception as e:
+            logger.warning("Pattern load failed: %s", e)
 
     async def execute_workflow(self, workflow: Workflow,
                                 callback: Callable = None) -> Workflow:
         workflow.status = "running"
         logger.info(f"Starting workflow: {workflow.name}")
 
-        for step in workflow.steps:
+        step_index = 0
+        while step_index < len(workflow.steps):
+            step = workflow.steps[step_index]
+
             if workflow.status == "cancelled":
                 break
 
+            if step.status == StepStatus.COMPLETED or step.status == StepStatus.SKIPPED:
+                step_index += 1
+                continue
+
             step.status = StepStatus.RUNNING
-            logger.info(f"  Step: {step.name}")
+            logger.info(f"  Step [{step_index+1}/{len(workflow.steps)}]: {step.name}")
 
             if step.requires_approval:
                 step.status = StepStatus.WAITING_APPROVAL
                 if callback:
                     await callback("approval_required", step)
+                step_index += 1
                 continue
 
             try:
+                resolved_params = self._substitute_templates(step.params, workflow.context)
+                step.params = resolved_params
                 result = await self._execute_step(step, workflow.context)
                 step.result = result
                 step.status = StepStatus.COMPLETED
                 workflow.context[f"step_{step.id}_result"] = result
+                workflow.context["data"] = workflow.context.get("data", {})
+                if isinstance(result, dict):
+                    workflow.context["data"].update(result)
                 if callback:
                     await callback("step_completed", step)
+                step_index += 1
             except Exception as e:
                 step.error = str(e)
-                step.status = StepStatus.FAILED
                 logger.error(f"  Step failed: {step.name} — {e}")
                 if step.retries < step.max_retries:
                     step.retries += 1
                     step.status = StepStatus.PENDING
+                    await asyncio.sleep(1)
                     continue
+                step.status = StepStatus.FAILED
                 if callback:
                     await callback("step_failed", step)
+                step_index += 1
 
-        workflow.status = "completed"
+        all_completed = all(s.status in (StepStatus.COMPLETED, StepStatus.SKIPPED) for s in workflow.steps)
+        any_failed = any(s.status == StepStatus.FAILED for s in workflow.steps)
+        workflow.status = "completed" if all_completed else ("failed" if any_failed else "partial")
         workflow.completed_at = datetime.now(timezone.utc).isoformat()
         workflow.result = self._aggregate_results(workflow)
 
-        self._learn_pattern(workflow)
+        if workflow.status == "completed":
+            self._learn_pattern(workflow)
 
         return workflow
+
+    def _substitute_templates(self, params: dict, context: dict) -> dict:
+        resolved = {}
+        for key, value in params.items():
+            if isinstance(value, str) and value.startswith("{") and value.endswith("}"):
+                ref = value[1:-1]
+                if ref in context:
+                    resolved[key] = context[ref]
+                elif ref.startswith("step_"):
+                    resolved[key] = context.get(ref, value)
+                else:
+                    resolved[key] = value
+            elif isinstance(value, dict):
+                resolved[key] = self._substitute_templates(value, context)
+            else:
+                resolved[key] = value
+        return resolved
 
     async def _execute_step(self, step: WorkflowStep,
                              context: dict) -> Any:
@@ -180,19 +221,43 @@ class ExecutionCopilot:
             return {"error": "OSINT agent not available"}
         target = params.get("target", "")
         task = params.get("task", "recon")
-        return await agent.run({"task": task, "target": target})
+        from core.bus import Message
+        msg = Message(
+            sender="copilot",
+            recipient="osint",
+            type="task",
+            payload={"task": task, "target": target},
+        )
+        response = await agent.on_message(msg)
+        return response if isinstance(response, dict) else {"result": str(response)}
 
     async def _handle_analyze(self, params: dict, context: dict) -> dict:
         agent = self.agents.get("analyst")
         if not agent:
             return {"error": "Analyst agent not available"}
-        return await agent.run(params)
+        from core.bus import Message
+        msg = Message(
+            sender="copilot",
+            recipient="analyst",
+            type="task",
+            payload=params,
+        )
+        response = await agent.on_message(msg)
+        return response if isinstance(response, dict) else {"result": str(response)}
 
     async def _handle_execute(self, params: dict, context: dict) -> dict:
         agent = self.agents.get("executor")
         if not agent:
             return {"error": "Executor agent not available"}
-        return await agent.run(params)
+        from core.bus import Message
+        msg = Message(
+            sender="copilot",
+            recipient="executor",
+            type="task",
+            payload=params,
+        )
+        response = await agent.on_message(msg)
+        return response if isinstance(response, dict) else {"result": str(response)}
 
     async def _handle_search(self, params: dict, context: dict) -> list:
         query = params.get("query", "")
@@ -218,10 +283,14 @@ class ExecutionCopilot:
         target = params.get("target", "")
         agent = self.agents.get("executor")
         if agent:
-            return await agent.run({
-                "command": f"nmap -sV {target}",
-                "timeout": 120,
-            })
+            from core.bus import Message
+            msg = Message(
+                sender="copilot",
+                recipient="executor",
+                type="task",
+                payload={"command": f"nmap -sV {target}", "timeout": 120},
+            )
+            return await agent.on_message(msg)
         return {"error": "Executor not available"}
 
     async def _handle_report(self, params: dict, context: dict) -> dict:
@@ -269,12 +338,12 @@ class ExecutionCopilot:
             self.patterns = self.patterns[-100:]
         try:
             self.memory.save_knowledge(
-                "workflow_patterns",
-                json.dumps(self.patterns),
-                {"type": "patterns", "count": len(self.patterns)}
+                f"workflow_pattern_{int(time.time())}",
+                json.dumps(pattern),
+                {"type": "pattern", "name": workflow.name}
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pattern save failed: %s", e)
 
     def create_workflow(self, name: str, steps: list[dict],
                         description: str = "") -> Workflow:

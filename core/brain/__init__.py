@@ -13,12 +13,16 @@ from __future__ import annotations
 
 import json
 import time
+import hashlib
+import logging
 from datetime import datetime, timezone
 from typing import Any
 from dataclasses import dataclass, field
 
 from core.memory import Memory
 from core.rag import RAGStore as RAG
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -56,8 +60,16 @@ class MemoryEntry:
         self.last_accessed = datetime.now(timezone.utc).isoformat()
 
     def calculate_strength(self) -> float:
-        time_factor = 1.0 / (1.0 + self.decay_rate * self.access_count)
-        return self.importance * self.confidence * time_factor
+        time_since = 0.0
+        if self.last_accessed:
+            try:
+                last = datetime.fromisoformat(self.last_accessed).timestamp()
+                time_since = time.time() - last
+            except Exception:
+                pass
+        recency_factor = 1.0 / (1.0 + self.decay_rate * (time_since / 3600))
+        access_boost = min(1.0, self.access_count * 0.1)
+        return self.importance * self.confidence * (0.5 + 0.5 * recency_factor) * (0.5 + 0.5 * access_boost)
 
 
 class IVABrain:
@@ -76,24 +88,29 @@ class IVABrain:
 
     def _load_from_storage(self) -> None:
         try:
-            knowledge = self.memory.get_all_knowledge()
+            knowledge = self.memory.list_knowledge(limit=1000)
             for item in knowledge:
+                key = item.get("key", "")
+                value = item.get("value", "")
+                metadata = item.get("metadata", {})
                 entry = MemoryEntry(
-                    id=item.get("id", ""),
-                    type=item.get("type", "semantic"),
-                    content=item.get("content", ""),
-                    metadata=item.get("metadata", {}),
-                    importance=item.get("importance", 0.5),
-                    confidence=item.get("confidence", 0.8),
-                    tags=item.get("tags", []),
-                    sources=item.get("sources", []),
+                    id=key,
+                    type=metadata.get("type", "semantic"),
+                    content=value,
+                    metadata=metadata,
+                    importance=metadata.get("importance", 0.5),
+                    confidence=metadata.get("confidence", 0.8),
+                    tags=metadata.get("tags", []),
+                    sources=metadata.get("sources", []),
                 )
                 if entry.type == "semantic":
                     self.semantic.append(entry)
                 elif entry.type == "procedural":
                     self.procedural.append(entry)
-        except Exception:
-            pass
+                elif entry.type == "episodic":
+                    self.episodic.append(entry)
+        except Exception as e:
+            logger.warning("Brain load failed: %s", e)
 
     def think(self, context: str, query: str = "") -> str:
         relevant = self._retrieve_relevant(context + " " + query)
@@ -101,10 +118,10 @@ class IVABrain:
         return self._synthesize_response(context, relevant, working)
 
     def remember(self, content: str, memory_type: str = "episodic",
-                 importance: float = 0.5, tags: list[str] = None,
-                 sources: list[str] = None) -> MemoryEntry:
+                 importance: float = 0.5, tags: list[str] | None = None,
+                 sources: list[str] | None = None) -> MemoryEntry:
         entry = MemoryEntry(
-            id=f"{memory_type}_{int(time.time())}",
+            id=f"{memory_type}_{int(time.time())}_{hashlib.md5(content.encode()).hexdigest()[:8]}",
             type=memory_type,
             content=content,
             importance=importance,
@@ -120,9 +137,9 @@ class IVABrain:
         elif memory_type == "procedural":
             self.procedural.append(entry)
         self.memory.save_knowledge(
-            f"{memory_type}_{entry.id}",
+            entry.id,
             content,
-            {"type": memory_type, "importance": importance,
+            {"type": memory_type, "importance": importance, "confidence": entry.confidence,
              "tags": tags or [], "sources": sources or []}
         )
         return entry
@@ -173,11 +190,13 @@ class IVABrain:
         results = self.rag.search(query, n=5)
         entries = []
         for r in results:
+            content = r.get("content", "") if isinstance(r, dict) else str(r)
+            source = r.get("source", "") if isinstance(r, dict) else ""
             entry = MemoryEntry(
-                id=f"rag_{hash(r.get('content', ''))}",
+                id=f"rag_{hashlib.md5(content.encode()).hexdigest()[:8]}",
                 type="semantic",
-                content=r.get("content", ""),
-                sources=[r.get("source", "")],
+                content=content,
+                sources=[source],
             )
             entries.append(entry)
         return entries

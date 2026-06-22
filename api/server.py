@@ -21,7 +21,7 @@ ALLOWED_ORIGINS = os.getenv("NEXUS_ALLOWED_ORIGINS", "https://navos.space").spli
 
 
 class ChatRequest(BaseModel):
-    text: str
+    message: str
     session_id: str | None = None
     project_id: str | None = None
 
@@ -90,6 +90,23 @@ def create_api_app(nexus_app) -> FastAPI:
 
     # ── System ──────────────────────────────────────────────────────────
 
+    @app.get("/api/overview")
+    async def overview():
+        stats = memory.stats()
+        rag_stats = nexus_app.rag.stats() if hasattr(nexus_app, "rag") else {}
+        providers = llm.provider_status() if hasattr(llm, "provider_status") else []
+        agent_activity = {}
+        for agent_name, count in stats.get("by_agent", {}).items():
+            agent_activity[agent_name] = count
+        return {
+            "total_sessions": stats.get("sessions", 0),
+            "total_messages": stats.get("conversations", 0),
+            "knowledge_count": stats.get("knowledge", 0),
+            "rag_docs": rag_stats.get("documents", 0),
+            "providers": [{"name": p.get("name", ""), "available": p.get("available", False)} for p in providers],
+            "agent_activity": agent_activity,
+        }
+
     @app.get("/api/system/status")
     async def system_status():
         from config import config
@@ -145,7 +162,7 @@ def create_api_app(nexus_app) -> FastAPI:
     async def chat(req: ChatRequest):
         session_id = req.session_id
         if not session_id:
-            session = memory.sessions.create(title=req.text[:60], project_id=req.project_id, channel="web")
+            session = memory.sessions.create(title=req.message[:60], project_id=req.project_id, channel="web")
             session_id = session["id"]
         else:
             memory.sessions.touch(session_id)
@@ -153,17 +170,17 @@ def create_api_app(nexus_app) -> FastAPI:
         inbound = InboundMessage(
             channel=ChannelKind.WEB,
             session_id=session_id,
-            text=req.text,
+            text=req.message,
             user_id="web",
             metadata={"project_id": req.project_id, "session_id": session_id},
         )
         response = await gateway.handle(inbound)
-        memory.save_conversation("orchestrator", "user", req.text, session_id)
+        memory.save_conversation("orchestrator", "user", req.message, session_id)
         memory.save_conversation("orchestrator", "assistant", response.text, session_id)
 
         return {
             "session_id": session_id,
-            "text": response.text,
+            "response": response.text,
             "route": response.route,
             "requires_approval": response.requires_approval,
             "approval_id": response.approval_id,
@@ -182,25 +199,36 @@ def create_api_app(nexus_app) -> FastAPI:
         response = await gateway.handle(inbound)
         return {"text": response.text, "success": response.success}
 
-    @app.websocket("/ws/chat")
+    @app.websocket("/ws")
     async def ws_chat(websocket: WebSocket):
-        token = websocket.query_params.get("token") or websocket.headers.get("Authorization", "").replace("Bearer ", "")
-        if not ws_auth.authenticate(token):
-            await websocket.close(code=4001, reason="Unauthorized")
-            return
-        client_ip = websocket.client.host if websocket.client else "unknown"
-        if ws_auth.is_rate_limited(client_ip):
-            await websocket.close(code=4029, reason="Rate limit exceeded")
-            return
         await websocket.accept()
+        authenticated = False
         session_id = None
+
+        if not ws_auth:
+            authenticated = True
+
         try:
             while True:
                 data = await websocket.receive_json()
-                text = data.get("text", "").strip()
-                if not text:
+                msg_type = data.get("type", "")
+
+                if msg_type == "auth":
+                    token = data.get("api_key", "")
+                    if ws_auth and not ws_auth.authenticate(token):
+                        await websocket.send_json({"type": "auth_failed", "error": "Invalid API key"})
+                        await websocket.close(code=4001, reason="Unauthorized")
+                        return
+                    authenticated = True
+                    await websocket.send_json({"type": "auth_ok"})
                     continue
-                if data.get("type") == "approve":
+
+                if not authenticated:
+                    await websocket.send_json({"type": "auth_required", "error": "Authenticate first"})
+                    continue
+
+                if msg_type == "approval_response":
+                    approval_id = data.get("approval_id") or data.get("task_id", "")
                     inbound = InboundMessage(
                         channel=ChannelKind.WEB,
                         session_id=data.get("session_id", session_id or "web"),
@@ -208,38 +236,55 @@ def create_api_app(nexus_app) -> FastAPI:
                         user_id="web",
                         metadata={
                             "approval_decision": data.get("approved"),
-                            "approval_id": data.get("approval_id"),
+                            "approval_id": approval_id,
                         },
                     )
+                    await websocket.send_json({"type": "typing"})
+                    response = await gateway.handle(inbound)
+                    await websocket.send_json({
+                        "type": "chat_response",
+                        "content": response.text,
+                        "route": response.route,
+                        "session_id": session_id,
+                    })
+                    continue
+
+                content = data.get("content") or data.get("text") or ""
+                content = content.strip()
+                if not content:
+                    continue
+
+                session_id = data.get("session_id") or session_id
+                if not session_id:
+                    s = memory.sessions.create(title=content[:60], channel="web")
+                    session_id = s["id"]
                 else:
-                    session_id = data.get("session_id") or session_id
-                    if not session_id:
-                        s = memory.sessions.create(title=text[:60], channel="web")
-                        session_id = s["id"]
-                    else:
-                        memory.sessions.touch(session_id)
-                    inbound = InboundMessage(
-                        channel=ChannelKind.WEB,
-                        session_id=session_id,
-                        text=text,
-                        user_id="web",
-                        metadata={"session_id": session_id},
-                    )
+                    memory.sessions.touch(session_id)
+
+                inbound = InboundMessage(
+                    channel=ChannelKind.WEB,
+                    session_id=session_id,
+                    text=content,
+                    user_id="web",
+                    metadata={"session_id": session_id},
+                )
 
                 await websocket.send_json({"type": "typing"})
                 response = await gateway.handle(inbound)
-                if text and data.get("type") != "approve":
-                    memory.save_conversation("orchestrator", "user", text, session_id)
-                    memory.save_conversation("orchestrator", "assistant", response.text, session_id)
+                memory.save_conversation("orchestrator", "user", content, session_id)
+                memory.save_conversation("orchestrator", "assistant", response.text, session_id)
 
-                await websocket.send_json({
-                    "type": "response",
-                    "session_id": session_id,
-                    "text": response.text,
+                msg = {
+                    "type": "chat_response",
+                    "content": response.text,
                     "route": response.route,
-                    "requires_approval": response.requires_approval,
-                    "approval_id": response.approval_id,
-                })
+                    "session_id": session_id,
+                }
+                if response.requires_approval:
+                    msg["type"] = "approval_required"
+                    msg["approval_id"] = response.approval_id
+                    msg["description"] = response.text
+                await websocket.send_json(msg)
         except WebSocketDisconnect:
             pass
 
@@ -247,7 +292,7 @@ def create_api_app(nexus_app) -> FastAPI:
 
     @app.get("/api/projects")
     async def list_projects():
-        return memory.projects.list()
+        return {"projects": memory.projects.list()}
 
     @app.post("/api/projects")
     async def create_project(body: ProjectCreate):
@@ -278,7 +323,7 @@ def create_api_app(nexus_app) -> FastAPI:
 
     @app.get("/api/sessions")
     async def list_sessions(project_id: str | None = None):
-        return memory.sessions.list(project_id=project_id)
+        return {"sessions": memory.sessions.list(project_id=project_id)}
 
     @app.post("/api/sessions")
     async def create_session(body: SessionCreate):
@@ -291,6 +336,11 @@ def create_api_app(nexus_app) -> FastAPI:
             raise HTTPException(404, "Session not found")
         s["messages"] = memory.list_conversations(session_id=session_id)
         return s
+
+    @app.get("/api/sessions/{session_id}/messages")
+    async def get_session_messages(session_id: str):
+        messages = memory.list_conversations(session_id=session_id)
+        return {"messages": messages}
 
     @app.delete("/api/sessions/{session_id}")
     async def delete_session(session_id: str):
@@ -310,7 +360,15 @@ def create_api_app(nexus_app) -> FastAPI:
 
     @app.get("/api/memory/search")
     async def search_memory(q: str, n: int = 10):
-        return memory.search_similar(q, n)
+        results = memory.search_similar(q, n)
+        scored = []
+        for i, r in enumerate(results):
+            scored.append({
+                "content": r.get("content", ""),
+                "metadata": r.get("metadata", {}),
+                "score": 1.0 - (i * 0.1),
+            })
+        return {"results": scored}
 
     @app.delete("/api/memory/knowledge/{key}")
     async def delete_knowledge(key: str):
@@ -431,7 +489,10 @@ def create_api_app(nexus_app) -> FastAPI:
             return {"error": "Integrations not initialized"}
         data = await request.json()
         headers = dict(request.headers)
-        return await integrations.process_webhook(source, "event", data, headers)
+        event_type = data.get("event_type", data.get("action", "event"))
+        if source == "github":
+            event_type = headers.get("x-github-event", "event")
+        return await integrations.process_webhook(source, event_type, data, headers)
 
     @app.get("/api/webhooks/events")
     async def list_webhook_events(limit: int = 20):

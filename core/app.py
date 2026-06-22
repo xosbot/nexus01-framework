@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import asyncio
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from config import Config, config
 from core.bus_factory import create_bus, set_global_bus
@@ -36,9 +39,13 @@ class NexusApp:
     channels: list
     bus: object
     cost_tracker: CostTracker
-    api_app: object | None
-    _channel_tasks: list
-    _api_server: object | None
+    api_app: object | None = None
+    _channel_tasks: list = field(default_factory=list)
+    _api_server: object | None = None
+    brain: Any = None
+    copilot: Any = None
+    integrations: Any = None
+    proactive: Any = None
 
     async def shutdown(self) -> None:
         for channel in self.channels:
@@ -215,8 +222,15 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
     from core.integrations import IntegrationHub
     from core.proactive import ProactiveIntelligence
 
+    agents_dict = {
+        "osint": osint,
+        "analyst": analyst,
+        "executor": executor,
+        "orchestrator": orchestrator,
+    }
+
     nexus.brain = IVABrain(nexus.memory, nexus.rag)
-    nexus.copilot = ExecutionCopilot(nexus.memory, nexus.rag, {})
+    nexus.copilot = ExecutionCopilot(nexus.memory, nexus.rag, agents_dict)
     nexus.integrations = IntegrationHub(nexus.memory, nexus.brain)
     nexus.proactive = ProactiveIntelligence(nexus.memory, nexus.brain)
 

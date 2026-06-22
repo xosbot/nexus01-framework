@@ -111,9 +111,14 @@ function authWS() {
 }
 
 function handleWSMessage(msg) {
+  if (msg.type === 'auth_ok') return;
+  if (msg.type === 'auth_failed') { toast('Auth failed', 'error'); return; }
+  if (msg.type === 'auth_required') { authWS(); return; }
+  if (msg.type === 'typing') { showTyping(); return; }
   if (msg.type === 'chat_response') {
     hideTyping();
     appendMessage('assistant', msg.content, msg.route);
+    if (msg.session_id) state.currentSession = msg.session_id;
   } else if (msg.type === 'approval_required') {
     showApproval(msg);
   } else if (msg.type === 'session_update') {
@@ -268,7 +273,12 @@ async function loadChatHistory(sessionId) {
     const data = await res.json();
     const container = $('#chat-messages');
     container.innerHTML = '';
-    (data.messages || []).forEach(m => appendMessage(m.role, m.content, m.route));
+    const messages = data.messages || [];
+    if (messages.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-title">No messages yet</div><div class="empty-desc">Start a conversation with IVA</div></div>';
+      return;
+    }
+    messages.forEach(m => appendMessage(m.role, m.content, null));
   } catch {}
 }
 
@@ -388,7 +398,7 @@ $('#btn-new-project')?.addEventListener('click', async () => {
 
 async function loadBrain() {
   try {
-    const res = await fetch('/api/memory/stats', {
+    const res = await fetch('/api/brain/stats', {
       headers: { 'X-API-Key': localStorage.getItem('iva_api_key') || '' }
     });
     const data = await res.json();
@@ -415,8 +425,9 @@ $('#btn-memory-search')?.addEventListener('click', async () => {
     });
     const data = await res.json();
     const el = $('#search-results');
-    if (!data.results?.length) { el.innerHTML = '<div class="empty-title">No results</div>'; return; }
-    el.innerHTML = data.results.map(r => `
+    const results = data.results || [];
+    if (!results.length) { el.innerHTML = '<div class="empty-title">No results</div>'; return; }
+    el.innerHTML = results.map(r => `
       <div style="padding:10px;background:var(--bg-2);border-radius:var(--radius-sm);margin-bottom:6px;font-size:13px;">
         <div style="color:var(--text-2);margin-bottom:4px;">${escapeHtml(r.content?.substring(0, 200) || '')}</div>
         <div style="color:var(--text-4);font-size:11px;">Score: ${(r.score || 0).toFixed(2)}</div>
@@ -448,9 +459,11 @@ function handleApproval(approved) {
   state.ws?.send(JSON.stringify({
     type: 'approval_response',
     approved,
-    task_id: pendingApproval.task_id,
+    approval_id: pendingApproval.approval_id,
+    session_id: state.currentSession,
   }));
   $('#approval-bar')?.classList.remove('visible');
+  if (approved) showTyping();
   pendingApproval = null;
 }
 

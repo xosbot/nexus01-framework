@@ -9,11 +9,10 @@ IVA doesn't wait for commands. It:
 
 from __future__ import annotations
 
-import json
 import time
 import logging
 from datetime import datetime, timezone
-from typing import Any, Callable, Awaitable
+from typing import Any, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -161,6 +160,12 @@ class ProactiveIntelligence:
             if now - last_check < monitor.interval:
                 continue
 
+            for callback in self._check_callbacks:
+                try:
+                    await callback(monitor)
+                except Exception as e:
+                    logger.error(f"Check callback error: {e}")
+
             try:
                 alerts = await self._check_monitor(monitor)
                 new_alerts.extend(alerts)
@@ -197,17 +202,34 @@ class ProactiveIntelligence:
         domain = monitor.target
         prev_state = monitor.state
 
-        current_state = {"domain": domain, "checked": datetime.now(timezone.utc).isoformat()}
+        current_state = {
+            "domain": domain,
+            "checked": datetime.now(timezone.utc).isoformat(),
+            "records": {},
+        }
 
-        if prev_state and prev_state.get("dns_changed"):
-            alerts.append(Alert(
-                id=f"alert_{int(time.time())}",
-                severity=AlertSeverity.MEDIUM,
-                title=f"DNS change detected: {domain}",
-                description=f"DNS records changed for {domain}",
-                source=monitor.name,
-                data={"domain": domain, "prev": prev_state, "current": current_state},
-            ))
+        try:
+            import socket
+            try:
+                ip = socket.gethostbyname(domain)
+                current_state["records"]["a"] = ip
+            except Exception:
+                current_state["records"]["a"] = None
+        except Exception:
+            pass
+
+        if prev_state:
+            prev_ip = prev_state.get("records", {}).get("a")
+            curr_ip = current_state.get("records", {}).get("a")
+            if prev_ip and curr_ip and prev_ip != curr_ip:
+                alerts.append(Alert(
+                    id=f"alert_{int(time.time())}",
+                    severity=AlertSeverity.HIGH,
+                    title=f"DNS change detected: {domain}",
+                    description=f"IP changed from {prev_ip} to {curr_ip}",
+                    source=monitor.name,
+                    data={"domain": domain, "prev_ip": prev_ip, "new_ip": curr_ip},
+                ))
 
         monitor.state = current_state
         return alerts
