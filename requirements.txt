@@ -17,3 +17,11 @@ discord.py>=2.3.0
 docker>=7.0.0
 hcloud>=2.0.0
 structlog>=24.0.0
+
+# Phase 3 — OSINT Hardening (install on SSD Node server)
+# crawl4ai>=0.4.0        # Self-hosted LLM-friendly scraper (pip install on server)
+# sherlock-project>=0.15  # Username enumeration (pip install on server)
+# theHarvester>=4.0       # Domain/email recon (pip install on server)
+# holehe>=1.0             # Email account enumeration (pip install on server)
+# onionsearch>=1.0        # Dark web search (Phase 4, requires Tor)
+playwright>=1.44.0        # Browser automation for OSINT

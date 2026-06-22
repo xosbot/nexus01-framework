@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -52,7 +53,14 @@ class IngestRequest(BaseModel):
 
 
 def create_api_app(nexus_app) -> FastAPI:
-    app = FastAPI(title="NEXUS-01 OS", version="0.2.0")
+    app = FastAPI(title="NEXUS-01 OS", version="0.3.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     gateway = nexus_app.gateway
     memory = nexus_app.memory
     llm = nexus_app.llm

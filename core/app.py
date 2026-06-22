@@ -92,9 +92,15 @@ def _build_orchestrator_tools(rag: RAGStore, app_bus) -> ToolRegistry:
         result = reply.payload.get("data", {})
         return result.get("analysis", str(result))
 
+    from tools.browser import browser_navigate, browser_scrape, browser_interact, browser_screenshot
+
     registry.register(search_knowledge, description="Search tradecraft knowledge base for relevant context")
     registry.register(ask_osint, description="Delegate OSINT web research to the OSINT agent")
     registry.register(ask_analyst, description="Delegate data analysis to the Analyst agent")
+    registry.register(browser_navigate, description="Navigate to a URL with full JS rendering and extract text content")
+    registry.register(browser_scrape, description="Extract text from a URL using a CSS selector")
+    registry.register(browser_interact, description="Navigate a URL, perform actions (click, fill, scroll), and extract content")
+    registry.register(browser_screenshot, description="Capture a screenshot of a webpage")
     return registry
 
 
