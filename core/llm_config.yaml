@@ -10,10 +10,10 @@ routing:
 providers:
   - name: ollama_local
     provider: ollama
-    model: "${OLLAMA_MODEL:-llama3.1}"
+    model: "${OLLAMA_MODEL:-qwen3:8b}"
     base_url: "${OLLAMA_URL:-http://localhost:11434}/v1"
     api_key: ollama
-    timeout_seconds: 120
+    timeout_seconds: 180
     tier: cheap
     cost_per_1m_tokens: 0.0
     supports_tool_calling: false
@@ -30,13 +30,13 @@ providers:
     supports_tool_calling: true
     supports_streaming: true
 
-  - name: groq_fast
+  - name: groq_free
     provider: groq
-    model: llama-3.1-8b-instant
+    model: llama-3.3-70b-versatile
     api_key: "${GROQ_API_KEY}"
-    timeout_seconds: 15
-    tier: standard
-    cost_per_1m_tokens: 0.05
+    timeout_seconds: 30
+    tier: cheap
+    cost_per_1m_tokens: 0.0
     supports_tool_calling: true
     supports_streaming: true
 
@@ -62,9 +62,9 @@ providers:
     supports_streaming: false
 
 tier_order:
-  cheap: [ollama_local, gemini_flash]
-  standard: [ollama_local, gemini_flash, groq_fast, openai_mini]
-  premium: [claude_sonnet, gemini_flash, groq_fast, openai_mini, ollama_local]
+  cheap: [groq_free, ollama_local, gemini_flash]
+  standard: [groq_free, ollama_local, gemini_flash, openai_mini]
+  premium: [claude_sonnet, groq_free, gemini_flash, openai_mini, ollama_local]
 
 agent_loop:
   default_tier: standard

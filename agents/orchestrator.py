@@ -88,14 +88,14 @@ class OrchestratorAgent(BaseAgent):
             if pattern.search(text):
                 return {"agents": chain, "args": text}
 
-        if re.search(r"\b(osint|research|investigate|scrape|search)\b", text, re.I):
+        if re.search(r"\b(osint|research|investigate|scrape|search|recon|intel|spy)\b", text, re.I):
             return {"agents": ["osint"], "args": text}
-        if re.search(r"\b(analyz|analyse|pattern|anomaly|report)\b", text, re.I):
+        if re.search(r"\b(analyz|analyse|pattern|anomaly|report|summary|explain)\b", text, re.I):
             return {"agents": ["analyst"], "args": text}
-        if re.search(r"\b(exec|run|command|shell|deploy)\b", text, re.I):
+        if re.search(r"\b(exec|run|command|shell|deploy|install|build)\b", text, re.I):
             return {"agents": ["executor"], "args": text}
 
-        return {"agents": ["osint"], "args": text}
+        return {"agents": ["analyst"], "args": text}
 
     @staticmethod
     def _summarize_step(result: dict) -> str:

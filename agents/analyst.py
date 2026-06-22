@@ -20,6 +20,14 @@ class AnalystAgent(BaseAgent):
         session_id = message.payload.get("session_id")
         self.memory.save_conversation(self.name, "user", str(data), session_id)
 
+        input_text = data.get("input", str(data)) if isinstance(data, dict) else str(data)
+
+        if not isinstance(data, dict) or "prior" not in data:
+            analysis = await self.think(input_text, session_id=session_id)
+            report = {"analysis": analysis, "status": "complete"}
+            self.memory.save_conversation(self.name, "assistant", analysis, session_id)
+            return report
+
         analysis_prompt = f"""Analyze this data and provide insights:
 Data: {data}
 
