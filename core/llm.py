@@ -15,7 +15,7 @@ class OllamaClient:
                 resp = await self._client.post("/api/chat", json=payload)
                 resp.raise_for_status()
                 return resp.json()["message"]["content"]
-            except (httpx.HTTPError, KeyError) as e:
+            except (httpx.HTTPError, KeyError):
                 if attempt == 2:
                     raise
                 await asyncio.sleep(1 * (attempt + 1))

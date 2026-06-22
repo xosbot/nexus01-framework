@@ -63,7 +63,7 @@ class TelegramChannel(BaseChannelAdapter):
 
         async def status_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             pending = self.gateway.approvals.pending_count()
-            status = f"\u2705 NEXUS-01 Telegram channel is online."
+            status = "\u2705 NEXUS-01 Telegram channel is online."
             if pending:
                 status += f"\n\n\U0001f514 {pending} pending approval(s)."
             await update.message.reply_text(status)
@@ -105,9 +105,7 @@ class TelegramChannel(BaseChannelAdapter):
                 },
             )
 
-            start = time.monotonic()
             response = await self.gateway.handle(inbound)
-            elapsed = int((time.monotonic() - start) * 1000)
 
             if response.requires_approval:
                 self._pending_approvals[chat_id] = {
@@ -130,7 +128,6 @@ class TelegramChannel(BaseChannelAdapter):
                 )
                 await self._reply(update.message.reply_text, approval_msg, reply_markup=keyboard)
             else:
-                meta = f" ({elapsed}ms)" if elapsed > 1000 else ""
                 await self._reply(update.message.reply_text, response.text)
 
         async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

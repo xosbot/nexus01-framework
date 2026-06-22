@@ -3,7 +3,6 @@
 
 import argparse
 import asyncio
-import logging
 import signal
 
 from rich.console import Console
@@ -85,10 +84,10 @@ async def main():
     app = await create_app(config)
     await start_services(app, config)
 
-    console.print(f"[green]Brain:[/green] Second brain ready")
-    console.print(f"[green]Copilot:[/green] Execution copilot ready")
-    console.print(f"[green]Integrations:[/green] App hub ready")
-    console.print(f"[green]Proactive:[/green] Intelligence active")
+    console.print("[green]Brain:[/green] Second brain ready")
+    console.print("[green]Copilot:[/green] Execution copilot ready")
+    console.print("[green]Integrations:[/green] App hub ready")
+    console.print("[green]Proactive:[/green] Intelligence active")
 
     channels = ", ".join(c.name for c in app.channels) or "none"
     console.print(f"[green]Channels:[/green] {channels}")
@@ -96,7 +95,7 @@ async def main():
         console.print(f"[green]Dashboard:[/green] http://127.0.0.1:{config.api_port}")
     console.print(f"[green]LLM:[/green] {config.ollama_model} (router: Ollama → cloud fallback)")
     if json_logs:
-        console.print(f"[green]Logging:[/green] structured JSON")
+        console.print("[green]Logging:[/green] structured JSON")
 
     try:
         if config.enable_cli and not args.no_cli:

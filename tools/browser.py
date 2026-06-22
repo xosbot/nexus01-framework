@@ -11,9 +11,7 @@ Requires: pip install playwright && playwright install chromium
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import os
 import tempfile
 from dataclasses import dataclass, field
 from typing import Any

@@ -6,7 +6,30 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint with ruff
+        run: ruff check .
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -20,25 +43,20 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install ruff mypy pytest pytest-asyncio
-
-      - name: Lint with ruff
-        run: ruff check .
-
-      - name: Type check with mypy
-        run: mypy . --ignore-missing-imports
-        continue-on-error: true
+          pip install pytest pytest-asyncio
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
 
   build:
-    needs: test
+    needs: [lint, test]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
@@ -46,8 +64,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build Docker image
+        if: hashFiles('Dockerfile') != ''
         run: docker build -t nexus01:latest .
 
       - name: Smoke test
+        if: hashFiles('Dockerfile') != ''
         run: |
-          docker run --rm nexus01:latest python -c "from core.bus import MessageBus; print('OK')"
+          docker run --rm nexus01:latest python -c "from core.bus import MessageBus; print('Docker smoke test OK')"

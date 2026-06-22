@@ -1,6 +1,6 @@
 import asyncio
 from enum import Enum
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable
 from core.bus import Message, MessageBus
 from core.memory import Memory
 from config import config

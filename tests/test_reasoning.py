@@ -6,8 +6,6 @@ from unittest.mock import AsyncMock, MagicMock
 from core.reasoning import (
     ReasoningEngine,
     ReasoningDepth,
-    ReasoningPhase,
-    ReasoningStep,
     ReasoningResult,
 )
 

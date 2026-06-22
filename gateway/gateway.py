@@ -3,7 +3,7 @@ import re
 
 from core.bus import Message, MessageBus
 from gateway.approvals import ApprovalManager
-from gateway.types import ChannelKind, GatewayResponse, InboundMessage
+from gateway.types import GatewayResponse, InboundMessage
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,7 @@ class NexusGateway:
         data = reply.payload.get("data", {})
         if data.get("status") == "blocked":
             reasons = data.get("reasons", [])
-            return GatewayResponse(f"🧊 Blocked by Cold Mode:\n" + "\n".join(f"• {r}" for r in reasons), raw=data)
+            return GatewayResponse("🧊 Blocked by Cold Mode:\n" + "\n".join(f"• {r}" for r in reasons), raw=data)
 
         if data.get("status") == "error":
             return GatewayResponse(f"❌ {data.get('error', 'Request failed')}", raw=data)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from core.bus import MessageBus, bus
+from core.bus import MessageBus
 
 logger = logging.getLogger(__name__)
 

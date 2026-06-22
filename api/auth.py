@@ -6,7 +6,6 @@ import os
 import time
 import logging
 from collections import defaultdict
-from typing import Callable
 
 from fastapi import Request
 from fastapi.responses import JSONResponse

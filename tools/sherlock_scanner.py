@@ -41,8 +41,6 @@ async def scan_username(username: str, timeout: int = 120) -> UsernameResult:
 
     Falls back to a simple HTTP check if sherlock is not installed.
     """
-    result = UsernameResult(username=username)
-
     sherlock_path = shutil.which("sherlock")
     if sherlock_path:
         return await _run_sherlock(username, timeout)

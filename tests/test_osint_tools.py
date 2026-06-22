@@ -5,8 +5,7 @@ from __future__ import annotations
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from tools.crawl4ai_scraper import (
-    crawl4ai_scrape, crawl4ai_search, duckduckgo_search,
-    httpx_fallback_scrape, format_osint_report, ScrapeResult,
+    crawl4ai_scrape, crawl4ai_search, format_osint_report, ScrapeResult,
 )
 from tools.sherlock_scanner import scan_username, UsernameResult
 from tools.theharvester import harvest_domain, _parse_harvester_output, HarvestResult

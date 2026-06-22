@@ -1,4 +1,3 @@
-import asyncio
 import pytest
 from core.bus import Message, MessageBus
 from core.cold_mode import ColdMode

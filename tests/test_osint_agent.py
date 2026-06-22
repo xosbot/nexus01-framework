@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 from agents.osint import _classify_query, _extract_usernames, _extract_domains, _extract_emails
 
 

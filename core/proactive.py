@@ -280,7 +280,7 @@ class ProactiveIntelligence:
         self._check_callbacks.append(callback)
 
     def learn(self, pattern: str, example: dict, confidence: float = 0.5) -> None:
-        existing = next((l for l in self.learnings if l.pattern == pattern), None)
+        existing = next((entry for entry in self.learnings if entry.pattern == pattern), None)
         if existing:
             existing.examples.append(example)
             if len(existing.examples) > 10:

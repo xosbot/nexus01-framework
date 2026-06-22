@@ -53,7 +53,7 @@ async def firecrawl_scrape(url: str, api_key: str = "") -> ScrapedPage:
             markdown = data.get("markdown", "")
             text = data.get("text", "")
             title = data.get("metadata", {}).get("title", "")
-            links = [l.get("href", "") for l in data.get("links", []) if l.get("href")]
+            links = [link.get("href", "") for link in data.get("links", []) if link.get("href")]
 
             return ScrapedPage(
                 url=url,

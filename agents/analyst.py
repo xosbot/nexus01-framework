@@ -1,7 +1,6 @@
 import statistics
-from agents.base import BaseAgent, AgentStatus
+from agents.base import BaseAgent
 from core.bus import Message
-from core.memory import Memory
 
 class AnalystAgent(BaseAgent):
     def __init__(self, llm, memory, rag=None):
