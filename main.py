@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NEXUS-01 — Agentic AI OS entry point."""
+"""IVA — Intelligent Virtual Assistant. The AI within NEXUS-01 OS."""
 
 import argparse
 import asyncio
@@ -28,7 +28,7 @@ async def _run_cli(app):
     while running:
         try:
             user_input = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: Prompt.ask("[bold green]nexus[/bold green]")
+                None, lambda: Prompt.ask("[bold cyan]iva[/bold cyan]")
             )
         except (EOFError, KeyboardInterrupt):
             break
@@ -80,9 +80,25 @@ async def main():
     signal.signal(signal.SIGINT, _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)
 
-    console.print("[bold cyan]NEXUS-01 Agentic OS[/bold cyan]")
+    console.print("[bold cyan]IVA — Intelligent Virtual Assistant[/bold cyan]")
+    console.print("[dim]NEXUS-01 OS v2.0 — Second Brain + Execution Copilot[/dim]")
     app = await create_app(config)
     await start_services(app, config)
+
+    from core.brain import IVABrain
+    from core.copilot import ExecutionCopilot
+    from core.integrations import IntegrationHub
+    from core.proactive import ProactiveIntelligence
+
+    app.brain = IVABrain(app.memory, app.rag)
+    app.copilot = ExecutionCopilot(app.memory, app.rag, app.agents)
+    app.integrations = IntegrationHub(app.memory, app.brain)
+    app.proactive = ProactiveIntelligence(app.memory, app.brain)
+
+    console.print("[green]Brain:[/green] Second brain initialized (episodic, semantic, procedural)")
+    console.print("[green]Copilot:[/green] Execution copilot ready (multi-step workflows)")
+    console.print("[green]Integrations:[/green] App hub ready (webhooks, API connectors)")
+    console.print("[green]Proactive:[/green] Intelligence system active (monitors, alerts)")
 
     channels = ", ".join(c.name for c in app.channels) or "none"
     console.print(f"[green]Channels:[/green] {channels}")
@@ -102,7 +118,7 @@ async def main():
                 await asyncio.sleep(1)
     finally:
         await app.shutdown()
-        console.print("[green]NEXUS-01 shutdown complete.[/green]")
+        console.print("[green]IVA shutdown complete, Sir.[/green]")
 
 
 if __name__ == "__main__":

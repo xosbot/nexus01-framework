@@ -1,4 +1,4 @@
-"""FastAPI server — REST API, WebSocket chat, webhooks, static OS dashboard."""
+"""FastAPI server — IVA by NEXUS-01 OS. REST API, WebSocket chat, webhooks, static OS dashboard."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ class IngestRequest(BaseModel):
 
 
 def create_api_app(nexus_app) -> FastAPI:
-    app = FastAPI(title="NEXUS-01 OS", version="0.3.0")
+    app = FastAPI(title="IVA — NEXUS-01 OS", version="2.0.0")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=ALLOWED_ORIGINS,
@@ -68,6 +68,11 @@ def create_api_app(nexus_app) -> FastAPI:
     gateway = nexus_app.gateway
     memory = nexus_app.memory
     llm = nexus_app.llm
+
+    brain = getattr(nexus_app, 'brain', None)
+    copilot = getattr(nexus_app, 'copilot', None)
+    integrations = getattr(nexus_app, 'integrations', None)
+    proactive = getattr(nexus_app, 'proactive', None)
 
     if WEB_ROOT.exists():
         app.mount("/assets", StaticFiles(directory=WEB_ROOT), name="assets")
@@ -316,6 +321,173 @@ def create_api_app(nexus_app) -> FastAPI:
     @app.get("/api/memory/conversations")
     async def list_conversations(session_id: str | None = None, agent: str | None = None, limit: int = 100):
         return memory.list_conversations(session_id, agent, limit)
+
+    # ── Brain / Second Brain ────────────────────────────────────────────
+
+    @app.get("/api/brain/stats")
+    async def brain_stats():
+        if not brain:
+            return {"error": "Brain not initialized"}
+        return brain.get_stats()
+
+    @app.post("/api/brain/remember")
+    async def brain_remember(request: Request):
+        if not brain:
+            return {"error": "Brain not initialized"}
+        data = await request.json()
+        entry = brain.remember(
+            content=data.get("content", ""),
+            memory_type=data.get("type", "episodic"),
+            importance=data.get("importance", 0.5),
+            tags=data.get("tags", []),
+            sources=data.get("sources", []),
+        )
+        return entry.to_dict()
+
+    @app.get("/api/brain/recall")
+    async def brain_recall(q: str, type: str | None = None, limit: int = 10):
+        if not brain:
+            return {"error": "Brain not initialized"}
+        results = brain.recall(q, memory_type=type, limit=limit)
+        return [r.to_dict() for r in results]
+
+    @app.post("/api/brain/think")
+    async def brain_think(request: Request):
+        if not brain:
+            return {"error": "Brain not initialized"}
+        data = await request.json()
+        result = brain.think(context=data.get("context", ""), query=data.get("query", ""))
+        return {"response": result}
+
+    # ── Execution Copilot ──────────────────────────────────────────────
+
+    @app.post("/api/copilot/workflow")
+    async def create_workflow(request: Request):
+        if not copilot:
+            return {"error": "Copilot not initialized"}
+        data = await request.json()
+        workflow = copilot.create_workflow(
+            name=data.get("name", "Untitled"),
+            steps=data.get("steps", []),
+            description=data.get("description", ""),
+        )
+        return workflow.to_dict()
+
+    @app.post("/api/copilot/workflow/{workflow_id}/run")
+    async def run_workflow(workflow_id: str):
+        if not copilot:
+            return {"error": "Copilot not initialized"}
+        workflow = copilot.get_workflow(workflow_id)
+        if not workflow:
+            raise HTTPException(404, "Workflow not found")
+        result = await copilot.execute_workflow(workflow)
+        return result.to_dict()
+
+    @app.get("/api/copilot/workflows")
+    async def list_workflows():
+        if not copilot:
+            return {"error": "Copilot not initialized"}
+        return copilot.list_workflows()
+
+    @app.get("/api/copilot/suggest")
+    async def suggest_workflow(intent: str):
+        if not copilot:
+            return {"error": "Copilot not initialized"}
+        return copilot.suggest_workflow(intent)
+
+    # ── Integrations ───────────────────────────────────────────────────
+
+    @app.get("/api/integrations")
+    async def list_integrations():
+        if not integrations:
+            return {"error": "Integrations not initialized"}
+        return integrations.list_integrations()
+
+    @app.post("/api/integrations")
+    async def register_integration(request: Request):
+        if not integrations:
+            return {"error": "Integrations not initialized"}
+        data = await request.json()
+        from core.integrations import IntegrationType
+        int_type = IntegrationType(data.get("type", "webhook"))
+        result = integrations.register_integration(
+            name=data.get("name", ""),
+            integration_type=int_type,
+            config=data.get("config", {}),
+        )
+        return result.to_dict()
+
+    @app.delete("/api/integrations/{integration_id}")
+    async def remove_integration(integration_id: str):
+        if not integrations:
+            return {"error": "Integrations not initialized"}
+        if integrations.unregister_integration(integration_id):
+            return {"deleted": True}
+        raise HTTPException(404, "Integration not found")
+
+    @app.post("/api/webhooks/{source}")
+    async def receive_webhook(source: str, request: Request):
+        if not integrations:
+            return {"error": "Integrations not initialized"}
+        data = await request.json()
+        headers = dict(request.headers)
+        return await integrations.process_webhook(source, "event", data, headers)
+
+    @app.get("/api/webhooks/events")
+    async def list_webhook_events(limit: int = 20):
+        if not integrations:
+            return {"error": "Integrations not initialized"}
+        return integrations.get_recent_events(limit)
+
+    # ── Proactive Intelligence ─────────────────────────────────────────
+
+    @app.get("/api/proactive/stats")
+    async def proactive_stats():
+        if not proactive:
+            return {"error": "Proactive not initialized"}
+        return proactive.get_stats()
+
+    @app.get("/api/proactive/monitors")
+    async def list_monitors():
+        if not proactive:
+            return {"error": "Proactive not initialized"}
+        return proactive.list_monitors()
+
+    @app.post("/api/proactive/monitors")
+    async def create_monitor(request: Request):
+        if not proactive:
+            return {"error": "Proactive not initialized"}
+        data = await request.json()
+        from core.proactive import MonitorType
+        mon_type = MonitorType(data.get("type", "domain"))
+        result = proactive.register_monitor(
+            name=data.get("name", ""),
+            monitor_type=mon_type,
+            target=data.get("target", ""),
+            interval=data.get("interval", 3600),
+            config=data.get("config", {}),
+        )
+        return result.to_dict()
+
+    @app.get("/api/proactive/alerts")
+    async def list_alerts(limit: int = 50, unacknowledged: bool = False):
+        if not proactive:
+            return {"error": "Proactive not initialized"}
+        return proactive.get_alerts(limit, unacknowledged)
+
+    @app.post("/api/proactive/alerts/{alert_id}/acknowledge")
+    async def acknowledge_alert(alert_id: str):
+        if not proactive:
+            return {"error": "Proactive not initialized"}
+        if proactive.acknowledge_alert(alert_id):
+            return {"acknowledged": True}
+        raise HTTPException(404, "Alert not found")
+
+    @app.get("/api/proactive/suggest")
+    async def proactive_suggest(q: str):
+        if not proactive:
+            return {"error": "Proactive not initialized"}
+        return proactive.suggest(q)
 
     # ── Webhooks (WhatsApp, Slack, Teams) ───────────────────────────────
 
