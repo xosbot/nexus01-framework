@@ -90,8 +90,21 @@ def create_api_app(nexus_app) -> FastAPI:
 
     # ── System ──────────────────────────────────────────────────────────
 
+    _start_time = __import__('time').time()
+
     @app.get("/api/overview")
     async def overview():
+        import time as _t
+        uptime_secs = int(_t.time() - _start_time)
+        hours, remainder = divmod(uptime_secs, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours > 24:
+            days, hours = divmod(hours, 24)
+            uptime_str = f"{days}d {hours}h"
+        elif hours > 0:
+            uptime_str = f"{hours}h {minutes}m"
+        else:
+            uptime_str = f"{minutes}m {seconds}s"
         stats = memory.stats()
         rag_stats = nexus_app.rag.stats() if hasattr(nexus_app, "rag") else {}
         providers = llm.provider_status() if hasattr(llm, "provider_status") else []
@@ -103,6 +116,7 @@ def create_api_app(nexus_app) -> FastAPI:
             "total_messages": stats.get("conversations", 0),
             "knowledge_count": stats.get("knowledge", 0),
             "rag_docs": rag_stats.get("documents", 0),
+            "uptime": uptime_str,
             "providers": [{"name": p.get("name", ""), "available": p.get("available", False)} for p in providers],
             "agent_activity": agent_activity,
         }

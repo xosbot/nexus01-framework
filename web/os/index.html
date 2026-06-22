@@ -15,7 +15,10 @@
       <div class="sidebar-header">
         <div class="logo">
           <div class="logo-mark">IVA</div>
-          <span class="logo-text">NEXUS-01</span>
+          <div class="logo-text">
+            <span class="logo-title">NEXUS-01</span>
+            <span class="logo-sub">Agentic OS</span>
+          </div>
         </div>
         <button class="sidebar-close" id="sidebar-close" aria-label="Close menu">✕</button>
       </div>
@@ -31,7 +34,7 @@
           Chat
         </button>
         <button class="nav-item" data-panel="brain">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6v6l4 2"/></svg>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           Memory
         </button>
 
@@ -69,7 +72,7 @@
           <span class="status-dot"></span>
           <span>Online</span>
         </div>
-        <span class="version">v1.0</span>
+        <span class="version">v2.0</span>
       </div>
     </aside>
 
@@ -84,7 +87,7 @@
         <div class="topbar-right">
           <div class="ws-badge" id="ws-indicator" title="WebSocket status">
             <span class="dot"></span>
-            <span class="label">Connected</span>
+            <span class="label">Connecting...</span>
           </div>
         </div>
       </header>
@@ -93,35 +96,28 @@
         <!-- Overview -->
         <section class="panel active" id="panel-overview">
           <div class="stats-row" id="stats-grid">
-            <div class="stat-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
-            <div class="stat-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
-            <div class="stat-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
-            <div class="stat-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
+            <div class="stat-card"><div class="stat-label">Sessions</div><div class="stat-value accent" id="stat-sessions">—</div></div>
+            <div class="stat-card"><div class="stat-label">Messages</div><div class="stat-value green" id="stat-messages">—</div></div>
+            <div class="stat-card"><div class="stat-label">Knowledge</div><div class="stat-value purple" id="stat-knowledge">—</div></div>
+            <div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-value amber" id="stat-uptime">—</div></div>
           </div>
           <div class="card-grid">
             <div class="card">
-              <div class="card-header">
-                <span class="card-title">Agent Activity</span>
-              </div>
+              <div class="card-header"><span class="card-title">Agent Activity</span></div>
               <canvas id="agent-chart" height="160"></canvas>
             </div>
             <div class="card">
-              <div class="card-header">
-                <span class="card-title">Providers</span>
-              </div>
-              <div class="provider-list" id="provider-list">
-                <div class="skeleton-row"></div>
-                <div class="skeleton-row"></div>
-                <div class="skeleton-row"></div>
-              </div>
+              <div class="card-header"><span class="card-title">LLM Providers</span></div>
+              <div class="provider-list" id="provider-list"></div>
             </div>
           </div>
         </section>
 
         <!-- Chat -->
         <section class="panel" id="panel-chat">
+          <button class="btn btn-sm chat-sidebar-toggle" id="btn-toggle-sessions">Sessions</button>
           <div class="chat-layout">
-            <div class="chat-sidebar">
+            <div class="chat-sidebar" id="chat-sidebar-panel">
               <div class="chat-sidebar-header">
                 <input class="input input-sm" id="session-search" placeholder="Search sessions..." aria-label="Search sessions">
                 <button class="btn btn-sm btn-primary" id="btn-new-session" title="New session">+</button>
@@ -140,7 +136,7 @@
                 <span class="typing-dot"></span>
                 <span class="typing-dot"></span>
                 <span class="typing-dot"></span>
-                <span>IVA processing...</span>
+                <span>IVA thinking...</span>
               </div>
               <div class="approval-bar" id="approval-bar">
                 <div class="approval-info">
@@ -168,35 +164,31 @@
         <!-- Brain / Memory -->
         <section class="panel" id="panel-brain">
           <div class="stats-row" id="brain-stats">
-            <div class="stat-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
-            <div class="stat-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
-            <div class="stat-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
-            <div class="stat-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
+            <div class="stat-card"><div class="stat-label">Episodic</div><div class="stat-value accent" id="brain-episodic">0</div></div>
+            <div class="stat-card"><div class="stat-label">Semantic</div><div class="stat-value green" id="brain-semantic">0</div></div>
+            <div class="stat-card"><div class="stat-label">Procedural</div><div class="stat-value purple" id="brain-procedural">0</div></div>
+            <div class="stat-card"><div class="stat-label">Working</div><div class="stat-value amber" id="brain-working">0</div></div>
           </div>
           <div class="card-grid">
             <div class="card">
-              <div class="card-header">
-                <span class="card-title">Semantic Search</span>
-              </div>
+              <div class="card-header"><span class="card-title">Semantic Search</span></div>
               <div style="display:flex;gap:8px;margin-bottom:12px;">
                 <input class="input" id="memory-search" placeholder="Search memory..." aria-label="Search memory">
                 <button class="btn btn-primary" id="btn-memory-search">Search</button>
               </div>
-              <div id="search-results" class="empty-state">
-                <div class="empty-title">Search vector memory</div>
-                <div class="empty-desc">Enter a query to find related knowledge</div>
+              <div id="search-results">
+                <div class="empty-state">
+                  <div class="empty-title">Search vector memory</div>
+                  <div class="empty-desc">Enter a query to find related knowledge</div>
+                </div>
               </div>
             </div>
             <div class="card">
-              <div class="card-header">
-                <span class="card-title">Knowledge Store</span>
-              </div>
+              <div class="card-header"><span class="card-title">Knowledge Store</span></div>
               <div class="table-wrap">
                 <table>
                   <thead><tr><th>Key</th><th>Preview</th></tr></thead>
-                  <tbody id="knowledge-table">
-                    <tr><td colspan="2"><div class="skeleton-row"></div></td></tr>
-                  </tbody>
+                  <tbody id="knowledge-table"></tbody>
                 </table>
               </div>
             </div>
@@ -214,9 +206,7 @@
             <div class="table-wrap">
               <table>
                 <thead><tr><th>Name</th><th>Status</th><th>Updated</th></tr></thead>
-                <tbody id="projects-table">
-                  <tr><td colspan="3"><div class="skeleton-row"></div></td></tr>
-                </tbody>
+                <tbody id="projects-table"></tbody>
               </table>
             </div>
           </div>
@@ -231,9 +221,7 @@
             <div class="table-wrap">
               <table>
                 <thead><tr><th>Title</th><th>Channel</th><th>Project</th><th>Updated</th></tr></thead>
-                <tbody id="sessions-table">
-                  <tr><td colspan="4"><div class="skeleton-row"></div></td></tr>
-                </tbody>
+                <tbody id="sessions-table"></tbody>
               </table>
             </div>
           </div>
@@ -241,27 +229,30 @@
 
         <!-- RAG -->
         <section class="panel" id="panel-rag">
+          <div class="stats-row" id="rag-stats">
+            <div class="stat-card"><div class="stat-label">Collection</div><div class="stat-value accent" id="rag-collection" style="font-size:16px;">—</div></div>
+            <div class="stat-card"><div class="stat-label">Documents</div><div class="stat-value green" id="rag-documents">0</div></div>
+            <div class="stat-card"><div class="stat-label">ChromaDB</div><div class="stat-value cyan" id="rag-chroma" style="font-size:16px;">—</div></div>
+            <div class="stat-card"><div class="stat-label">Embedder</div><div class="stat-value purple" id="rag-embedder" style="font-size:16px;">—</div></div>
+          </div>
           <div class="toolbar">
             <input class="input" id="rag-query" placeholder="Search tradecraft knowledge..." aria-label="Search RAG">
             <button class="btn" id="btn-rag-search">Search</button>
             <button class="btn btn-primary" id="btn-rag-ingest">Re-ingest</button>
           </div>
           <div class="card">
-            <div id="rag-results" class="empty-state">
-              <div class="empty-title">Tradecraft Knowledge Base</div>
-              <div class="empty-desc">483 documents ingested into ChromaDB</div>
+            <div id="rag-results">
+              <div class="empty-state">
+                <div class="empty-title">Tradecraft Knowledge Base</div>
+                <div class="empty-desc">Search documents ingested into ChromaDB</div>
+              </div>
             </div>
           </div>
         </section>
 
         <!-- Agents -->
         <section class="panel" id="panel-agents">
-          <div class="agent-grid" id="agent-grid">
-            <div class="agent-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
-            <div class="agent-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
-            <div class="agent-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
-            <div class="agent-card skeleton"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
-          </div>
+          <div class="agent-grid" id="agent-grid"></div>
         </section>
 
         <!-- Integrations -->
@@ -270,20 +261,21 @@
             <div class="card">
               <div class="card-header">
                 <span class="card-title">Connected Apps</span>
-                <button class="btn btn-sm btn-primary">+ Add</button>
               </div>
-              <div id="integrations-list" class="empty-state">
-                <div class="empty-title">No integrations yet</div>
-                <div class="empty-desc">Connect your apps to IVA</div>
+              <div id="integrations-list">
+                <div class="empty-state">
+                  <div class="empty-title">No integrations yet</div>
+                  <div class="empty-desc">Connect your apps to IVA via API</div>
+                </div>
               </div>
             </div>
             <div class="card">
-              <div class="card-header">
-                <span class="card-title">Webhooks</span>
-              </div>
-              <div id="webhooks-list" class="empty-state">
-                <div class="empty-title">No webhooks configured</div>
-                <div class="empty-desc">Receive events from external services</div>
+              <div class="card-header"><span class="card-title">Recent Webhook Events</span></div>
+              <div id="webhooks-list">
+                <div class="empty-state">
+                  <div class="empty-title">No events yet</div>
+                  <div class="empty-desc">Webhook events will appear here</div>
+                </div>
               </div>
             </div>
           </div>
@@ -297,12 +289,12 @@
               <div class="setting-row">
                 <span class="setting-label">REST API</span>
                 <code class="mono setting-value" id="api-url"></code>
-                <button class="btn btn-sm btn-ghost" onclick="navigator.clipboard.writeText($('#api-url').textContent);toast('Copied','success')">Copy</button>
+                <button class="btn btn-sm btn-ghost" id="btn-copy-api">Copy</button>
               </div>
               <div class="setting-row">
                 <span class="setting-label">WebSocket</span>
                 <code class="mono setting-value" id="ws-url"></code>
-                <button class="btn btn-sm btn-ghost" onclick="navigator.clipboard.writeText($('#ws-url').textContent);toast('Copied','success')">Copy</button>
+                <button class="btn btn-sm btn-ghost" id="btn-copy-ws">Copy</button>
               </div>
             </div>
             <div class="card">
@@ -324,9 +316,10 @@ python main.py</pre>
             </div>
             <div class="card">
               <div class="card-header"><span class="card-title">Danger Zone</span></div>
-              <div style="display:flex;gap:8px;">
-                <button class="btn btn-sm btn-ghost" style="border-color:var(--red-dim);color:var(--red);" id="btn-restart">Restart IVA</button>
-                <button class="btn btn-sm btn-ghost" style="border-color:var(--red-dim);color:var(--red);" id="btn-reload-rag">Reload RAG</button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-sm btn-danger" id="btn-restart">Restart IVA</button>
+                <button class="btn btn-sm btn-danger" id="btn-reload-rag">Reload RAG</button>
+                <button class="btn btn-sm btn-danger" id="btn-clear-key">Clear API Key</button>
               </div>
             </div>
           </div>
