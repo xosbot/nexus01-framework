@@ -18,7 +18,7 @@ from typing import Any
 from dataclasses import dataclass, field
 
 from core.memory import Memory
-from core.rag import RAG
+from core.rag import RAGStore as RAG
 
 
 @dataclass
