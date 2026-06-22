@@ -85,20 +85,10 @@ async def main():
     app = await create_app(config)
     await start_services(app, config)
 
-    from core.brain import IVABrain
-    from core.copilot import ExecutionCopilot
-    from core.integrations import IntegrationHub
-    from core.proactive import ProactiveIntelligence
-
-    app.brain = IVABrain(app.memory, app.rag)
-    app.copilot = ExecutionCopilot(app.memory, app.rag, {})
-    app.integrations = IntegrationHub(app.memory, app.brain)
-    app.proactive = ProactiveIntelligence(app.memory, app.brain)
-
-    console.print("[green]Brain:[/green] Second brain initialized (episodic, semantic, procedural)")
-    console.print("[green]Copilot:[/green] Execution copilot ready (multi-step workflows)")
-    console.print("[green]Integrations:[/green] App hub ready (webhooks, API connectors)")
-    console.print("[green]Proactive:[/green] Intelligence system active (monitors, alerts)")
+    console.print(f"[green]Brain:[/green] Second brain ready")
+    console.print(f"[green]Copilot:[/green] Execution copilot ready")
+    console.print(f"[green]Integrations:[/green] App hub ready")
+    console.print(f"[green]Proactive:[/green] Intelligence active")
 
     channels = ", ".join(c.name for c in app.channels) or "none"
     console.print(f"[green]Channels:[/green] {channels}")

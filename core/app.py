@@ -210,6 +210,16 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
         _api_server=None,
     )
 
+    from core.brain import IVABrain
+    from core.copilot import ExecutionCopilot
+    from core.integrations import IntegrationHub
+    from core.proactive import ProactiveIntelligence
+
+    nexus.brain = IVABrain(nexus.memory, nexus.rag)
+    nexus.copilot = ExecutionCopilot(nexus.memory, nexus.rag, {})
+    nexus.integrations = IntegrationHub(nexus.memory, nexus.brain)
+    nexus.proactive = ProactiveIntelligence(nexus.memory, nexus.brain)
+
     if cfg.enable_web_ui:
         from api.server import create_api_app
         nexus.api_app = create_api_app(nexus)
