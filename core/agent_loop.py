@@ -1,4 +1,4 @@
-"""ReAct agent loop — reason + act with parallel tool execution."""
+"""ReAct agent loop — reason + act with parallel tool execution, resilience."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from core.llm_router import STANDARD, classify_tier
+from core.resilience import CircuitBreaker, with_retry
 
 if TYPE_CHECKING:
     from core.llm_router import LLMRouter
@@ -29,6 +30,7 @@ class AgentLoop:
         self._tools = tools
         self._memory = memory
         self._max_iter = max_iterations
+        self._llm_breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0, name="llm")
 
     async def run(self, intent: str, session_id: str = "", agent: str = "orchestrator") -> str:
         routing_cfg = getattr(self._router, "_routing", {})
@@ -44,20 +46,29 @@ class AgentLoop:
 
         tools_schema = self._tools.as_openai_tools()
         iteration = 0
+        last_error = ""
 
         while iteration < self._max_iter:
             iteration += 1
             try:
-                if tools_schema:
-                    response = await self._router.complete_with_tools(
-                        messages, tools=tools_schema, tier=tier,
-                        session_id=session_id, agent=agent,
-                    )
-                else:
-                    response = await self._router.complete_messages(
+                if not self._llm_breaker.can_execute():
+                    return f"LLM circuit open (too many failures). Try again later. Last error: {last_error}"
+
+                async def _llm_call():
+                    if tools_schema:
+                        return await self._router.complete_with_tools(
+                            messages, tools=tools_schema, tier=tier, session_id=session_id, agent=agent,
+                        )
+                    return await self._router.complete_messages(
                         messages, tier=tier, session_id=session_id, agent=agent,
                     )
+
+                response = await with_retry(_llm_call, max_attempts=2, base_delay=1.0)
+                self._llm_breaker.record_success()
+
             except Exception as exc:
+                self._llm_breaker.record_failure()
+                last_error = str(exc)
                 return f"LLM failed at iteration {iteration}: {exc}"
 
             if not response.has_tool_calls:

@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from pathlib import Path
+
 from agents.base import BaseAgent
 from core.bus import Message
 from core.cold_mode import ColdMode
+from core.resilience import with_retry
 from tools.shell_exec import run_command, _is_safe_command
+
+logger = logging.getLogger(__name__)
 
 RESTRICTED_PATHS = ["/etc", "/proc", "/sys", "/dev", "/boot", "/root/.ssh"]
 WORKSPACE = Path(__file__).parent.parent / "workspace"
@@ -51,12 +57,25 @@ class ExecutorAgent(BaseAgent):
         return result
 
     async def _run_command(self, cmd: str, timeout: int = 30) -> dict:
+        safe, reason = _is_safe_command(cmd)
+        if not safe:
+            return {"error": reason, "exit_code": -1}
+
         if self._sandbox:
             try:
-                result = await self._sandbox.run_command(cmd)
+                async def _sandbox_call():
+                    return await self._sandbox.run_command(cmd)
+                result = await asyncio.wait_for(
+                    with_retry(_sandbox_call, max_attempts=2, base_delay=0.5),
+                    timeout=timeout,
+                )
                 return result.to_dict()
+            except asyncio.TimeoutError:
+                logger.warning("Sandbox exec timed out: %s", cmd[:80])
+                return {"error": "Command timed out", "exit_code": -124, "cmd": cmd}
             except Exception as exc:
-                return {"error": f"Sandbox error: {exc}", "exit_code": -1}
+                logger.warning("Sandbox failed, falling back: %s", exc)
+                return await run_command(cmd, timeout=timeout, sandbox=False)
 
         return await run_command(cmd, timeout=timeout, sandbox=True)
 

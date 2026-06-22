@@ -60,15 +60,20 @@ class Memory:
                 channel TEXT DEFAULT 'web',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
+                expires_at TEXT,
                 metadata TEXT DEFAULT '{}'
             );
         """)
         self._migrate_columns()
 
     def _migrate_columns(self):
-        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(conversations)").fetchall()}
-        if "session_id" not in cols:
+        conv_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(conversations)").fetchall()}
+        if "session_id" not in conv_cols:
             self._conn.execute("ALTER TABLE conversations ADD COLUMN session_id TEXT")
+            self._conn.commit()
+        sess_cols = {r[1] for r in self._conn.execute("PRAGMA table_info(sessions)").fetchall()}
+        if "expires_at" not in sess_cols:
+            self._conn.execute("ALTER TABLE sessions ADD COLUMN expires_at TEXT")
             self._conn.commit()
 
     def _init_chroma(self, path: str):
@@ -78,6 +83,27 @@ class Memory:
             self._collection = self._chroma.get_or_create_collection("nexus_memory")
         except Exception:
             self._collection = None
+
+    def cleanup_expired_sessions(self, max_age_hours: int = 24) -> int:
+        cutoff = datetime.now().isoformat()
+        count = self._conn.execute(
+            "DELETE FROM sessions WHERE expires_at IS NOT NULL AND expires_at < ?",
+            (cutoff,),
+        ).rowcount
+        if count:
+            self._conn.commit()
+            logger = __import__("logging").getLogger(__name__)
+            logger.info("[memory] Cleaned %d expired sessions", count)
+        return count
+
+    def set_session_expiry(self, session_id: str, hours: int = 24) -> None:
+        from datetime import timedelta
+        expires = (datetime.now() + timedelta(hours=hours)).isoformat()
+        self._conn.execute(
+            "UPDATE sessions SET expires_at = ? WHERE id = ?",
+            (expires, session_id),
+        )
+        self._conn.commit()
 
     def save_conversation(self, agent: str, role: str, content: str, session_id: str | None = None):
         now = datetime.now().isoformat()
