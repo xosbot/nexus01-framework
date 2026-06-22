@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
@@ -11,10 +12,12 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from api.auth import AuthMiddleware, ws_auth
 from gateway.types import ChannelKind, InboundMessage
 
 logger = logging.getLogger(__name__)
 WEB_ROOT = Path(__file__).parent.parent / "web" / "os"
+ALLOWED_ORIGINS = os.getenv("NEXUS_ALLOWED_ORIGINS", "https://navos.space").split(",")
 
 
 class ChatRequest(BaseModel):
@@ -56,11 +59,12 @@ def create_api_app(nexus_app) -> FastAPI:
     app = FastAPI(title="NEXUS-01 OS", version="0.3.0")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=ALLOWED_ORIGINS,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "X-API-Key", "Content-Type"],
     )
+    app.add_middleware(AuthMiddleware)
     gateway = nexus_app.gateway
     memory = nexus_app.memory
     llm = nexus_app.llm
@@ -111,10 +115,16 @@ def create_api_app(nexus_app) -> FastAPI:
 
     @app.post("/api/rag/ingest")
     async def rag_ingest(req: IngestRequest):
+        RESTRICTED = ["/etc", "/proc", "/sys", "/dev", "/root/.ssh"]
+        if req.path:
+            from pathlib import Path
+            p = Path(req.path).resolve()
+            for restricted in RESTRICTED:
+                if str(p).startswith(restricted):
+                    raise HTTPException(403, f"Access to {restricted} is restricted")
         if req.text:
             chunks = nexus_app.rag.ingest_text(req.text, source=req.source)
         elif req.path:
-            from pathlib import Path
             p = Path(req.path)
             if p.is_dir():
                 stats = nexus_app.rag.ingest_directory(p)
@@ -169,6 +179,14 @@ def create_api_app(nexus_app) -> FastAPI:
 
     @app.websocket("/ws/chat")
     async def ws_chat(websocket: WebSocket):
+        token = websocket.query_params.get("token") or websocket.headers.get("Authorization", "").replace("Bearer ", "")
+        if not ws_auth.authenticate(token):
+            await websocket.close(code=4001, reason="Unauthorized")
+            return
+        client_ip = websocket.client.host if websocket.client else "unknown"
+        if ws_auth.is_rate_limited(client_ip):
+            await websocket.close(code=4029, reason="Rate limit exceeded")
+            return
         await websocket.accept()
         session_id = None
         try:

@@ -1,13 +1,15 @@
-import subprocess
-import asyncio
+"""Executor agent — runs commands in Docker sandbox with security gates."""
+
+from __future__ import annotations
+
 from pathlib import Path
-from agents.base import BaseAgent, AgentStatus
+from agents.base import BaseAgent
 from core.bus import Message
 from core.cold_mode import ColdMode
-from core.memory import Memory
-from core.llm import OllamaClient
+from tools.shell_exec import run_command, _is_safe_command
 
-SANDBOX_ENABLED = True
+RESTRICTED_PATHS = ["/etc", "/proc", "/sys", "/dev", "/boot", "/root/.ssh"]
+WORKSPACE = Path(__file__).parent.parent / "workspace"
 
 
 class ExecutorAgent(BaseAgent):
@@ -22,6 +24,7 @@ class ExecutorAgent(BaseAgent):
             "read_file": self._read_file,
             "write_file": self._write_file,
         }
+        WORKSPACE.mkdir(parents=True, exist_ok=True)
 
     async def on_message(self, message: Message) -> dict:
         action = message.payload.get("action", "")
@@ -48,38 +51,41 @@ class ExecutorAgent(BaseAgent):
         return result
 
     async def _run_command(self, cmd: str, timeout: int = 30) -> dict:
-        dangerous = ["rm -rf /", "chmod 777", "mkfs", "> /dev/sda", ":(){ :|:& };:"]
-        if any(d in cmd for d in dangerous):
-            return {"error": "Command blocked for safety", "exit_code": -1}
-
-        if self._sandbox and SANDBOX_ENABLED:
+        if self._sandbox:
             try:
                 result = await self._sandbox.run_command(cmd)
                 return result.to_dict()
             except Exception as exc:
                 return {"error": f"Sandbox error: {exc}", "exit_code": -1}
 
+        return await run_command(cmd, timeout=timeout, sandbox=True)
+
+    def _validate_path(self, path: str) -> tuple[bool, str]:
         try:
-            proc = await asyncio.create_subprocess_shell(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-            return {
-                "stdout": stdout.decode(),
-                "stderr": stderr.decode(),
-                "exit_code": proc.returncode
-            }
-        except asyncio.TimeoutError:
-            return {"error": "Command timed out", "exit_code": -1}
+            p = Path(path).resolve()
+        except Exception:
+            return False, "Invalid path"
+
+        for restricted in RESTRICTED_PATHS:
+            if str(p).startswith(restricted):
+                return False, f"Access to {restricted} is restricted"
+
+        return True, ""
 
     async def _read_file(self, path: str) -> dict:
+        safe, reason = self._validate_path(path)
+        if not safe:
+            return {"error": reason}
         try:
             content = Path(path).read_text(encoding="utf-8")
-            return {"content": content, "path": path}
+            return {"content": content[:10000], "path": path}
         except Exception as e:
             return {"error": str(e)}
 
     async def _write_file(self, path: str, content: str) -> dict:
+        safe, reason = self._validate_path(path)
+        if not safe:
+            return {"error": reason}
         try:
             p = Path(path)
             p.parent.mkdir(parents=True, exist_ok=True)
@@ -87,6 +93,6 @@ class ExecutorAgent(BaseAgent):
                 backup = p.with_suffix(p.suffix + ".bak")
                 backup.write_text(p.read_text())
             p.write_text(content, encoding="utf-8")
-            return {"status": "written", "path": path, "backup": str(backup) if p.exists() else None}
+            return {"status": "written", "path": path}
         except Exception as e:
             return {"error": str(e)}
