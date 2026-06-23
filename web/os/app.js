@@ -16,6 +16,23 @@ const state = {
   wsBackoff: 1000,
 };
 
+/* ── Terminal Log ──────────────────────────── */
+
+const MAX_TERM_LINES = 100;
+
+function logTerminal(message, level = 'info') {
+  const feed = $('#terminal-feed');
+  if (!feed) return;
+  const line = document.createElement('div');
+  line.className = 'terminal-line';
+  const ts = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const icons = { ok: '<span class="term-ok">●</span>', warn: '<span class="term-warn">◆</span>', error: '<span class="term-error">▲</span>', info: '<span class="term-info">■</span>' };
+  line.innerHTML = `<span class="term-ts">[${ts}]</span> ${icons[level] || icons.info} ${escapeHtml(message)}`;
+  feed.appendChild(line);
+  feed.scrollTop = feed.scrollHeight;
+  while (feed.children.length > MAX_TERM_LINES) feed.removeChild(feed.firstChild);
+}
+
 /* ── Init ──────────────────────────────────── */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -126,6 +143,7 @@ function connectWS() {
     state.wsRetries = 0;
     state.wsBackoff = 1000;
     updateWSStatus('connected');
+    logTerminal('WebSocket connected', 'ok');
     authWS();
   };
 
@@ -161,6 +179,7 @@ function authWS() {
 function handleWSMessage(msg) {
   if (msg.type === 'auth_ok') {
     state.authenticated = true;
+    logTerminal('Authenticated', 'ok');
     return;
   }
   if (msg.type === 'auth_failed') {
@@ -182,10 +201,16 @@ function handleWSMessage(msg) {
     appendMessage('assistant', msg.content, msg.route);
     if (msg.session_id) state.currentSession = msg.session_id;
     loadSessions();
+    logTerminal(`IVA response via ${msg.route || 'direct'}`, 'info');
     return;
   }
   if (msg.type === 'approval_required') {
     showApproval(msg);
+    logTerminal('Approval required for execution', 'warn');
+    return;
+  }
+  if (msg.type === 'system_log') {
+    logTerminal(msg.message, msg.level || 'info');
     return;
   }
 }
@@ -309,7 +334,7 @@ async function loadSessions() {
     state.sessions = data.sessions || [];
     renderChatSessions();
     renderSessionsTable();
-  } catch {}
+  } catch { logTerminal('Failed to load sessions', 'error'); }
 }
 
 function renderChatSessions() {
@@ -384,10 +409,12 @@ async function loadOverview() {
     renderStats(data);
     renderProviders(data.providers || []);
     renderChart(data.agent_activity || {});
+    logTerminal('Overview data loaded', 'ok');
   } catch {
     renderStats({});
     renderProviders([]);
     renderChart({});
+    logTerminal('Failed to load overview', 'error');
   }
 }
 
@@ -433,8 +460,8 @@ function renderChart(activity) {
       labels,
       datasets: [{
         data: values,
-        backgroundColor: 'rgba(99, 102, 241, 0.3)',
-        borderColor: 'rgba(99, 102, 241, 0.8)',
+        backgroundColor: 'rgba(118, 185, 0, 0.3)',
+        borderColor: 'rgba(118, 185, 0, 0.8)',
         borderWidth: 1,
         borderRadius: 4,
       }],
@@ -576,8 +603,9 @@ function initRAG() {
       toast('Re-ingesting documents...', 'info');
       await apiFetch('/api/rag/ingest', { method: 'POST', body: JSON.stringify({ path: '../docs' }) });
       toast('RAG re-ingested', 'success');
+      logTerminal('RAG documents re-ingested', 'ok');
       loadRAGStats();
-    } catch { toast('Re-ingest failed', 'error'); }
+    } catch { toast('Re-ingest failed', 'error'); logTerminal('RAG re-ingest failed', 'error'); }
   });
 }
 
@@ -606,10 +634,10 @@ function renderAgents(agents) {
   if (!el) return;
 
   const agentInfo = {
-    orchestrator: { icon: '🧠', role: 'Routes tasks to specialized agents' },
-    osint: { icon: '🔍', role: 'Open-source intelligence gathering' },
-    analyst: { icon: '📊', role: 'Data analysis and reporting' },
-    executor: { icon: '⚡', role: 'Command execution in sandbox' },
+    orchestrator: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path d="M12 8v3M7 17l2-3M17 17l-2-3"/></svg>', role: 'Routes tasks to specialized agents' },
+    osint: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/><circle cx="12" cy="12" r="10" stroke-dasharray="4 4"/></svg>', role: 'Open-source intelligence gathering' },
+    analyst: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/></svg>', role: 'Data analysis and reporting' },
+    executor: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>', role: 'Command execution in sandbox' },
   };
 
   if (!agents.length) {
@@ -618,7 +646,7 @@ function renderAgents(agents) {
   }
 
   el.innerHTML = agents.map(name => {
-    const info = agentInfo[name] || { icon: '🤖', role: 'Agent' };
+    const info = agentInfo[name] || { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/><path d="M10 12h4"/></svg>', role: 'Agent' };
     return `
       <div class="agent-card">
         <div class="agent-icon">${info.icon}</div>
