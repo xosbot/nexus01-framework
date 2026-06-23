@@ -3,141 +3,115 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NEXUS-01 — Agentic AI OS</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2376b900' rx='2'/><text x='50' y='68' text-anchor='middle' font-family='monospace' font-size='56' font-weight='bold' fill='%23000'>N</text></svg>">
+  <title>NEXUS-01</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2376b900'/><text x='50' y='68' text-anchor='middle' font-family='monospace' font-size='56' font-weight='bold' fill='%23000'>N</text></svg>">
   <link rel="stylesheet" href="/assets/styles.css">
 </head>
 <body>
-  <div class="os-shell">
-    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <div class="shell">
 
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="logo">
-          <div class="logo-mark">N1</div>
-          <div class="logo-text">
-            <span class="logo-title">NEXUS-01</span>
-            <span class="logo-sub">Agentic OS</span>
-          </div>
-        </div>
-        <button class="sidebar-close" id="sidebar-close" aria-label="Close menu">✕</button>
+    <!-- Activity Bar -->
+    <aside class="activity" id="activity">
+      <div class="activity-top">
+        <button class="activity-btn active" data-panel="overview" title="Overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        </button>
+        <button class="activity-btn" data-panel="chat" title="Chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button class="activity-btn" data-panel="memory" title="Memory">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </button>
+        <button class="activity-btn" data-panel="projects" title="Projects">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button class="activity-btn" data-panel="sessions" title="Sessions">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+        </button>
+        <button class="activity-btn" data-panel="rag" title="RAG">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        </button>
+        <button class="activity-btn" data-panel="agents" title="Agents">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/><path d="M10 12h4"/></svg>
+        </button>
+        <button class="activity-btn" data-panel="integrations" title="Integrations">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </button>
       </div>
-
-      <nav class="nav">
-        <div class="nav-section">Core</div>
-        <button class="nav-item active" data-panel="overview">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          Overview
+      <div class="activity-bottom">
+        <button class="activity-btn" data-panel="settings" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
-        <button class="nav-item" data-panel="chat">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          Chat
-        </button>
-        <button class="nav-item" data-panel="brain">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          Memory
-        </button>
-
-        <div class="nav-section">Workspace</div>
-        <button class="nav-item" data-panel="projects">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          Projects
-        </button>
-        <button class="nav-item" data-panel="sessions">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
-          Sessions
-        </button>
-        <button class="nav-item" data-panel="rag">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          RAG
-        </button>
-
-        <div class="nav-section">System</div>
-        <button class="nav-item" data-panel="agents">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect x="2" y="8" width="20" height="8" rx="2"/><path d="M6 8v8"/><path d="M18 8v8"/><circle cx="12" cy="12" r="2"/></svg>
-          Agents
-        </button>
-        <button class="nav-item" data-panel="integrations">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          Integrations
-        </button>
-        <button class="nav-item" data-panel="settings">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          Settings
-        </button>
-      </nav>
-
-      <div class="sidebar-footer">
-        <div class="status-badge">
-          <span class="status-dot"></span>
-          <span>Online</span>
-        </div>
-        <span class="version">v2.0</span>
       </div>
     </aside>
 
-    <div class="main">
-      <header class="topbar">
-        <div class="topbar-left">
-          <button class="hamburger" id="hamburger" aria-label="Open menu">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          </button>
-          <h1 class="topbar-title" id="panel-title">Overview</h1>
+    <!-- Contextual Sidebar -->
+    <aside class="side" id="side">
+      <div class="side-header">
+        <span class="side-title" id="side-title">OVERVIEW</span>
+        <button class="side-close" id="side-close">✕</button>
+      </div>
+      <div class="side-body" id="side-body">
+        <div class="side-section">
+          <div class="side-label">LLM Providers</div>
+          <div class="provider-list" id="provider-list"></div>
         </div>
-        <div class="topbar-right">
-          <div class="ws-badge" id="ws-indicator" title="WebSocket status">
-            <span class="dot"></span>
-            <span class="label">Connecting...</span>
+        <div class="side-section">
+          <div class="side-label">Quick Stats</div>
+          <div class="side-stats" id="side-stats">
+            <div class="side-stat"><span class="side-stat-label">Sessions</span><span class="side-stat-value" id="stat-sessions">—</span></div>
+            <div class="side-stat"><span class="side-stat-label">Messages</span><span class="side-stat-value" id="stat-messages">—</span></div>
+            <div class="side-stat"><span class="side-stat-label">Knowledge</span><span class="side-stat-value" id="stat-knowledge">—</span></div>
+            <div class="side-stat"><span class="side-stat-label">Uptime</span><span class="side-stat-value" id="stat-uptime">—</span></div>
           </div>
         </div>
-      </header>
+      </div>
+    </aside>
 
-      <div class="content">
+    <!-- Main Area -->
+    <div class="main">
+      <!-- Tab Bar -->
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-panel="overview">
+          <span class="tab-icon">⬡</span>
+          <span class="tab-label">Overview</span>
+        </div>
+      </div>
+
+      <!-- Content Panels -->
+      <div class="content" id="content">
         <!-- Overview -->
         <section class="panel active" id="panel-overview">
-          <div class="stats-row" id="stats-grid">
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">Sessions</div><div class="stat-value accent" id="stat-sessions">—</div></div>
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">Messages</div><div class="stat-value green" id="stat-messages">—</div></div>
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">Knowledge</div><div class="stat-value accent" id="stat-knowledge">—</div></div>
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">Uptime</div><div class="stat-value amber" id="stat-uptime">—</div></div>
+          <div class="stats-row">
+            <div class="stat-card"><div class="stat-label">Sessions</div><div class="stat-value accent" id="stat-sessions-ov">—</div></div>
+            <div class="stat-card"><div class="stat-label">Messages</div><div class="stat-value green" id="stat-messages-ov">—</div></div>
+            <div class="stat-card"><div class="stat-label">Knowledge</div><div class="stat-value accent" id="stat-knowledge-ov">—</div></div>
+            <div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-value amber" id="stat-uptime-ov">—</div></div>
           </div>
           <div class="card-grid">
             <div class="card">
-              <span class="corner corner-tl"></span>
               <div class="card-header"><span class="card-title">Agent Activity</span></div>
               <canvas id="agent-chart" height="160"></canvas>
             </div>
             <div class="card">
-              <span class="corner corner-tl"></span>
-              <div class="card-header"><span class="card-title">LLM Providers</span></div>
-              <div class="provider-list" id="provider-list"></div>
-            </div>
-          </div>
-          <div class="card" style="margin-top:12px;">
-            <span class="corner corner-tl"></span>
-            <div class="card-header"><span class="card-title">System Log</span><span class="mono" style="font-size:11px;color:var(--text-4);">live</span></div>
-            <div class="terminal-feed" id="terminal-feed">
-              <div class="terminal-line"><span class="term-ts">[04:35:19]</span> <span class="term-ok">●</span> RAG: ingested 3481 chunks from 21 docs</div>
-              <div class="terminal-line"><span class="term-ts">[04:35:19]</span> <span class="term-warn">◆</span> Docker sandbox unavailable — falling back to host exec</div>
-              <div class="terminal-line"><span class="term-ts">[04:35:21]</span> <span class="term-ok">●</span> Dashboard: http://0.0.0.0:8765</div>
-              <div class="terminal-line"><span class="term-ts">[04:35:21]</span> <span class="term-ok">●</span> NEXUS-01 online. Systems nominal.</div>
+              <div class="card-header"><span class="card-title">System Log</span><span class="mono" style="font-size:11px;color:var(--text-4);">live</span></div>
+              <div class="term-feed" id="term-feed"></div>
             </div>
           </div>
         </section>
 
         <!-- Chat -->
         <section class="panel" id="panel-chat">
-          <button class="btn btn-sm chat-sidebar-toggle" id="btn-toggle-sessions">Sessions</button>
           <div class="chat-layout">
-            <div class="chat-sidebar" id="chat-sidebar-panel">
-              <div class="chat-sidebar-header">
-                <input class="input input-sm" id="session-search" placeholder="Search sessions..." aria-label="Search sessions">
-                <button class="btn btn-sm btn-primary" id="btn-new-session" title="New session">+</button>
+            <div class="chat-side" id="chat-side">
+              <div class="chat-side-hdr">
+                <input class="input" id="session-search" placeholder="Search sessions...">
+                <button class="btn btn-sm" id="btn-new-session" title="New session">+</button>
               </div>
               <div class="chat-sessions" id="chat-sessions"></div>
             </div>
             <div class="chat-main">
-              <div class="chat-messages" id="chat-messages">
+              <div class="chat-msgs" id="chat-msgs">
                 <div class="empty-state">
                   <div class="empty-icon">N1</div>
                   <div class="empty-title">NEXUS-01 Online</div>
@@ -152,20 +126,19 @@
               </div>
               <div class="approval-bar" id="approval-bar">
                 <div class="approval-info">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                   <span>Execution requires approval</span>
                 </div>
                 <div class="approval-actions">
-                  <button class="btn btn-sm btn-ghost" id="btn-reject">Cancel</button>
+                  <button class="btn btn-sm" id="btn-reject">Cancel</button>
                   <button class="btn btn-sm btn-primary" id="btn-approve">Approve</button>
                 </div>
               </div>
               <div class="chat-input-row">
                 <div class="chat-input-wrap">
-                  <textarea class="input chat-textarea" id="chat-input" placeholder="Issue command to IVA..." rows="1" aria-label="Chat message"></textarea>
-                  <span class="input-hint">Enter to send · Shift+Enter for newline</span>
+                  <textarea class="input chat-textarea" id="chat-input" placeholder="Issue command to IVA..." rows="1"></textarea>
                 </div>
-                <button class="btn btn-primary" id="btn-send" aria-label="Send message">
+                <button class="btn btn-primary" id="btn-send">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 </button>
               </div>
@@ -173,37 +146,29 @@
           </div>
         </section>
 
-        <!-- Brain / Memory -->
-        <section class="panel" id="panel-brain">
-          <div class="stats-row" id="brain-stats">
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">Episodic</div><div class="stat-value accent" id="brain-episodic">0</div></div>
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">Semantic</div><div class="stat-value green" id="brain-semantic">0</div></div>
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">Procedural</div><div class="stat-value accent" id="brain-procedural">0</div></div>
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">Working</div><div class="stat-value amber" id="brain-working">0</div></div>
+        <!-- Memory -->
+        <section class="panel" id="panel-memory">
+          <div class="stats-row">
+            <div class="stat-card"><div class="stat-label">Episodic</div><div class="stat-value accent" id="brain-episodic">0</div></div>
+            <div class="stat-card"><div class="stat-label">Semantic</div><div class="stat-value green" id="brain-semantic">0</div></div>
+            <div class="stat-card"><div class="stat-label">Procedural</div><div class="stat-value accent" id="brain-procedural">0</div></div>
+            <div class="stat-card"><div class="stat-label">Working</div><div class="stat-value amber" id="brain-working">0</div></div>
           </div>
           <div class="card-grid">
             <div class="card">
-              <span class="corner corner-tl"></span>
               <div class="card-header"><span class="card-title">Semantic Search</span></div>
               <div style="display:flex;gap:8px;margin-bottom:12px;">
-                <input class="input" id="memory-search" placeholder="Search memory..." aria-label="Search memory">
+                <input class="input" id="memory-search" placeholder="Search memory...">
                 <button class="btn btn-primary" id="btn-memory-search">Search</button>
               </div>
               <div id="search-results">
-                <div class="empty-state">
-                  <div class="empty-title">Search vector memory</div>
-                  <div class="empty-desc">Enter a query to find related knowledge</div>
-                </div>
+                <div class="empty-state"><div class="empty-title">Search vector memory</div><div class="empty-desc">Enter a query to find related knowledge</div></div>
               </div>
             </div>
             <div class="card">
-              <span class="corner corner-tl"></span>
               <div class="card-header"><span class="card-title">Knowledge Store</span></div>
               <div class="table-wrap">
-                <table>
-                  <thead><tr><th>Key</th><th>Preview</th></tr></thead>
-                  <tbody id="knowledge-table"></tbody>
-                </table>
+                <table><thead><tr><th>Key</th><th>Preview</th></tr></thead><tbody id="knowledge-table"></tbody></table>
               </div>
             </div>
           </div>
@@ -212,17 +177,13 @@
         <!-- Projects -->
         <section class="panel" id="panel-projects">
           <div class="toolbar">
-            <input class="input" id="project-name" placeholder="Project name" aria-label="Project name">
-            <input class="input" id="project-desc" placeholder="Description" aria-label="Project description" style="max-width:200px;">
+            <input class="input" id="project-name" placeholder="Project name">
+            <input class="input" id="project-desc" placeholder="Description" style="max-width:200px;">
             <button class="btn btn-primary" id="btn-new-project">Create</button>
           </div>
           <div class="card">
-            <span class="corner corner-tl"></span>
             <div class="table-wrap">
-              <table>
-                <thead><tr><th>Name</th><th>Status</th><th>Updated</th></tr></thead>
-                <tbody id="projects-table"></tbody>
-              </table>
+              <table><thead><tr><th>Name</th><th>Status</th><th>Updated</th></tr></thead><tbody id="projects-table"></tbody></table>
             </div>
           </div>
         </section>
@@ -230,39 +191,31 @@
         <!-- Sessions -->
         <section class="panel" id="panel-sessions">
           <div class="toolbar">
-            <input class="input" id="sessions-filter" placeholder="Filter sessions..." aria-label="Filter sessions">
+            <input class="input" id="sessions-filter" placeholder="Filter sessions...">
           </div>
           <div class="card">
-            <span class="corner corner-tl"></span>
             <div class="table-wrap">
-              <table>
-                <thead><tr><th>Title</th><th>Channel</th><th>Project</th><th>Updated</th></tr></thead>
-                <tbody id="sessions-table"></tbody>
-              </table>
+              <table><thead><tr><th>Title</th><th>Channel</th><th>Project</th><th>Updated</th></tr></thead><tbody id="sessions-table"></tbody></table>
             </div>
           </div>
         </section>
 
         <!-- RAG -->
         <section class="panel" id="panel-rag">
-          <div class="stats-row" id="rag-stats">
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">Collection</div><div class="stat-value accent" id="rag-collection" style="font-size:16px;">—</div></div>
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">Documents</div><div class="stat-value green" id="rag-documents">0</div></div>
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">ChromaDB</div><div class="stat-value cyan" id="rag-chroma" style="font-size:16px;">—</div></div>
-            <div class="stat-card"><span class="corner corner-tl"></span><div class="stat-label">Embedder</div><div class="stat-value accent" id="rag-embedder" style="font-size:16px;">—</div></div>
+          <div class="stats-row">
+            <div class="stat-card"><div class="stat-label">Collection</div><div class="stat-value accent" id="rag-collection" style="font-size:14px;">—</div></div>
+            <div class="stat-card"><div class="stat-label">Documents</div><div class="stat-value green" id="rag-documents">0</div></div>
+            <div class="stat-card"><div class="stat-label">ChromaDB</div><div class="stat-value cyan" id="rag-chroma" style="font-size:14px;">—</div></div>
+            <div class="stat-card"><div class="stat-label">Embedder</div><div class="stat-value accent" id="rag-embedder" style="font-size:14px;">—</div></div>
           </div>
           <div class="toolbar">
-            <input class="input" id="rag-query" placeholder="Search tradecraft knowledge..." aria-label="Search RAG">
+            <input class="input" id="rag-query" placeholder="Search tradecraft knowledge...">
             <button class="btn" id="btn-rag-search">Search</button>
             <button class="btn btn-primary" id="btn-rag-ingest">Re-ingest</button>
           </div>
           <div class="card">
-            <span class="corner corner-tl"></span>
             <div id="rag-results">
-              <div class="empty-state">
-                <div class="empty-title">Tradecraft Knowledge Base</div>
-                <div class="empty-desc">Search documents ingested into ChromaDB</div>
-              </div>
+              <div class="empty-state"><div class="empty-title">Tradecraft Knowledge Base</div><div class="empty-desc">Search documents ingested into ChromaDB</div></div>
             </div>
           </div>
         </section>
@@ -276,26 +229,12 @@
         <section class="panel" id="panel-integrations">
           <div class="card-grid">
             <div class="card">
-              <span class="corner corner-tl"></span>
-              <div class="card-header">
-                <span class="card-title">Connected Apps</span>
-              </div>
-              <div id="integrations-list">
-                <div class="empty-state">
-                  <div class="empty-title">No integrations yet</div>
-                  <div class="empty-desc">Connect your apps to IVA via API</div>
-                </div>
-              </div>
+              <div class="card-header"><span class="card-title">Connected Apps</span></div>
+              <div id="integrations-list"><div class="empty-state"><div class="empty-title">No integrations yet</div><div class="empty-desc">Connect your apps to IVA via API</div></div></div>
             </div>
             <div class="card">
-              <span class="corner corner-tl"></span>
               <div class="card-header"><span class="card-title">Recent Webhook Events</span></div>
-              <div id="webhooks-list">
-                <div class="empty-state">
-                  <div class="empty-title">No events yet</div>
-                  <div class="empty-desc">Webhook events will appear here</div>
-                </div>
-              </div>
+              <div id="webhooks-list"><div class="empty-state"><div class="empty-title">No events yet</div><div class="empty-desc">Webhook events will appear here</div></div></div>
             </div>
           </div>
         </section>
@@ -304,7 +243,6 @@
         <section class="panel" id="panel-settings">
           <div class="settings-grid">
             <div class="card">
-              <span class="corner corner-tl"></span>
               <div class="card-header"><span class="card-title">Connection</span></div>
               <div class="setting-row">
                 <span class="setting-label">REST API</span>
@@ -318,26 +256,21 @@
               </div>
             </div>
             <div class="card">
-              <span class="corner corner-tl"></span>
               <div class="card-header"><span class="card-title">Quick Start</span></div>
-              <div class="code-block">
-                <pre>pip install -r requirements.txt
+              <div class="code-block"><pre>pip install -r requirements.txt
 ollama pull llama3.1
-python main.py</pre>
-              </div>
+python main.py</pre></div>
             </div>
             <div class="card">
-              <span class="corner corner-tl"></span>
               <div class="card-header"><span class="card-title">Keyboard Shortcuts</span></div>
               <div class="shortcuts-list">
-                <div class="shortcut-row"><span><kbd>Ctrl</kbd> <kbd>K</kbd></span><span>Focus chat</span></div>
-                <div class="shortcut-row"><span><kbd>Ctrl</kbd> <kbd>/</kbd></span><span>Toggle sidebar</span></div>
+                <div class="shortcut-row"><span><kbd>Ctrl</kbd><kbd>K</kbd></span><span>Focus chat</span></div>
+                <div class="shortcut-row"><span><kbd>Ctrl</kbd><kbd>`</kbd></span><span>Toggle terminal</span></div>
+                <div class="shortcut-row"><span><kbd>Ctrl</kbd><kbd>B</kbd></span><span>Toggle sidebar</span></div>
                 <div class="shortcut-row"><span><kbd>Esc</kbd></span><span>Close sidebar</span></div>
-                <div class="shortcut-row"><span><kbd>1</kbd>–<kbd>9</kbd></span><span>Navigate panels</span></div>
               </div>
             </div>
             <div class="card">
-              <span class="corner corner-tl"></span>
               <div class="card-header"><span class="card-title">Danger Zone</span></div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <button class="btn btn-sm btn-danger" id="btn-restart">Restart IVA</button>
@@ -348,10 +281,41 @@ python main.py</pre>
           </div>
         </section>
       </div>
+
+      <!-- Bottom Terminal -->
+      <div class="term" id="term">
+        <div class="term-hdr">
+          <div class="term-tabs">
+            <span class="term-tab active">TERMINAL</span>
+            <span class="term-tab">OUTPUT</span>
+          </div>
+          <div class="term-actions">
+            <span class="term-count" id="term-count"></span>
+            <button class="term-btn" id="btn-term-clear" title="Clear">⊘</button>
+            <button class="term-btn" id="btn-term-toggle" title="Toggle terminal panel">_</button>
+          </div>
+        </div>
+        <div class="term-body" id="term-body">
+          <div class="term-line"><span class="term-prompt">nexus@os:~$</span> system ready</div>
+          <div class="term-line"><span class="term-prompt">nexus@os:~$</span> RAG: 3481 chunks ingested</div>
+          <div class="term-line"><span class="term-prompt">nexus@os:~$</span> agents: all online</div>
+        </div>
+        <div class="term-input-row">
+          <span class="term-prompt">nexus@os:~$</span>
+          <input class="term-input" id="term-input" type="text" placeholder="type command..." spellcheck="false" autocomplete="off">
+        </div>
+      </div>
     </div>
+
+    <!-- WebSocket badge (floating) -->
+    <div class="ws-badge" id="ws-badge">
+      <span class="ws-dot"></span>
+      <span class="ws-label" id="ws-label">Connecting...</span>
+    </div>
+
   </div>
 
-  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+  <div class="toast-container" id="toast-container"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="/assets/app.js"></script>
