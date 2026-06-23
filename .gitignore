@@ -3,6 +3,7 @@ __pycache__/
 *.pyo
 .env
 config.yaml
+config/secrets.yaml
 data/
 .venv/
 venv/

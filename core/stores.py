@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import sqlite3
 import uuid
@@ -217,3 +219,57 @@ class TaskStore:
             "updated_at": row["updated_at"],
             "completed_at": row["completed_at"],
         }
+
+
+class SettingsStore:
+    """Key-value store for runtime settings in SQLite."""
+
+    def __init__(self, conn: sqlite3.Connection):
+        self._conn = conn
+        self._ensure_table()
+
+    def _ensure_table(self) -> None:
+        self._conn.execute(
+            """CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )"""
+        )
+        self._conn.commit()
+
+    def get(self, key: str, default: str | None = None) -> str | None:
+        row = self._conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else default
+
+    def set(self, key: str, value: str) -> None:
+        now = datetime.now().isoformat()
+        self._conn.execute(
+            "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=?, updated_at=?",
+            (key, value, now, value, now),
+        )
+        self._conn.commit()
+
+    def delete(self, key: str) -> bool:
+        cur = self._conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+        self._conn.commit()
+        return cur.rowcount > 0
+
+    def list(self) -> dict[str, str]:
+        rows = self._conn.execute("SELECT key, value FROM settings ORDER BY key").fetchall()
+        return {r[0]: r[1] for r in rows}
+
+    def get_bool(self, key: str, default: bool = False) -> bool:
+        val = self.get(key)
+        if val is None:
+            return default
+        return val.lower() in ("true", "1", "yes")
+
+    def get_int(self, key: str, default: int = 0) -> int:
+        val = self.get(key)
+        if val is None:
+            return default
+        try:
+            return int(val)
+        except ValueError:
+            return default

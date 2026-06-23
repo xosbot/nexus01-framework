@@ -817,4 +817,113 @@ def create_api_app(nexus_app) -> FastAPI:
         body = await request.json()
         return await teams_ch.handle_webhook(body)
 
+    # ── Config Management ─────────────────────────────────────────────
+
+    config_mgr = getattr(nexus_app, 'config_manager', None)
+
+    @app.get("/api/config")
+    async def get_config():
+        if not config_mgr:
+            return {"error": "Config manager not initialized"}
+        return config_mgr.get_full_config()
+
+    @app.get("/api/config/providers")
+    async def list_config_providers():
+        if not config_mgr:
+            return {"providers": {}}
+        return {"providers": config_mgr.list_providers()}
+
+    @app.put("/api/config/providers/{name}/key")
+    async def set_provider_key(name: str, request: Request):
+        if not config_mgr:
+            raise HTTPException(503, "Config manager not initialized")
+        data = await request.json()
+        api_key = data.get("api_key", "")
+        if not api_key:
+            raise HTTPException(400, "api_key is required")
+        config_mgr.set_provider_key(name, api_key)
+        return {"ok": True, "provider": name, "key_masked": config_mgr.get_provider_status(name).get("key_masked", "")}
+
+    @app.delete("/api/config/providers/{name}/key")
+    async def delete_provider_key(name: str):
+        if not config_mgr:
+            raise HTTPException(503, "Config manager not initialized")
+        config_mgr.delete_provider_key(name)
+        return {"ok": True, "deleted": name}
+
+    @app.post("/api/config/providers/{name}/test")
+    async def test_provider(name: str):
+        if not config_mgr:
+            raise HTTPException(503, "Config manager not initialized")
+        key = config_mgr.get_provider_key(name)
+        if name != "ollama" and not key:
+            return {"ok": False, "error": "No API key configured"}
+        try:
+            import httpx
+            router_name = config_mgr._resolve_name(name)
+            provider = nexus_app.llm.router._provider_map.get(router_name)
+            if not provider:
+                return {"ok": False, "error": f"Unknown provider: {name}"}
+            if name == "ollama":
+                async with httpx.AsyncClient(timeout=5) as client:
+                    resp = await client.get(f"{provider.base_url}/api/tags")
+                    return {"ok": resp.status_code == 200, "status": resp.status_code}
+            headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+            base = provider.base_url or provider._default_base_url()
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(
+                    f"{base}/chat/completions",
+                    json={"model": provider.model, "messages": [{"role": "user", "content": "ping"}], "max_tokens": 1},
+                    headers=headers,
+                )
+                return {"ok": resp.status_code == 200, "status": resp.status_code}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @app.post("/api/config/providers/{name}/toggle")
+    async def toggle_provider(name: str, request: Request):
+        if not config_mgr:
+            raise HTTPException(503, "Config manager not initialized")
+        data = await request.json()
+        enabled = data.get("enabled", True)
+        config_mgr.set_provider_enabled(name, enabled)
+        return {"ok": True, "provider": name, "enabled": enabled}
+
+    @app.put("/api/config/providers/{name}/setting")
+    async def set_provider_setting(name: str, request: Request):
+        if not config_mgr:
+            raise HTTPException(503, "Config manager not initialized")
+        data = await request.json()
+        key = data.get("key", "")
+        value = data.get("value", "")
+        if not key:
+            raise HTTPException(400, "key is required")
+        config_mgr.set_provider_setting(name, key, value)
+        return {"ok": True, "provider": name, "key": key, "value": value}
+
+    @app.get("/api/config/settings")
+    async def get_settings():
+        if not config_mgr:
+            return {"settings": {}}
+        return {"settings": config_mgr.list_settings()}
+
+    @app.put("/api/config/settings")
+    async def update_setting(request: Request):
+        if not config_mgr:
+            raise HTTPException(503, "Config manager not initialized")
+        data = await request.json()
+        key = data.get("key", "")
+        value = data.get("value", "")
+        if not key:
+            raise HTTPException(400, "key is required")
+        config_mgr.set_setting(key, value)
+        return {"ok": True, "key": key, "value": value}
+
+    @app.post("/api/config/reload")
+    async def reload_config():
+        if not config_mgr:
+            raise HTTPException(503, "Config manager not initialized")
+        config_mgr.reload()
+        return {"ok": True, "message": "Config reloaded"}
+
     return app

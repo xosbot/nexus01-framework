@@ -254,6 +254,47 @@
         <!-- Settings -->
         <section class="panel" id="panel-settings">
           <div class="settings-grid">
+
+            <!-- LLM Providers -->
+            <div class="card settings-full">
+              <div class="card-header"><span class="card-title">LLM Providers</span><button class="btn btn-sm" id="btn-reload-providers" title="Reload config">↻</button></div>
+              <div id="settings-providers">
+                <div class="loading-placeholder">Loading providers...</div>
+              </div>
+            </div>
+
+            <!-- System Settings -->
+            <div class="card settings-full">
+              <div class="card-header"><span class="card-title">System</span></div>
+              <div class="settings-toggles" id="settings-system">
+                <div class="setting-toggle-row">
+                  <span class="setting-label">Cold Mode (approval for exec)</span>
+                  <label class="toggle"><input type="checkbox" id="toggle-cold-mode" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="setting-toggle-row">
+                  <span class="setting-label">React Loop (ReAct agent)</span>
+                  <label class="toggle"><input type="checkbox" id="toggle-react-loop" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="setting-toggle-row">
+                  <span class="setting-label">RAG Enabled</span>
+                  <label class="toggle"><input type="checkbox" id="toggle-rag" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="setting-toggle-row">
+                  <span class="setting-label">Executor Sandbox (Docker)</span>
+                  <label class="toggle"><input type="checkbox" id="toggle-sandbox"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="setting-row">
+                  <span class="setting-label">Default LLM Tier</span>
+                  <select class="input select-input" id="select-tier">
+                    <option value="cheap">Cheap</option>
+                    <option value="standard" selected>Standard</option>
+                    <option value="premium">Premium</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Connection -->
             <div class="card">
               <div class="card-header"><span class="card-title">Connection</span></div>
               <div class="setting-row">
@@ -267,12 +308,8 @@
                 <button class="btn btn-sm btn-ghost" id="btn-copy-ws">Copy</button>
               </div>
             </div>
-            <div class="card">
-              <div class="card-header"><span class="card-title">Quick Start</span></div>
-              <div class="code-block"><pre>pip install -r requirements.txt
-ollama pull llama3.1
-python main.py</pre></div>
-            </div>
+
+            <!-- Keyboard Shortcuts -->
             <div class="card">
               <div class="card-header"><span class="card-title">Keyboard Shortcuts</span></div>
               <div class="shortcuts-list">
@@ -282,16 +319,42 @@ python main.py</pre></div>
                 <div class="shortcut-row"><span><kbd>Esc</kbd></span><span>Close sidebar</span></div>
               </div>
             </div>
-            <div class="card">
+
+            <!-- Danger Zone -->
+            <div class="card settings-full">
               <div class="card-header"><span class="card-title">Danger Zone</span></div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <button class="btn btn-sm btn-danger" id="btn-restart">Restart IVA</button>
                 <button class="btn btn-sm btn-danger" id="btn-reload-rag">Reload RAG</button>
+                <button class="btn btn-sm" id="btn-reload-config">Reload Config</button>
                 <button class="btn btn-sm btn-danger" id="btn-clear-key">Clear API Key</button>
               </div>
             </div>
           </div>
         </section>
+
+        <!-- API Key Modal -->
+        <div class="modal-overlay" id="modal-overlay" style="display:none;">
+          <div class="modal">
+            <div class="modal-header">
+              <span class="modal-title" id="modal-title">Set API Key</span>
+              <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+              <p class="modal-desc" id="modal-desc">Enter the API key for this provider.</p>
+              <div class="modal-input-row">
+                <input type="password" class="input modal-input" id="modal-key-input" placeholder="Enter API key...">
+                <button class="btn btn-sm btn-ghost" id="modal-toggle-visibility" title="Show/Hide">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-sm btn-ghost" id="modal-cancel">Cancel</button>
+              <button class="btn btn-sm btn-primary" id="modal-save">Save</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Bottom Terminal -->

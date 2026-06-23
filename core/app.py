@@ -7,12 +7,15 @@ from pathlib import Path
 from typing import Any
 
 from config import Config, config
+from core.secrets import SecretsStore
 from core.bus_factory import create_bus, set_global_bus
 from core.cold_mode import ColdMode
+from core.config_manager import ConfigManager
 from core.cost_tracker import CostTracker
 from core.llm_client import NexusLLM
 from core.memory import Memory
 from core.rag import RAGStore
+from core.stores import SettingsStore
 from core.tool_registry import ToolRegistry
 from core.agent_loop import AgentLoop
 from agents.osint import OSINTAgent
@@ -48,6 +51,7 @@ class NexusApp:
     integrations: Any = None
     proactive: Any = None
     social_media: Any = None
+    config_manager: ConfigManager | None = None
 
     async def shutdown(self) -> None:
         for channel in self.channels:
@@ -123,6 +127,24 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
     llm = NexusLLM(cfg.ollama_url, cfg.ollama_model, cost_tracker=cost_tracker)
     memory = Memory(cfg.database_path, cfg.chroma_path)
     cold_mode = ColdMode(cfg.cold_mode_enabled)
+
+    # Config manager for runtime settings
+    secrets = SecretsStore()
+    settings_store = SettingsStore(memory._conn)
+    config_manager = ConfigManager(secrets, settings_store)
+    config_manager.set_llm_router(llm.router)
+
+    # Apply any saved provider keys from secrets store
+    from core.config_manager import _PROVIDER_NAME_MAP
+    for provider_name, key in secrets.get_all_keys().items():
+        if key:
+            router_name = _PROVIDER_NAME_MAP.get(provider_name, provider_name)
+            llm.router.update_provider_key(router_name, key)
+
+    # Apply saved enabled/disabled state
+    for provider_name, info in secrets.list_providers().items():
+        router_name = _PROVIDER_NAME_MAP.get(provider_name, provider_name)
+        llm.router.toggle_provider(router_name, info.get("enabled", True))
 
     rag = RAGStore(
         chroma_path=cfg.chroma_path,
@@ -249,6 +271,7 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
         api_app=None,
         _channel_tasks=[],
         _api_server=None,
+        config_manager=config_manager,
     )
 
     from core.brain import IVABrain

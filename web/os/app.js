@@ -1016,6 +1016,8 @@ async function loadWebhooks() {
 
 /* ── Settings ──────────────────────────────── */
 
+let _modalProvider = null;
+
 function initSettings() {
   const proto = location.protocol;
   const host = location.host;
@@ -1054,6 +1056,195 @@ function initSettings() {
     localStorage.removeItem('iva_api_key');
     toast('API key cleared. Refresh to re-enter.', 'info');
   });
+
+  // Reload providers button
+  $('#btn-reload-providers')?.addEventListener('click', loadProviders);
+
+  // Modal handlers
+  $('#modal-close')?.addEventListener('click', closeKeyModal);
+  $('#modal-cancel')?.addEventListener('click', closeKeyModal);
+  $('#modal-save')?.addEventListener('click', saveModalKey);
+  $('#modal-toggle-visibility')?.addEventListener('click', () => {
+    const input = $('#modal-key-input');
+    if (input) input.type = input.type === 'password' ? 'text' : 'password';
+  });
+  $('#modal-overlay')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeKeyModal();
+  });
+
+  // System setting toggles
+  $('#toggle-cold-mode')?.addEventListener('change', (e) => saveSetting('cold_mode', e.target.checked));
+  $('#toggle-react-loop')?.addEventListener('change', (e) => saveSetting('use_react_loop', e.target.checked));
+  $('#toggle-rag')?.addEventListener('change', (e) => saveSetting('rag_enabled', e.target.checked));
+  $('#toggle-sandbox')?.addEventListener('change', (e) => saveSetting('executor_sandbox_enabled', e.target.checked));
+  $('#select-tier')?.addEventListener('change', (e) => saveSetting('default_tier', e.target.value));
+
+  // Reload config button
+  $('#btn-reload-config')?.addEventListener('click', async () => {
+    try {
+      await apiFetch('/api/config/reload', { method: 'POST' });
+      toast('Config reloaded', 'success');
+      loadProviders();
+    } catch { toast('Reload failed', 'error'); }
+  });
+}
+
+async function loadProviders() {
+  try {
+    const data = await apiFetch('/api/config');
+    renderProviders(data.providers || {});
+    applySystemSettings(data.settings || {});
+  } catch {
+    const el = $('#settings-providers');
+    if (el) el.innerHTML = '<div class="provider-empty">Could not load providers</div>';
+  }
+}
+
+function renderProviders(providers) {
+  const el = $('#settings-providers');
+  if (!el) return;
+
+  const names = Object.keys(providers);
+  if (!names.length) {
+    el.innerHTML = '<div class="provider-empty">No providers configured</div>';
+    return;
+  }
+
+  const providerIcons = {
+    ollama: '🦙', groq: '⚡', gemini: '🔷', openai: '🟢', anthropic: '🟠',
+  };
+
+  el.innerHTML = `<div class="provider-cards">${names.map(name => {
+    const p = providers[name];
+    const hasKey = p.has_key;
+    const enabled = p.enabled;
+    const statusClass = !enabled ? 'unconfigured' : (p.has_key || name === 'ollama') ? 'online' : 'offline';
+    const model = p.model || '—';
+    const keyDisplay = p.key_masked || 'Not set';
+    const icon = providerIcons[name] || '●';
+
+    return `
+      <div class="provider-card ${enabled ? '' : 'disabled'}" data-provider="${escapeHtml(name)}">
+        <div class="provider-status ${statusClass}"></div>
+        <div class="provider-info">
+          <div class="provider-name">${icon} ${escapeHtml(name)}</div>
+          <div class="provider-meta">
+            <span>Model: ${escapeHtml(model)}</span>
+            ${p.tier ? `<span>Tier: ${escapeHtml(p.tier)}</span>` : ''}
+          </div>
+        </div>
+        <div class="provider-key">${escapeHtml(keyDisplay)}</div>
+        <div class="provider-actions">
+          <label class="toggle" title="${enabled ? 'Disable' : 'Enable'}">
+            <input type="checkbox" ${enabled ? 'checked' : ''} onchange="toggleProvider('${escapeHtml(name)}', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+          ${name !== 'ollama' ? `
+            <button class="btn btn-sm btn-ghost" onclick="openKeyModal('${escapeHtml(name)}')" title="Set API Key">🔑</button>
+            <button class="btn btn-sm btn-ghost" onclick="testProvider('${escapeHtml(name)}')" title="Test connection">▶</button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('')}</div>`;
+}
+
+function openKeyModal(provider) {
+  _modalProvider = provider;
+  const modal = $('#modal-overlay');
+  const title = $('#modal-title');
+  const desc = $('#modal-desc');
+  const input = $('#modal-key-input');
+  if (title) title.textContent = `Set API Key — ${provider}`;
+  if (desc) desc.textContent = `Enter the API key for ${provider}. The key will be stored securely.`;
+  if (input) { input.value = ''; input.type = 'password'; }
+  if (modal) modal.style.display = 'flex';
+  setTimeout(() => input?.focus(), 100);
+}
+
+function closeKeyModal() {
+  _modalProvider = null;
+  const modal = $('#modal-overlay');
+  if (modal) modal.style.display = 'none';
+}
+
+async function saveModalKey() {
+  if (!_modalProvider) return;
+  const input = $('#modal-key-input');
+  const key = input?.value?.trim();
+  if (!key) { toast('Enter an API key', 'warning'); return; }
+
+  try {
+    await apiFetch(`/api/config/providers/${_modalProvider}/key`, {
+      method: 'PUT',
+      body: JSON.stringify({ api_key: key }),
+    });
+    toast(`${_modalProvider} API key saved`, 'success');
+    closeKeyModal();
+    loadProviders();
+  } catch { toast('Failed to save key', 'error'); }
+}
+
+async function testProvider(name) {
+  toast(`Testing ${name}...`, 'info');
+  try {
+    const result = await apiFetch(`/api/config/providers/${name}/test`, { method: 'POST' });
+    if (result.ok) {
+      toast(`${name}: Connected!`, 'success');
+    } else {
+      toast(`${name}: ${result.error || 'Connection failed'}`, 'error');
+    }
+  } catch { toast(`${name}: Test failed`, 'error'); }
+}
+
+async function toggleProvider(name, enabled) {
+  try {
+    await apiFetch(`/api/config/providers/${name}/toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    });
+    toast(`${name} ${enabled ? 'enabled' : 'disabled'}`, 'success');
+    loadProviders();
+  } catch { toast('Toggle failed', 'error'); }
+}
+
+function applySystemSettings(settings) {
+  const coldMode = settings.cold_mode;
+  const reactLoop = settings.use_react_loop;
+  const ragEnabled = settings.rag_enabled;
+  const sandbox = settings.executor_sandbox_enabled;
+  const tier = settings.default_tier;
+
+  if (coldMode !== undefined) {
+    const el = $('#toggle-cold-mode');
+    if (el) el.checked = coldMode === 'true' || coldMode === true;
+  }
+  if (reactLoop !== undefined) {
+    const el = $('#toggle-react-loop');
+    if (el) el.checked = reactLoop === 'true' || reactLoop === true;
+  }
+  if (ragEnabled !== undefined) {
+    const el = $('#toggle-rag');
+    if (el) el.checked = ragEnabled === 'true' || ragEnabled === true;
+  }
+  if (sandbox !== undefined) {
+    const el = $('#toggle-sandbox');
+    if (el) el.checked = sandbox === 'true' || sandbox === true;
+  }
+  if (tier) {
+    const el = $('#select-tier');
+    if (el) el.value = tier;
+  }
+}
+
+async function saveSetting(key, value) {
+  try {
+    await apiFetch('/api/config/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ key, value: String(value) }),
+    });
+    toast(`${key} updated`, 'success');
+  } catch { toast('Failed to update setting', 'error'); }
 }
 
 /* ── Terminal Panel ────────────────────────── */

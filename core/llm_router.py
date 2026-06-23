@@ -94,6 +94,7 @@ class LLMProvider:
         raw_url = cfg.get("base_url") or self._default_base_url()
         self.base_url = raw_url.rstrip("/") if raw_url else ""
         self._breaker = CircuitBreaker()
+        self._enabled = True
 
     def _default_base_url(self) -> str:
         return {
@@ -104,6 +105,8 @@ class LLMProvider:
         }.get(self.provider, "")
 
     def is_available(self) -> bool:
+        if not self._enabled:
+            return False
         if self.provider == "ollama":
             return bool(self.base_url)
         return bool(self.api_key and self.base_url) and not self._breaker.is_open
@@ -473,3 +476,50 @@ class LLMRouter:
             "estimated_cost_usd": round(self._total_cost, 4),
             "ledger": summary,
         }
+
+    # ── Dynamic Reconfiguration ─────────────────────────────────────
+
+    def update_provider_key(self, name: str, api_key: str) -> bool:
+        """Update a provider's API key at runtime without restart."""
+        provider = self._provider_map.get(name)
+        if not provider:
+            logger.warning("Unknown provider: %s", name)
+            return False
+        provider.api_key = api_key
+        provider._breaker = CircuitBreaker()
+        logger.info("Updated API key for provider %s (available=%s)", name, provider.is_available())
+        return True
+
+    def toggle_provider(self, name: str, enabled: bool) -> bool:
+        """Enable or disable a provider at runtime."""
+        provider = self._provider_map.get(name)
+        if not provider:
+            return False
+        provider._enabled = enabled
+        logger.info("Provider %s enabled=%s", name, enabled)
+        return True
+
+    def update_provider_setting(self, name: str, key: str, value: Any) -> bool:
+        """Update a provider setting (model, url, etc.) at runtime."""
+        provider = self._provider_map.get(name)
+        if not provider:
+            return False
+        if key == "model":
+            provider.model = value
+        elif key == "url":
+            provider.base_url = value.rstrip("/") if value else ""
+        elif key == "timeout":
+            provider.timeout = int(value)
+        elif key == "max_tokens":
+            provider.max_tokens = int(value)
+        elif key == "temperature":
+            provider.temperature = float(value)
+        logger.info("Updated %s.%s = %s", name, key, value)
+        return True
+
+    def reconfigure(self, keys: dict[str, str]) -> None:
+        """Batch update API keys for multiple providers."""
+        for name, key in keys.items():
+            if name in self._provider_map:
+                self.update_provider_key(name, key)
+        logger.info("Router reconfigured with %d provider keys", len(keys))
