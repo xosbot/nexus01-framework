@@ -12,6 +12,8 @@ EXEC_INTENT = re.compile(r"\b(exec|run|command|shell|deploy|install)\b", re.I)
 APPROVE_WORDS = frozenset({"yes", "y", "approve", "confirm", "ok", "✅"})
 CANCEL_WORDS = frozenset({"no", "n", "cancel", "abort", "stop", "❌"})
 
+CUSTOMER_CHANNELS = frozenset({"whatsapp", "instagram"})
+
 
 class NexusGateway:
     """Normalizes inbound messages from any channel and routes them through the message bus."""
@@ -21,11 +23,13 @@ class NexusGateway:
         bus: MessageBus,
         allowed_users: dict[str, list[str]] | None = None,
         require_approval_for_exec: bool = True,
+        require_approval_for_replies: bool = True,
     ):
         self.bus = bus
         self.approvals = ApprovalManager()
         self.allowed_users = allowed_users or {}
         self.require_approval_for_exec = require_approval_for_exec
+        self.require_approval_for_replies = require_approval_for_replies
         self._channels: dict[str, object] = {}
 
     def register_channel(self, adapter) -> None:
@@ -74,7 +78,38 @@ class NexusGateway:
                 approval_id=approval.id,
             )
 
+        if self.require_approval_for_replies and channel in CUSTOMER_CHANNELS:
+            return await self._handle_customer_reply(inbound)
+
         return await self._dispatch(inbound)
+
+    async def _handle_customer_reply(self, inbound: InboundMessage) -> GatewayResponse:
+        channel = inbound.channel.value
+        response = await self._dispatch(inbound)
+        if response.raw.get("status") in ("error", "blocked"):
+            return response
+
+        approval = self.approvals.create(
+            channel=channel,
+            session_id=inbound.session_id,
+            text=inbound.text,
+            payload={
+                "metadata": inbound.metadata,
+                "draft_reply": response.text,
+                "channel": channel,
+            },
+            ttl=86400,
+        )
+        return GatewayResponse(
+            text=(
+                "📝 *Draft reply queued for review*\n\n"
+                f"To: {inbound.session_id}\n"
+                f"Draft: {response.text[:200]}{'...' if len(response.text) > 200 else ''}\n\n"
+                "Approve via dashboard or reply YES/NO."
+            ),
+            requires_approval=True,
+            approval_id=approval.id,
+        )
 
     async def _handle_approval_decision(self, inbound: InboundMessage) -> GatewayResponse:
         channel = inbound.channel.value
@@ -90,7 +125,16 @@ class NexusGateway:
 
         self.approvals.clear(pending.id)
         if not approved:
-            return GatewayResponse("❌ Cancelled. No command was executed.")
+            return GatewayResponse("❌ Cancelled. No action taken.")
+
+        draft_reply = pending.payload.get("draft_reply")
+        if draft_reply and pending.payload.get("channel") in CUSTOMER_CHANNELS:
+            target_channel = pending.payload["channel"]
+            ch = self.get_channel(target_channel)
+            if ch:
+                await ch.send(pending.session_id, draft_reply)
+                return GatewayResponse(f"✅ Reply sent to {target_channel}.")
+            return GatewayResponse(f"⚠️ Channel {target_channel} not available.")
 
         inbound.text = pending.text
         inbound.metadata = {**pending.payload.get("metadata", {}), **inbound.metadata, "approved": True}

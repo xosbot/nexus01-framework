@@ -37,6 +37,14 @@ INTENT_PATTERNS = {
         r"\bbreach\s+check\b",
         r"\bhaveibeenpwned\b",
     ],
+    "market_research": [
+        r"\b(market|competitor|competition|industry)\b.*\b(research|analysis|intelligence|trends)\b",
+        r"\b(competitor|competitive)\s+(analysis|research|intelligence|landscape)\b",
+        r"\b(market|industry)\s+(trends|analysis|overview|size|share)\b",
+        r"\b(business|intelligence|bi)\b.*\b(research|analysis)\b",
+        r"\b(swcot|porter|five forces)\b",
+        r"\b(research|analyze|investigate)\b.*\b(competitor|market|industry|niche|sector)\b",
+    ],
     "analysis": [
         r"\b(analyz|analyse|pattern|anomaly|insight|trend)\b",
         r"\b(summariz|summarise|explain|describe|overview)\b",
@@ -151,6 +159,7 @@ class OrchestratorAgent(BaseAgent):
             "osint_username": "osint",
             "osint_domain": "osint",
             "osint_email": "osint",
+            "market_research": "analyst",
             "analysis": "analyst",
             "execution": "executor",
             "general": "analyst",

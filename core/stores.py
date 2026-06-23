@@ -118,3 +118,102 @@ class SessionStore:
             "updated_at": row["updated_at"],
             "metadata": json.loads(row["metadata"] or "{}"),
         }
+
+
+class TaskStore:
+    def __init__(self, conn: sqlite3.Connection):
+        self._conn = conn
+
+    def create(
+        self,
+        project_id: str,
+        title: str,
+        description: str = "",
+        status: str = "pending",
+        metadata: dict | None = None,
+    ) -> dict:
+        tid = uuid.uuid4().hex[:12]
+        now = datetime.now().isoformat()
+        self._conn.execute(
+            """INSERT INTO tasks (id, project_id, title, description, status, payload, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (tid, project_id, title, description, status, json.dumps(metadata or {}), now, now),
+        )
+        self._conn.commit()
+        return self.get(tid)
+
+    def list(self, project_id: str | None = None, status: str | None = None, limit: int = 100) -> list[dict]:
+        query = "SELECT * FROM tasks WHERE 1=1"
+        params: list = []
+        if project_id:
+            query += " AND project_id = ?"
+            params.append(project_id)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        rows = self._conn.execute(query, params).fetchall()
+        return [self._row(r) for r in rows]
+
+    def get(self, task_id: str) -> dict | None:
+        row = self._conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        return self._row(row) if row else None
+
+    def update(self, task_id: str, **fields) -> dict | None:
+        task = self.get(task_id)
+        if not task:
+            return None
+        now = datetime.now().isoformat()
+        updates = []
+        params: list = []
+        for field_name in ("title", "description", "status", "project_id"):
+            if field_name in fields:
+                updates.append(f"{field_name} = ?")
+                params.append(fields[field_name])
+        if "completed_at" in fields:
+            updates.append("completed_at = ?")
+            params.append(fields["completed_at"])
+        if updates:
+            updates.append("updated_at = ?")
+            params.append(now)
+            params.append(task_id)
+            self._conn.execute(f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params)
+            self._conn.commit()
+        return self.get(task_id)
+
+    def delete(self, task_id: str) -> bool:
+        cur = self._conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+        self._conn.commit()
+        return cur.rowcount > 0
+
+    def progress(self, project_id: str) -> dict:
+        rows = self._conn.execute(
+            "SELECT status, COUNT(*) as cnt FROM tasks WHERE project_id = ? GROUP BY status",
+            (project_id,),
+        ).fetchall()
+        counts = {r["status"]: r["cnt"] for r in rows}
+        total = sum(counts.values())
+        done = counts.get("done", 0) + counts.get("completed", 0)
+        return {
+            "total": total,
+            "done": done,
+            "pending": counts.get("pending", 0),
+            "in_progress": counts.get("in_progress", 0),
+            "percent": round(done / total * 100, 1) if total > 0 else 0,
+        }
+
+    @staticmethod
+    def _row(row) -> dict:
+        return {
+            "id": row["id"],
+            "project_id": row["project_id"],
+            "title": row["title"],
+            "description": row["description"],
+            "status": row["status"],
+            "payload": json.loads(row["payload"] or "{}"),
+            "result": row["result"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "completed_at": row["completed_at"],
+        }

@@ -2,7 +2,7 @@ import statistics
 from dataclasses import dataclass
 
 READ_ACTIONS = frozenset({"read_file", "list", "query"})
-EXECUTE_ACTIONS = frozenset({"run_command", "write_file", "delete"})
+EXECUTE_ACTIONS = frozenset({"run_command", "write_file", "delete", "social_post", "social_schedule"})
 HIGH_RISK_PERMISSIONS = frozenset({"EXECUTE", "ADMIN"})
 
 @dataclass
@@ -29,7 +29,7 @@ class ColdMode:
     ) -> dict:
         requires_fallback = permission in HIGH_RISK_PERMISSIONS or action in EXECUTE_ACTIONS
         if confidence is None:
-            confidence = 0.95 if permission == "READ" else 0.8
+            confidence = 0.95 if permission == "READ" else 0.5
         if reversible is None:
             if fallback_script and action in EXECUTE_ACTIONS:
                 reversible = True

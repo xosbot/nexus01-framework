@@ -17,6 +17,7 @@ from typing import Any
 
 from agents.base import BaseAgent
 from core.bus import Message
+from tools.availability import get_tool_availability
 
 logger = logging.getLogger(__name__)
 
@@ -276,16 +277,25 @@ class OSINTAgent(BaseAgent):
         }
 
     async def _run_username_scan(self, username: str) -> dict:
+        availability = get_tool_availability()
+        if not availability.is_available("sherlock"):
+            logger.info("Sherlock not available — using built-in scanner")
         from tools.sherlock_scanner import scan_username
         result = await scan_username(username)
         return result.to_dict()
 
     async def _run_domain_recon(self, domain: str) -> dict:
+        availability = get_tool_availability()
+        if not availability.is_available("theharvester"):
+            logger.info("theHarvester not available — using built-in domain recon")
         from tools.theharvester import harvest_domain
         result = await harvest_domain(domain)
         return result.to_dict()
 
     async def _run_email_check(self, email: str) -> dict:
+        availability = get_tool_availability()
+        if not availability.is_available("holehe"):
+            logger.info("holehe not available — using built-in email checks")
         from tools.holehe_checker import check_email
         result = await check_email(email)
         return result.to_dict()
@@ -295,6 +305,16 @@ class OSINTAgent(BaseAgent):
         return await check_email_breach(email)
 
     async def _run_darkweb_search(self, query: str) -> dict:
+        availability = get_tool_availability()
+        if not availability.is_available("onionsearch"):
+            return {
+                "query": query,
+                "results": [],
+                "source": "stub",
+                "is_stub": True,
+                "note": "Dark web monitoring requires Tor proxy. Enable in Phase 4.",
+                "errors": ["onionsearch not installed"],
+            }
         from tools.darkweb_monitor import search_darkweb
         result = await search_darkweb(query)
         return result.to_dict()

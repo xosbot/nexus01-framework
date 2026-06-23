@@ -1,3 +1,4 @@
+import os
 import pytest
 from fastapi.testclient import TestClient
 
@@ -19,6 +20,42 @@ def client():
 
     nexus = asyncio.run(_setup())
     return TestClient(create_api_app(nexus))
+
+
+def test_auth_rejects_unauthenticated_when_only_readonly_key_set():
+    """Regression: auth must not fail open when only NEXUS_READONLY_KEY is set."""
+    import api.auth as auth_mod
+
+    original_api_key = auth_mod.API_KEY
+    original_readonly_key = auth_mod.READONLY_KEY
+    try:
+        auth_mod.API_KEY = None
+        auth_mod.READONLY_KEY = auth_mod._parse_key("read:readonlytest123")
+
+        assert auth_mod.API_KEY is None
+        assert auth_mod.READONLY_KEY is not None
+
+        from starlette.testclient import TestClient
+        from starlette.applications import Starlette
+        from starlette.responses import JSONResponse
+        from starlette.routing import Route
+        from starlette.middleware import Middleware
+
+        async def dummy_endpoint(request):
+            return JSONResponse({"ok": True})
+
+        app = Starlette(
+            routes=[Route("/test", dummy_endpoint)],
+            middleware=[Middleware(auth_mod.AuthMiddleware)],
+        )
+
+        client = TestClient(app, raise_server_exceptions=False)
+
+        r = client.get("/test")
+        assert r.status_code == 401, f"Expected 401, got {r.status_code}"
+    finally:
+        auth_mod.API_KEY = original_api_key
+        auth_mod.READONLY_KEY = original_readonly_key
 
 
 def test_health(client):

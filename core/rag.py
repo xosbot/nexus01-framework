@@ -121,15 +121,16 @@ class RAGStore:
                 stats["errors"].append(f"{path}: {exc}")
         return stats
 
-    def search(self, query: str, n: int = 5) -> list[dict[str, Any]]:
+    def search(self, query: str, n: int = 5, project_id: str | None = None) -> list[dict[str, Any]]:
         if self._collection:
             try:
                 embedder = self._get_embedder()
+                where_filter = {"project_id": project_id} if project_id else None
                 if embedder:
                     emb = embedder([query])
-                    results = self._collection.query(query_embeddings=emb, n_results=n)
+                    results = self._collection.query(query_embeddings=emb, n_results=n, where=where_filter)
                 else:
-                    results = self._collection.query(query_texts=[query], n_results=n)
+                    results = self._collection.query(query_texts=[query], n_results=n, where=where_filter)
                 output = []
                 for i, doc in enumerate(results.get("documents", [[]])[0]):
                     meta = results.get("metadatas", [[]])[0][i] if results.get("metadatas") else {}
@@ -138,14 +139,16 @@ class RAGStore:
                 return output
             except Exception as exc:
                 logger.warning("RAG search failed: %s", exc)
-        return self._memory_search(query, n)
+        return self._memory_search(query, n, project_id)
 
-    def _memory_search(self, query: str, n: int) -> list[dict[str, Any]]:
+    def _memory_search(self, query: str, n: int, project_id: str | None = None) -> list[dict[str, Any]]:
         if not self._memory_store:
             return []
         terms = set(query.lower().split())
         scored = []
         for item in self._memory_store.values():
+            if project_id and item.get("metadata", {}).get("project_id") != project_id:
+                continue
             content = item["content"].lower()
             score = sum(1 for t in terms if t in content)
             if score:
@@ -153,8 +156,8 @@ class RAGStore:
         scored.sort(key=lambda x: x[0], reverse=True)
         return [{"content": s[1]["content"], "metadata": s[1]["metadata"]} for s in scored[:n]]
 
-    def format_context(self, query: str, n: int = 3) -> str:
-        hits = self.search(query, n)
+    def format_context(self, query: str, n: int = 3, project_id: str | None = None) -> str:
+        hits = self.search(query, n, project_id=project_id)
         if not hits:
             return ""
         parts = []

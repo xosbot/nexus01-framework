@@ -16,3 +16,4 @@ build/
 *~
 .vercel
 *.db
+.mypy_cache/

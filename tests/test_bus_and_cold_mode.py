@@ -59,6 +59,7 @@ def test_cold_mode_execute_with_fallback():
         action="run_command",
         permission="EXECUTE",
         fallback_script="echo safe",
+        confidence=0.8,
     )
     assert not cold.should_block(ctx)
 

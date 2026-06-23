@@ -38,7 +38,13 @@ class Config:
     whatsapp_token: str = field(default_factory=lambda: os.getenv("WHATSAPP_TOKEN", ""))
     whatsapp_phone_number_id: str = field(default_factory=lambda: os.getenv("WHATSAPP_PHONE_NUMBER_ID", ""))
     whatsapp_verify_token: str = field(default_factory=lambda: os.getenv("WHATSAPP_VERIFY_TOKEN", "nexus-verify"))
+    whatsapp_app_secret: str = field(default_factory=lambda: os.getenv("WHATSAPP_APP_SECRET", ""))
     whatsapp_allowed_numbers: list[str] = field(default_factory=lambda: _env_list("WHATSAPP_ALLOWED_NUMBERS"))
+
+    instagram_token: str = field(default_factory=lambda: os.getenv("INSTAGRAM_TOKEN", ""))
+    instagram_page_id: str = field(default_factory=lambda: os.getenv("INSTAGRAM_PAGE_ID", ""))
+    instagram_app_secret: str = field(default_factory=lambda: os.getenv("INSTAGRAM_APP_SECRET", ""))
+    instagram_allowed_users: list[str] = field(default_factory=lambda: _env_list("INSTAGRAM_ALLOWED_USERS"))
 
     discord_token: str = field(default_factory=lambda: os.getenv("DISCORD_TOKEN", ""))
     discord_allowed_users: list[str] = field(default_factory=lambda: _env_list("DISCORD_ALLOWED_USERS"))
@@ -64,6 +70,17 @@ class Config:
     # Phase 3 — Deploy & Control
     executor_sandbox_enabled: bool = field(default_factory=lambda: _env_bool("EXECUTOR_SANDBOX_ENABLED", "true"))
     structured_log_json: bool = field(default_factory=lambda: _env_bool("STRUCTURED_LOG_JSON", "false"))
+    allow_public_bots: bool = field(default_factory=lambda: _env_bool("ALLOW_PUBLIC_BOTS", "false"))
+
+    # Social Media (official API only)
+    twitter_api_key: str = field(default_factory=lambda: os.getenv("TWITTER_API_KEY", ""))
+    twitter_api_secret: str = field(default_factory=lambda: os.getenv("TWITTER_API_SECRET", ""))
+    twitter_access_token: str = field(default_factory=lambda: os.getenv("TWITTER_ACCESS_TOKEN", ""))
+    twitter_access_token_secret: str = field(default_factory=lambda: os.getenv("TWITTER_ACCESS_TOKEN_SECRET", ""))
+    twitter_bearer_token: str = field(default_factory=lambda: os.getenv("TWITTER_BEARER_TOKEN", ""))
+    linkedin_access_token: str = field(default_factory=lambda: os.getenv("LINKEDIN_ACCESS_TOKEN", ""))
+    linkedin_person_id: str = field(default_factory=lambda: os.getenv("LINKEDIN_PERSON_ID", ""))
+    linkedin_org_id: str = field(default_factory=lambda: os.getenv("LINKEDIN_ORG_ID", ""))
 
     # Phase 2 — Cloud Brain
     bus_backend: str = field(default_factory=lambda: os.getenv("BUS_BACKEND", "local"))

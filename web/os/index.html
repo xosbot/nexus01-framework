@@ -208,14 +208,26 @@
             <div class="stat-card"><div class="stat-label">ChromaDB</div><div class="stat-value cyan" id="rag-chroma" style="font-size:14px;">—</div></div>
             <div class="stat-card"><div class="stat-label">Embedder</div><div class="stat-value accent" id="rag-embedder" style="font-size:14px;">—</div></div>
           </div>
-          <div class="toolbar">
-            <input class="input" id="rag-query" placeholder="Search tradecraft knowledge...">
-            <button class="btn" id="btn-rag-search">Search</button>
-            <button class="btn btn-primary" id="btn-rag-ingest">Re-ingest</button>
-          </div>
-          <div class="card">
-            <div id="rag-results">
-              <div class="empty-state"><div class="empty-title">Tradecraft Knowledge Base</div><div class="empty-desc">Search documents ingested into ChromaDB</div></div>
+          <div class="card-grid">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Search Knowledge Base</span></div>
+              <div class="toolbar">
+                <input class="input" id="rag-query" placeholder="Search documents...">
+                <button class="btn" id="btn-rag-search">Search</button>
+              </div>
+              <div id="rag-results">
+                <div class="empty-state"><div class="empty-title">No results</div><div class="empty-desc">Search to find relevant documents</div></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Ingest Content</span></div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <input class="input" id="rag-ingest-url" placeholder="Paste URL to fetch and ingest...">
+                <button class="btn btn-primary" id="btn-rag-ingest-url">Ingest URL</button>
+                <textarea class="input" id="rag-ingest-text" placeholder="Or paste text to ingest..." style="min-height:80px;resize:vertical;"></textarea>
+                <button class="btn btn-primary" id="btn-rag-ingest-text">Ingest Text</button>
+                <button class="btn" id="btn-rag-ingest">Re-ingest Docs Folder</button>
+              </div>
             </div>
           </div>
         </section>

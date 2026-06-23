@@ -14,6 +14,8 @@ from typing import Callable
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_TOOL_TIMEOUT = 60
+
 
 @dataclass
 class ToolResult:
@@ -23,8 +25,9 @@ class ToolResult:
 
 
 class ToolRegistry:
-    def __init__(self) -> None:
+    def __init__(self, tool_timeout: int = DEFAULT_TOOL_TIMEOUT) -> None:
         self._tools: dict[str, dict] = {}
+        self._tool_timeout = tool_timeout
 
     def register(
         self,
@@ -66,11 +69,21 @@ class ToolRegistry:
         try:
             args = json.loads(arguments) if arguments else {}
             fn = self._tools[name]["fn"]
-            if asyncio.iscoroutinefunction(fn):
-                result = await fn(**args)
-            else:
-                result = await asyncio.get_event_loop().run_in_executor(None, lambda: fn(**args))
+
+            async def _execute():
+                if asyncio.iscoroutinefunction(fn):
+                    return await fn(**args)
+                return await asyncio.get_event_loop().run_in_executor(None, lambda: fn(**args))
+
+            result = await asyncio.wait_for(_execute(), timeout=self._tool_timeout)
             return ToolResult(tool_call_id=tool_call_id, name=name, content=str(result)[:4000])
+        except asyncio.TimeoutError:
+            logger.warning("[tools] %s timed out after %ds", name, self._tool_timeout)
+            return ToolResult(
+                tool_call_id=tool_call_id,
+                name=name,
+                content=f"Error: tool '{name}' timed out after {self._tool_timeout}s",
+            )
         except Exception as exc:
             logger.error("[tools] %s failed: %s", name, exc)
             return ToolResult(tool_call_id=tool_call_id, name=name, content=f"Error executing {name}: {exc}")

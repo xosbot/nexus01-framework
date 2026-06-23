@@ -116,3 +116,44 @@ Some skill content here."""
         assert registry._parse_list("") == []
         assert registry._parse_list("[a, b, c]") == ["a", "b", "c"]
         assert registry._parse_list("single") == ["single"]
+
+
+class TestMarketResearchSkill:
+    def test_market_research_intent_classification(self):
+        from agents.orchestrator import INTENT_PATTERNS
+        import re
+
+        patterns = INTENT_PATTERNS.get("market_research", [])
+        assert len(patterns) > 0
+
+        test_queries = [
+            "research competitor activity for AI startups",
+            "market trends in cloud computing",
+            "competitor analysis for SaaS companies",
+            "industry analysis of cybersecurity market",
+            "what's the market size for IoT devices",
+        ]
+
+        for query in test_queries:
+            matched = any(re.search(p, query, re.I) for p in patterns)
+            assert matched, f"Query '{query}' should match market_research intent"
+
+    def test_market_research_routes_to_analyst(self):
+        from agents.orchestrator import INTENT_PATTERNS
+        import re
+
+        patterns = INTENT_PATTERNS.get("market_research", [])
+        test_query = "analyze competitor landscape for fintech startups"
+
+        matched = any(re.search(p, test_query, re.I) for p in patterns)
+        assert matched, "Market research query should match"
+
+    def test_market_research_skill_exists(self):
+        from pathlib import Path
+        skill_path = Path(__file__).parent.parent / "skills" / "market-research" / "SKILL.md"
+        assert skill_path.exists(), "market-research SKILL.md should exist"
+
+        content = skill_path.read_text()
+        assert "market_research" in content.lower() or "market research" in content.lower()
+        assert "competitor" in content.lower()
+        assert "trend" in content.lower()

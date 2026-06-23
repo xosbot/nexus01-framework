@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initProjects();
   initSessions();
   initTerminal();
+  initApprovals();
   loadOverview();
   loadSessions();
   loadProjects();
@@ -68,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadIntegrations();
   loadWebhooks();
   loadRAGStats();
+  loadApprovals();
   connectWS();
 });
 
@@ -106,7 +108,7 @@ function initNav() {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     const n = parseInt(e.key);
     if (n >= 1 && n <= 9) {
-      const panels = ['overview','chat','memory','projects','sessions','rag','agents','integrations','settings'];
+      const panels = ['overview','chat','memory','projects','sessions','rag','agents','integrations','approvals'];
       if (panels[n - 1]) {
         e.preventDefault();
         switchPanel(panels[n - 1]);
@@ -133,7 +135,7 @@ function switchPanel(id) {
   const titles = {
     overview: 'Overview', chat: 'Chat', memory: 'Memory',
     projects: 'Projects', sessions: 'Sessions', rag: 'RAG',
-    agents: 'Agents', integrations: 'Integrations', settings: 'Settings'
+    agents: 'Agents', integrations: 'Integrations', approvals: 'Approvals', settings: 'Settings'
   };
   const titleEl = $('#side-title');
   if (titleEl) titleEl.textContent = titles[id] || id;
@@ -150,6 +152,7 @@ function switchPanel(id) {
   if (id === 'rag') loadRAGStats();
   if (id === 'agents') loadAgents();
   if (id === 'integrations') { loadIntegrations(); loadWebhooks(); }
+  if (id === 'approvals') loadApprovals();
 }
 
 function ensureTab(id) {
@@ -159,11 +162,11 @@ function ensureTab(id) {
   const titles = {
     overview: 'Overview', chat: 'Chat', memory: 'Memory',
     projects: 'Projects', sessions: 'Sessions', rag: 'RAG',
-    agents: 'Agents', integrations: 'Integrations', settings: 'Settings'
+    agents: 'Agents', integrations: 'Integrations', approvals: 'Approvals', settings: 'Settings'
   };
   const icons = {
     overview: '⬡', chat: '💬', memory: '🧠', projects: '📁',
-    sessions: '⌘', rag: '📚', agents: '🤖', integrations: '🔗', settings: '⚙'
+    sessions: '⌘', rag: '📚', agents: '🤖', integrations: '🔗', approvals: '✓', settings: '⚙'
   };
   const tab = document.createElement('div');
   tab.className = 'tab active';
@@ -341,6 +344,24 @@ function updateSidebar(id) {
       if (!items.length) { list.innerHTML = '<div style="padding:8px;color:var(--fg-dim);font-size:11px;">None</div>'; return; }
       list.innerHTML = items.map(i => `<div class="side-stat"><span class="side-stat-label">${escapeHtml(i.name)}</span><span class="badge ${i.enabled ? 'ok' : 'off'}">${i.enabled ? 'On' : 'Off'}</span></div>`).join('');
     }).catch(() => {});
+    return;
+  }
+
+  if (id === 'approvals') {
+    body.innerHTML = `
+      <div class="side-section">
+        <div class="side-label">Pending Approvals</div>
+        <div id="approvals-side-count" style="padding:8px;font-size:11px;color:var(--fg-dim);">Loading...</div>
+      </div>
+      <div class="side-section">
+        <div class="side-label">Quick Actions</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <button class="btn btn-sm" id="btn-approvals-refresh">Refresh</button>
+        </div>
+      </div>
+    `;
+    loadApprovals();
+    $('#btn-approvals-refresh')?.addEventListener('click', loadApprovals);
     return;
   }
 
@@ -745,16 +766,26 @@ function renderProjects(projects) {
   const el = $('#projects-table');
   if (!el) return;
   if (!projects.length) {
-    el.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--fg-muted);padding:24px;">No projects yet</td></tr>';
+    el.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--fg-muted);padding:24px;">No projects yet</td></tr>';
     return;
   }
-  el.innerHTML = projects.map(p => `
-    <tr>
-      <td><strong>${escapeHtml(p.name)}</strong></td>
-      <td><span class="badge ${p.status === 'active' ? 'ok' : p.status === 'completed' ? 'info' : 'warn'}">${p.status || 'active'}</span></td>
-      <td style="color:var(--fg-dim)">${formatTime(p.updated_at)}</td>
-    </tr>
-  `).join('');
+  el.innerHTML = projects.map(p => {
+    const progress = p.progress || { total: 0, done: 0, percent: 0 };
+    const progressClass = progress.percent >= 100 ? 'ok' : progress.percent >= 50 ? 'info' : 'warn';
+    return `
+      <tr>
+        <td><strong>${escapeHtml(p.name)}</strong></td>
+        <td><span class="badge ${p.status === 'active' ? 'ok' : p.status === 'completed' ? 'info' : 'warn'}">${p.status || 'active'}</span></td>
+        <td>
+          <div class="progress-bar">
+            <div class="progress-fill ${progressClass}" style="width:${progress.percent}%"></div>
+            <span class="progress-text">${progress.done}/${progress.total} (${progress.percent}%)</span>
+          </div>
+        </td>
+        <td style="color:var(--fg-dim)">${formatTime(p.updated_at)}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 /* ── Brain / Memory ────────────────────────── */
@@ -825,7 +856,11 @@ function initRAG() {
       if (!results.length) { el.innerHTML = '<div class="empty-state"><div class="empty-title">No results</div></div>'; return; }
       el.innerHTML = results.map(r => {
         const content = typeof r === 'string' ? r : (r.content || r.document || JSON.stringify(r));
-        return `<div style="padding:10px;background:var(--bg);border:1px solid var(--border);margin-bottom:6px;"><div style="color:var(--fg-dim);">${escapeHtml(content?.substring(0, 300) || '')}</div></div>`;
+        const meta = r.metadata || {};
+        const source = meta.source || meta.url || '';
+        const score = r.score != null ? `<span style="color:var(--accent);font-size:11px;">score:${r.score.toFixed(3)}</span> ` : '';
+        const sourceEl = source ? `<span style="color:var(--fg-muted);font-size:11px;"> ${escapeHtml(source)}</span>` : '';
+        return `<div style="padding:10px;background:var(--bg);border:1px solid var(--border);margin-bottom:6px;"><div>${score}${sourceEl}</div><div style="color:var(--fg-dim);margin-top:4px;">${escapeHtml(content?.substring(0, 300) || '')}</div></div>`;
       }).join('');
     } catch { toast('RAG search failed', 'error'); }
   });
@@ -838,6 +873,32 @@ function initRAG() {
       logTerminal('RAG documents re-ingested', 'ok');
       loadRAGStats();
     } catch { toast('Re-ingest failed', 'error'); logTerminal('RAG re-ingest failed', 'error'); }
+  });
+
+  $('#btn-rag-ingest-url')?.addEventListener('click', async () => {
+    const url = $('#rag-ingest-url')?.value.trim();
+    if (!url) { toast('Enter a URL', 'error'); return; }
+    try {
+      toast('Fetching URL...', 'info');
+      await apiFetch('/api/rag/ingest', { method: 'POST', body: JSON.stringify({ url }) });
+      toast('URL ingested', 'success');
+      logTerminal(`Ingested: ${url}`, 'ok');
+      $('#rag-ingest-url').value = '';
+      loadRAGStats();
+    } catch { toast('URL ingest failed', 'error'); }
+  });
+
+  $('#btn-rag-ingest-text')?.addEventListener('click', async () => {
+    const text = $('#rag-ingest-text')?.value.trim();
+    if (!text) { toast('Enter text to ingest', 'error'); return; }
+    try {
+      toast('Ingesting text...', 'info');
+      await apiFetch('/api/rag/ingest', { method: 'POST', body: JSON.stringify({ text, source: 'dashboard' }) });
+      toast('Text ingested', 'success');
+      logTerminal(`Ingested ${text.length} chars`, 'ok');
+      $('#rag-ingest-text').value = '';
+      loadRAGStats();
+    } catch { toast('Text ingest failed', 'error'); }
   });
 }
 
@@ -1201,6 +1262,56 @@ function handleApproval(approved) {
   $('#approval-bar')?.classList.remove('visible');
   if (approved) showTyping();
   state.pendingApproval = null;
+}
+
+/* ── Approvals Panel ─────────────────────── */
+
+function initApprovals() {
+  $('#btn-approvals-refresh')?.addEventListener('click', loadApprovals);
+}
+
+async function loadApprovals() {
+  try {
+    const data = await apiFetch('/api/approvals?include_expired=true');
+    renderApprovals(data.approvals || []);
+  } catch { renderApprovals([]); }
+}
+
+function renderApprovals(approvals) {
+  const el = $('#approvals-list');
+  if (!el) return;
+  if (!approvals.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-title">No pending approvals</div><div class="empty-desc">Customer reply drafts will appear here for review</div></div>';
+    return;
+  }
+  el.innerHTML = approvals.map(a => `
+    <div class="approval-card ${a.expired ? 'expired' : ''}" data-id="${escapeHtml(a.id)}">
+      <div class="approval-header">
+        <span class="badge info">${escapeHtml(a.channel)}</span>
+        <span class="approval-time">${formatTime(a.created_at)}</span>
+        ${a.expired ? '<span class="badge warn">Expired</span>' : ''}
+      </div>
+      <div class="approval-session">Session: ${escapeHtml(a.session_id?.substring(0, 12) || '')}</div>
+      <div class="approval-text">${escapeHtml(a.text?.substring(0, 200) || '')}</div>
+      ${!a.expired ? `
+        <div class="approval-actions">
+          <button class="btn btn-sm btn-primary" onclick="respondApproval('${a.id}', true)">Approve</button>
+          <button class="btn btn-sm" onclick="respondApproval('${a.id}', false)">Reject</button>
+        </div>
+      ` : ''}
+    </div>
+  `).join('');
+}
+
+async function respondApproval(approvalId, approved) {
+  try {
+    await apiFetch(`/api/approvals/${approvalId}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ approved }),
+    });
+    toast(approved ? 'Approved' : 'Rejected', approved ? 'success' : 'info');
+    loadApprovals();
+  } catch { toast('Failed to respond', 'error'); }
 }
 
 /* ── Toast ─────────────────────────────────── */

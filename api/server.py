@@ -52,7 +52,9 @@ class ApprovalRequest(BaseModel):
 class IngestRequest(BaseModel):
     path: str | None = None
     text: str | None = None
+    url: str | None = None
     source: str = "manual"
+    project_id: str | None = None
 
 
 def create_api_app(nexus_app) -> FastAPI:
@@ -141,13 +143,104 @@ def create_api_app(nexus_app) -> FastAPI:
     async def costs(days: int = 30):
         return nexus_app.cost_tracker.summary(days)
 
+    @app.get("/api/tools/status")
+    async def tools_status():
+        from tools.availability import get_tool_availability
+        availability = get_tool_availability()
+        return availability.to_dict()
+
+    # ── Social Media ─────────────────────────────────────────────────
+
+    social_mgr = getattr(nexus_app, 'social_media', None)
+
+    @app.get("/api/social/adapters")
+    async def list_social_adapters():
+        if not social_mgr:
+            return {"adapters": [], "error": "Social media manager not initialized"}
+        return {"adapters": social_mgr.list_adapters()}
+
+    @app.post("/api/social/draft")
+    async def draft_social_post(request: Request):
+        if not social_mgr:
+            return {"error": "Social media manager not initialized"}
+        data = await request.json()
+        platform = data.get("platform", "")
+        prompt = data.get("prompt", "")
+        if not platform or not prompt:
+            raise HTTPException(400, "platform and prompt are required")
+        try:
+            entry = await social_mgr.draft_post(platform, prompt, data.get("context"))
+            return entry.to_dict()
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
+    @app.post("/api/social/schedule")
+    async def schedule_social_post(request: Request):
+        if not social_mgr:
+            return {"error": "Social media manager not initialized"}
+        data = await request.json()
+        entry_id = data.get("entry_id", "")
+        scheduled_at = data.get("scheduled_at", "")
+        if not entry_id or not scheduled_at:
+            raise HTTPException(400, "entry_id and scheduled_at are required")
+        try:
+            dt = datetime.fromisoformat(scheduled_at.replace("Z", "+00:00"))
+            entry = await social_mgr.schedule_post(entry_id, dt)
+            return entry.to_dict()
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
+    @app.post("/api/social/publish")
+    async def publish_social_post(request: Request):
+        if not social_mgr:
+            return {"error": "Social media manager not initialized"}
+        data = await request.json()
+        entry_id = data.get("entry_id", "")
+        if not entry_id:
+            raise HTTPException(400, "entry_id is required")
+        try:
+            entry = await social_mgr.publish_now(entry_id)
+            return entry.to_dict()
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
+    @app.get("/api/social/calendar")
+    async def list_social_calendar(platform: str | None = None, status: str | None = None, limit: int = 50):
+        if not social_mgr:
+            return {"entries": [], "error": "Social media manager not initialized"}
+        entries = social_mgr.get_calendar().list_entries(platform=platform, status=status, limit=limit)
+        return {"entries": [e.to_dict() for e in entries]}
+
+    @app.get("/api/social/calendar/{entry_id}")
+    async def get_social_calendar_entry(entry_id: str):
+        if not social_mgr:
+            raise HTTPException(404, "Social media manager not initialized")
+        entry = social_mgr.get_calendar().get(entry_id)
+        if not entry:
+            raise HTTPException(404, "Entry not found")
+        return entry.to_dict()
+
+    @app.delete("/api/social/calendar/{entry_id}")
+    async def delete_social_calendar_entry(entry_id: str):
+        if not social_mgr:
+            raise HTTPException(404, "Social media manager not initialized")
+        if social_mgr.get_calendar().delete(entry_id):
+            return {"deleted": True}
+        raise HTTPException(404, "Entry not found")
+
+    @app.get("/api/social/stats")
+    async def social_stats():
+        if not social_mgr:
+            return {"error": "Social media manager not initialized"}
+        return social_mgr.stats()
+
     @app.get("/api/rag/stats")
     async def rag_stats():
         return nexus_app.rag.stats()
 
     @app.get("/api/rag/search")
-    async def rag_search(q: str, n: int = 5):
-        return nexus_app.rag.search(q, n)
+    async def rag_search(q: str, n: int = 5, project_id: str | None = None):
+        return nexus_app.rag.search(q, n, project_id=project_id)
 
     @app.post("/api/rag/ingest")
     async def rag_ingest(req: IngestRequest):
@@ -158,8 +251,23 @@ def create_api_app(nexus_app) -> FastAPI:
             for restricted in RESTRICTED:
                 if str(p).startswith(restricted):
                     raise HTTPException(403, f"Access to {restricted} is restricted")
+        meta = {"project_id": req.project_id} if req.project_id else {}
         if req.text:
-            chunks = nexus_app.rag.ingest_text(req.text, source=req.source)
+            chunks = nexus_app.rag.ingest_text(req.text, source=req.source, metadata=meta)
+        elif req.url:
+            try:
+                from tools.web_scraper import scrape_url
+                result = await scrape_url(req.url)
+                if result.get("status") == "failed":
+                    raise HTTPException(400, f"Failed to fetch URL: {result.get('error', 'unknown')}")
+                text = result.get("text", "")
+                if not text:
+                    raise HTTPException(400, "No content extracted from URL")
+                chunks = nexus_app.rag.ingest_text(text, source=req.url, metadata={**meta, "url": req.url, "title": result.get("title", "")})
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(400, f"URL ingest failed: {str(e)}")
         elif req.path:
             p = Path(req.path)
             if p.is_dir():
@@ -167,7 +275,7 @@ def create_api_app(nexus_app) -> FastAPI:
                 return stats
             chunks = nexus_app.rag.ingest_file(p, source=req.source)
         else:
-            raise HTTPException(400, "Provide text or path")
+            raise HTTPException(400, "Provide text, url, or path")
         return {"chunks": chunks, "stats": nexus_app.rag.stats()}
 
     # ── Chat ────────────────────────────────────────────────────────────
@@ -318,7 +426,42 @@ def create_api_app(nexus_app) -> FastAPI:
         if not p:
             raise HTTPException(404, "Project not found")
         p["sessions"] = memory.sessions.list(project_id=project_id)
+        p["progress"] = memory.tasks.progress(project_id)
+        p["tasks"] = memory.tasks.list(project_id=project_id)
         return p
+
+    @app.get("/api/projects/{project_id}/tasks")
+    async def list_project_tasks(project_id: str, status: str | None = None):
+        return {"tasks": memory.tasks.list(project_id=project_id, status=status)}
+
+    @app.post("/api/projects/{project_id}/tasks")
+    async def create_project_task(project_id: str, request: Request):
+        data = await request.json()
+        title = data.get("title", "")
+        if not title:
+            raise HTTPException(400, "title is required")
+        task = memory.tasks.create(
+            project_id=project_id,
+            title=title,
+            description=data.get("description", ""),
+            status=data.get("status", "pending"),
+            metadata=data.get("metadata"),
+        )
+        return task
+
+    @app.patch("/api/tasks/{task_id}")
+    async def update_task(task_id: str, request: Request):
+        data = await request.json()
+        task = memory.tasks.update(task_id, **data)
+        if not task:
+            raise HTTPException(404, "Task not found")
+        return task
+
+    @app.delete("/api/tasks/{task_id}")
+    async def delete_task(task_id: str):
+        if not memory.tasks.delete(task_id):
+            raise HTTPException(404, "Task not found")
+        return {"deleted": True}
 
     @app.patch("/api/projects/{project_id}")
     async def update_project(project_id: str, body: ProjectUpdate):
@@ -363,6 +506,39 @@ def create_api_app(nexus_app) -> FastAPI:
         return {"deleted": True}
 
     # ── Memory ────────────────────────────────────────────────────────
+
+    # ── Approvals ────────────────────────────────────────────────────
+
+    @app.get("/api/approvals")
+    async def list_approvals(include_expired: bool = False):
+        pending = gateway.approvals.list_pending(include_expired=include_expired)
+        return {"approvals": [a.to_dict() for a in pending]}
+
+    @app.post("/api/approvals/{approval_id}/respond")
+    async def respond_to_approval(approval_id: str, request: Request):
+        data = await request.json()
+        approved = data.get("approved", False)
+        edited_text = data.get("edited_text")
+
+        approval = gateway.approvals.get(approval_id)
+        if not approval:
+            raise HTTPException(404, "Approval not found or expired")
+
+        gateway.approvals.clear(approval_id)
+
+        inbound = InboundMessage(
+            channel=ChannelKind.WEB,
+            session_id=approval.session_id,
+            text="yes" if approved else "no",
+            user_id="web",
+            metadata={
+                "approval_decision": approved,
+                "approval_id": approval_id,
+                "edited_text": edited_text,
+            },
+        )
+        response = await gateway.handle(inbound)
+        return {"text": response.text, "success": response.success}
 
     @app.get("/api/memory/stats")
     async def memory_stats():
@@ -587,7 +763,33 @@ def create_api_app(nexus_app) -> FastAPI:
     @app.post("/webhooks/whatsapp")
     async def whatsapp_receive(request: Request):
         if whatsapp_ch:
-            await whatsapp_ch.handle_webhook(await request.json())
+            raw = await request.body()
+            signature = request.headers.get("X-Hub-Signature-256", "")
+            body = await request.json()
+            await whatsapp_ch.handle_webhook(body, raw_body=raw, signature=signature)
+        return {"ok": True}
+
+    instagram_ch = gateway.get_channel("instagram")
+
+    @app.get("/webhooks/instagram")
+    async def instagram_verify(request: Request):
+        if not instagram_ch:
+            raise HTTPException(404)
+        mode = request.query_params.get("hub.mode", "")
+        token = request.query_params.get("hub.verify_token", "")
+        challenge = request.query_params.get("hub.challenge", "")
+        if mode == "subscribe" and token == instagram_ch.app_secret:
+            from fastapi.responses import PlainTextResponse
+            return PlainTextResponse(challenge)
+        raise HTTPException(403)
+
+    @app.post("/webhooks/instagram")
+    async def instagram_receive(request: Request):
+        if instagram_ch:
+            raw = await request.body()
+            signature = request.headers.get("X-Hub-Signature-256", "")
+            body = await request.json()
+            await instagram_ch.handle_webhook(body, raw_body=raw, signature=signature)
         return {"ok": True}
 
     @app.post("/webhooks/slack")

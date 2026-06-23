@@ -99,7 +99,7 @@ def test_execute_without_fallback_blocks(cold):
 
 def test_execute_with_fallback_passes(cold):
     ctx = ColdMode.build_context(
-        action="run_command", permission="EXECUTE", fallback_script="echo safe",
+        action="run_command", permission="EXECUTE", fallback_script="echo safe", confidence=0.8,
     )
     assert not cold.should_block(ctx)
 

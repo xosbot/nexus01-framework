@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from core.stores import ProjectStore, SessionStore
+from core.stores import ProjectStore, SessionStore, TaskStore
 
 
 class Memory:
@@ -15,6 +15,7 @@ class Memory:
         self._init_chroma(chroma_path)
         self.projects = ProjectStore(self._conn)
         self.sessions = SessionStore(self._conn)
+        self.tasks = TaskStore(self._conn)
 
     def _init_sqlite(self, path: str):
         self._conn = sqlite3.connect(path, check_same_thread=False)
@@ -36,12 +37,16 @@ class Memory:
                 timestamp TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT PRIMARY KEY,
                 session_id TEXT,
+                project_id TEXT,
+                title TEXT DEFAULT '',
+                description TEXT DEFAULT '',
                 status TEXT DEFAULT 'pending',
-                payload TEXT NOT NULL,
+                payload TEXT NOT NULL DEFAULT '{}',
                 result TEXT,
                 created_at TEXT NOT NULL,
+                updated_at TEXT,
                 completed_at TEXT
             );
             CREATE TABLE IF NOT EXISTS projects (

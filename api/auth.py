@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import os
 import time
 import logging
@@ -15,7 +16,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 logger = logging.getLogger(__name__)
 
 # Key format: simple token or role:token (e.g. "admin:mytoken" or just "mytoken")
-RAW_KEY = os.getenv("NEXUS_API_KEY", "")
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX = 30
 
@@ -26,7 +26,7 @@ class APIKey:
     role: str  # "admin" | "read"
 
     def matches(self, candidate: str) -> bool:
-        return self.token == candidate
+        return hmac.compare_digest(self.token, candidate)
 
 
 def _parse_key(raw: str) -> APIKey | None:
@@ -40,7 +40,7 @@ def _parse_key(raw: str) -> APIKey | None:
     return APIKey(token=raw, role="admin")
 
 
-API_KEY = _parse_key(RAW_KEY)
+API_KEY = _parse_key(os.getenv("NEXUS_API_KEY", ""))
 READONLY_KEY = _parse_key(os.getenv("NEXUS_READONLY_KEY", ""))
 
 
@@ -107,7 +107,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         key = resolve_key(token) if token else None
 
-        if RAW_KEY and not key:
+        if (API_KEY or READONLY_KEY) and not key:
             return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
 
         # Admin check for write operations
@@ -126,7 +126,7 @@ class WSAuthMiddleware:
         self._ws_rate_limiter = RateLimiter(max_requests=20, window=60)
 
     def authenticate(self, token: str | None) -> bool:
-        if not RAW_KEY:
+        if not API_KEY and not READONLY_KEY:
             return True
         key = resolve_key(token) if token else None
         return key is not None

@@ -22,6 +22,7 @@ from agents.orchestrator import OrchestratorAgent
 from gateway.gateway import NexusGateway
 from gateway.channels.telegram import TelegramChannel
 from gateway.channels.whatsapp import WhatsAppChannel
+from gateway.channels.instagram import InstagramChannel
 from gateway.channels.discord_channel import DiscordChannel
 from gateway.channels.slack import SlackChannel
 from gateway.channels.signal import SignalChannel
@@ -46,6 +47,7 @@ class NexusApp:
     copilot: Any = None
     integrations: Any = None
     proactive: Any = None
+    social_media: Any = None
 
     async def shutdown(self) -> None:
         for channel in self.channels:
@@ -159,6 +161,7 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
     allowed_users = {
         "telegram": _parse_allowlist(cfg.telegram_allowed_users),
         "whatsapp": _parse_allowlist(cfg.whatsapp_allowed_numbers),
+        "instagram": _parse_allowlist(cfg.instagram_allowed_users),
         "discord": _parse_allowlist(cfg.discord_allowed_users),
         "slack": _parse_allowlist(cfg.slack_allowed_users),
         "signal": _parse_allowlist(cfg.signal_allowed_numbers),
@@ -174,35 +177,66 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
     channels = []
     enabled = {c.lower() for c in cfg.enabled_channels}
 
+    def _check_allowlist(channel_name: str, allowlist: list[str]) -> bool:
+        if allowlist:
+            return True
+        if cfg.allow_public_bots:
+            logger.warning(
+                "Channel '%s' has no allowlist but allow_public_bots is enabled — "
+                "this channel is open to all users",
+                channel_name,
+            )
+            return True
+        logger.critical(
+            "Refusing to register channel '%s': no allowlist configured and "
+            "allow_public_bots is false. Set %s_ALLOWED_USERS or set "
+            "allow_public_bots=true in config to proceed.",
+            channel_name,
+            channel_name.upper(),
+        )
+        return False
+
     if "telegram" in enabled and cfg.telegram_token:
-        tg = TelegramChannel(gateway, cfg.telegram_token)
-        gateway.register_channel(tg)
-        channels.append(tg)
+        if _check_allowlist("telegram", _parse_allowlist(cfg.telegram_allowed_users)):
+            tg = TelegramChannel(gateway, cfg.telegram_token)
+            gateway.register_channel(tg)
+            channels.append(tg)
 
     if "whatsapp" in enabled and cfg.whatsapp_token and cfg.whatsapp_phone_number_id:
-        wa = WhatsAppChannel(gateway, cfg.whatsapp_token, cfg.whatsapp_phone_number_id, cfg.whatsapp_verify_token)
-        gateway.register_channel(wa)
-        channels.append(wa)
+        if _check_allowlist("whatsapp", _parse_allowlist(cfg.whatsapp_allowed_numbers)):
+            wa = WhatsAppChannel(gateway, cfg.whatsapp_token, cfg.whatsapp_phone_number_id, cfg.whatsapp_verify_token, cfg.whatsapp_app_secret)
+            gateway.register_channel(wa)
+            channels.append(wa)
+
+    if "instagram" in enabled and cfg.instagram_token and cfg.instagram_page_id:
+        if _check_allowlist("instagram", _parse_allowlist(cfg.instagram_allowed_users)):
+            ig = InstagramChannel(gateway, cfg.instagram_token, cfg.instagram_page_id, cfg.instagram_app_secret)
+            gateway.register_channel(ig)
+            channels.append(ig)
 
     if "discord" in enabled and cfg.discord_token:
-        dc = DiscordChannel(gateway, cfg.discord_token)
-        gateway.register_channel(dc)
-        channels.append(dc)
+        if _check_allowlist("discord", _parse_allowlist(cfg.discord_allowed_users)):
+            dc = DiscordChannel(gateway, cfg.discord_token)
+            gateway.register_channel(dc)
+            channels.append(dc)
 
     if "slack" in enabled and cfg.slack_bot_token and cfg.slack_signing_secret:
-        sl = SlackChannel(gateway, cfg.slack_bot_token, cfg.slack_signing_secret)
-        gateway.register_channel(sl)
-        channels.append(sl)
+        if _check_allowlist("slack", _parse_allowlist(cfg.slack_allowed_users)):
+            sl = SlackChannel(gateway, cfg.slack_bot_token, cfg.slack_signing_secret)
+            gateway.register_channel(sl)
+            channels.append(sl)
 
     if "signal" in enabled and cfg.signal_account:
-        sig = SignalChannel(gateway, cfg.signal_api_url, cfg.signal_account)
-        gateway.register_channel(sig)
-        channels.append(sig)
+        if _check_allowlist("signal", _parse_allowlist(cfg.signal_allowed_numbers)):
+            sig = SignalChannel(gateway, cfg.signal_api_url, cfg.signal_account)
+            gateway.register_channel(sig)
+            channels.append(sig)
 
     if "teams" in enabled and cfg.teams_app_id and cfg.teams_app_password:
-        tm = TeamsChannel(gateway, cfg.teams_app_id, cfg.teams_app_password)
-        gateway.register_channel(tm)
-        channels.append(tm)
+        if _check_allowlist("teams", _parse_allowlist(cfg.teams_allowed_users)):
+            tm = TeamsChannel(gateway, cfg.teams_app_id, cfg.teams_app_password)
+            gateway.register_channel(tm)
+            channels.append(tm)
 
     nexus = NexusApp(
         llm=llm,
@@ -233,6 +267,24 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
     nexus.copilot = ExecutionCopilot(nexus.memory, nexus.rag, agents_dict)
     nexus.integrations = IntegrationHub(nexus.memory, nexus.brain)
     nexus.proactive = ProactiveIntelligence(nexus.memory, nexus.brain)
+
+    from integrations.social.manager import SocialMediaManager
+    from integrations.social.twitter_adapter import TwitterAdapter
+    from integrations.social.linkedin_adapter import LinkedInAdapter
+    social_mgr = SocialMediaManager()
+    if cfg.twitter_bearer_token:
+        social_mgr.register_adapter(TwitterAdapter({
+            "bearer_token": cfg.twitter_bearer_token,
+            "api_key": cfg.twitter_api_key,
+            "api_secret": cfg.twitter_api_secret,
+        }))
+    if cfg.linkedin_access_token:
+        social_mgr.register_adapter(LinkedInAdapter({
+            "access_token": cfg.linkedin_access_token,
+            "person_id": cfg.linkedin_person_id,
+            "organization_id": cfg.linkedin_org_id,
+        }))
+    nexus.social_media = social_mgr
 
     if cfg.enable_web_ui:
         from api.server import create_api_app

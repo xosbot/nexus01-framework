@@ -8,6 +8,7 @@ class ChannelKind(str, Enum):
     WEB = "web"
     TELEGRAM = "telegram"
     WHATSAPP = "whatsapp"
+    INSTAGRAM = "instagram"
     DISCORD = "discord"
     SLACK = "slack"
     SIGNAL = "signal"

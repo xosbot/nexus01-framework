@@ -45,14 +45,40 @@ async def test_gateway_osint_no_approval(gateway, msg_bus):
     msg_bus.subscribe("orchestrator", fake_orchestrator)
 
     inbound = InboundMessage(
+        channel=ChannelKind.TELEGRAM,
+        session_id="123",
+        text="osint AI frameworks",
+        user_id="user1",
+    )
+    response = await gateway.handle(inbound)
+    assert not response.requires_approval
+    assert "intel report" in response.text
+
+
+@pytest.mark.asyncio
+async def test_gateway_customer_reply_requires_approval(gateway, msg_bus):
+    async def fake_orchestrator(message: Message):
+        await msg_bus.publish(Message(
+            sender="orchestrator",
+            recipient=message.sender,
+            type="response",
+            payload={
+                "data": {"status": "complete", "route": ["osint"], "output": "intel report"},
+                "_correlation_id": message.payload.get("_correlation_id"),
+            },
+        ))
+
+    msg_bus.subscribe("orchestrator", fake_orchestrator)
+
+    inbound = InboundMessage(
         channel=ChannelKind.WHATSAPP,
         session_id="15551234",
         text="osint AI frameworks",
         user_id="15551234",
     )
     response = await gateway.handle(inbound)
-    assert not response.requires_approval
-    assert "intel report" in response.text
+    assert response.requires_approval
+    assert "Draft reply queued" in response.text
 
 
 @pytest.mark.asyncio

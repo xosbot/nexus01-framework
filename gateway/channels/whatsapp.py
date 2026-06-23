@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 from typing import TYPE_CHECKING
 
@@ -27,11 +29,13 @@ class WhatsAppChannel(BaseChannelAdapter):
         token: str,
         phone_number_id: str,
         verify_token: str,
+        app_secret: str = "",
     ):
         super().__init__(gateway)
         self.token = token
         self.phone_number_id = phone_number_id
         self.verify_token = verify_token
+        self.app_secret = app_secret
         self._client = httpx.AsyncClient(timeout=30.0)
 
     async def start(self) -> None:
@@ -40,12 +44,23 @@ class WhatsAppChannel(BaseChannelAdapter):
     async def stop(self) -> None:
         await self._client.aclose()
 
+    def verify_signature(self, body: bytes, signature: str) -> bool:
+        if not self.app_secret:
+            return True
+        expected = hmac.new(
+            self.app_secret.encode(), body, hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(f"sha256={expected}", signature)
+
     async def verify_webhook(self, mode: str, token: str, challenge: str) -> str | None:
         if mode == "subscribe" and token == self.verify_token:
             return challenge
         return None
 
-    async def handle_webhook(self, body: dict) -> None:
+    async def handle_webhook(self, body: dict, raw_body: bytes = b"", signature: str = "") -> None:
+        if signature and not self.verify_signature(raw_body, signature):
+            logger.warning("WhatsApp webhook signature verification failed")
+            return
         for entry in body.get("entry", []):
             for change in entry.get("changes", []):
                 value = change.get("value", {})
