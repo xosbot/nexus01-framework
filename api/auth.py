@@ -1,4 +1,4 @@
-"""API authentication and rate limiting middleware."""
+"""API authentication — scoped API keys with admin/read-only tiers + rate limiting."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import os
 import time
 import logging
 from collections import defaultdict
+from dataclasses import dataclass
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -13,9 +14,57 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
 
-API_KEY = os.getenv("NEXUS_API_KEY", "")
+# Key format: simple token or role:token (e.g. "admin:mytoken" or just "mytoken")
+RAW_KEY = os.getenv("NEXUS_API_KEY", "")
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX = 30
+
+
+@dataclass
+class APIKey:
+    token: str
+    role: str  # "admin" | "read"
+
+    def matches(self, candidate: str) -> bool:
+        return self.token == candidate
+
+
+def _parse_key(raw: str) -> APIKey | None:
+    if not raw:
+        return None
+    # Support "role:token" format
+    if ":" in raw:
+        parts = raw.split(":", 1)
+        if parts[0] in ("admin", "read"):
+            return APIKey(token=parts[0] + ":" + parts[1], role=parts[0])
+    return APIKey(token=raw, role="admin")
+
+
+API_KEY = _parse_key(RAW_KEY)
+READONLY_KEY = _parse_key(os.getenv("NEXUS_READONLY_KEY", ""))
+
+
+def resolve_key(candidate: str) -> APIKey | None:
+    for k in (API_KEY, READONLY_KEY):
+        if k and k.matches(candidate):
+            return k
+    return None
+
+
+def has_role(request: Request, required: str = "read") -> bool:
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        candidate = auth[7:]
+    else:
+        candidate = request.headers.get("X-API-Key", "")
+    key = resolve_key(candidate)
+    if not key:
+        return False
+    if required == "read":
+        return True
+    if required == "admin":
+        return key.role == "admin"
+    return False
 
 
 class RateLimiter:
@@ -39,6 +88,7 @@ _rate_limiter = RateLimiter()
 
 class AuthMiddleware(BaseHTTPMiddleware):
     EXEMPT_PATHS = {"/health", "/", "/docs", "/openapi.json", "/redoc"}
+    WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -46,29 +96,27 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if path in self.EXEMPT_PATHS or path.startswith("/assets"):
             return await call_next(request)
 
-        if API_KEY:
-            auth_header = request.headers.get("Authorization", "")
-            api_key_header = request.headers.get("X-API-Key", "")
+        # Extract token
+        auth = request.headers.get("Authorization", "")
+        api_key_header = request.headers.get("X-API-Key", "")
+        token = ""
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+        elif api_key_header:
+            token = api_key_header
 
-            if auth_header.startswith("Bearer "):
-                token = auth_header[7:]
-            elif api_key_header:
-                token = api_key_header
-            else:
-                token = ""
+        key = resolve_key(token) if token else None
 
-            if token != API_KEY:
-                return JSONResponse(
-                    status_code=401,
-                    content={"detail": "Invalid or missing API key"},
-                )
+        if RAW_KEY and not key:
+            return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
+
+        # Admin check for write operations
+        if key and key.role != "admin" and request.method in self.WRITE_METHODS and not path.startswith("/api/chat"):
+            return JSONResponse(status_code=403, content={"detail": "Read-only key cannot perform write operations"})
 
         client_ip = request.client.host if request.client else "unknown"
         if not _rate_limiter.is_allowed(client_ip):
-            return JSONResponse(
-                status_code=429,
-                content={"detail": "Rate limit exceeded. Try again later."},
-            )
+            return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
 
         return await call_next(request)
 
@@ -78,9 +126,10 @@ class WSAuthMiddleware:
         self._ws_rate_limiter = RateLimiter(max_requests=20, window=60)
 
     def authenticate(self, token: str | None) -> bool:
-        if not API_KEY:
+        if not RAW_KEY:
             return True
-        return token == API_KEY
+        key = resolve_key(token) if token else None
+        return key is not None
 
     def is_rate_limited(self, client_id: str) -> bool:
         return not self._ws_rate_limiter.is_allowed(client_id)

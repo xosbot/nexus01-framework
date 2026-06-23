@@ -1,0 +1,83 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nexus-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexus-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  nexus:
+    build: .
+    container_name: nexus-01
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    depends_on:
+      ollama:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      OLLAMA_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "qwen3:8b"
+      REDIS_URL: "redis://redis:6379"
+      BUS_BACKEND: "redis"
+      DATABASE_PATH: "/app/data/nexus.db"
+      CHROMA_PATH: "/app/data/chromadb"
+      COLD_MODE_ENABLED: "true"
+      REQUIRE_APPROVAL_FOR_EXEC: "true"
+      ENABLED_CHANNELS: ""
+      ENABLE_CLI: "false"
+      ENABLE_WEB_UI: "true"
+      API_HOST: "0.0.0.0"
+      API_PORT: "8765"
+      NEXUS_API_KEY: ""
+      # Uncomment to enable cloud LLM fallback:
+      # GEMINI_API_KEY: "${GEMINI_API_KEY}"
+      # GROQ_API_KEY: "${GROQ_API_KEY}"
+      # OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      # ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
+    volumes:
+      - nexus_data:/app/data
+      - ./web:/app/web
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  ollama_data:
+    name: nexus_ollama_data
+  redis_data:
+    name: nexus_redis_data
+  nexus_data:
+    name: nexus_app_data

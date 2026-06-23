@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.0-blue?style=for-the-badge" alt="version">
+  <img src="https://img.shields.io/badge/version-2.0.0-blue?style=for-the-badge" alt="version">
   <img src="https://img.shields.io/badge/python-3.11+-green?style=for-the-badge&logo=python&logoColor=white" alt="python">
   <img src="https://img.shields.io/badge/license-MIT-purple?style=for-the-badge" alt="license">
-  <img src="https://img.shields.io/badge/tests-19%20passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="tests">
+  <img src="https://img.shields.io/badge/tests-128%20passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="tests">
   <img src="https://img.shields.io/badge/phase-3%20deploy-orange?style=for-the-badge" alt="phase">
 </p>
 
@@ -96,6 +96,41 @@ python main.py
 ```
 
 That's it. You should see the NEXUS-01 prompt. Type `help` to see available commands.
+
+### Docker Compose (Ollama + Redis + App)
+
+```bash
+# Start all services
+docker compose up -d
+
+# Pull a model inside the Ollama container
+docker exec nexus-ollama ollama pull qwen3:8b
+
+# Dashboard: http://localhost:8765
+```
+
+This starts Ollama (GPU-accelerated), Redis (durable bus), and the NEXUS-01 web app.
+Cloud LLM keys can be set via environment variables in `.env`:
+
+```env
+GEMINI_API_KEY=your-key
+GROQ_API_KEY=your-key
+OPENAI_API_KEY=your-key
+```
+
+### API Authentication
+
+Set scoped API keys to protect the API:
+
+```bash
+# Admin key — full read/write access
+export NEXUS_API_KEY="admin:your-secret-key"
+
+# Read-only key — GET endpoints only, no mutations
+export NEXUS_READONLY_KEY="read:your-readonly-key"
+```
+
+When no keys are set, auth is disabled. Public endpoints (`/health`, `/docs`) are always accessible.
 
 ### Headless mode (API + Telegram, no terminal)
 

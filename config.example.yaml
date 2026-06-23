@@ -40,6 +40,11 @@ enabled_channels:
 # teams_app_id: ""
 # teams_app_password: ""
 
+# --- API Authentication ---
+# NEXUS_API_KEY: "admin:your-secret-key"      # Admin key — full access
+# NEXUS_READONLY_KEY: "read:your-ro-key"     # Read-only key — GET only, no mutations
+# When no keys are set, auth is disabled (open access)
+
 # --- Cloud LLM fallback (optional) ---
 # GEMINI_API_KEY, GROQ_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY
 
