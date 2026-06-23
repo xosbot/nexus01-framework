@@ -17,7 +17,10 @@ from gateway.types import ChannelKind, InboundMessage
 
 logger = logging.getLogger(__name__)
 WEB_ROOT = Path(__file__).parent.parent / "web" / "os"
-ALLOWED_ORIGINS = os.getenv("NEXUS_ALLOWED_ORIGINS", "https://navos.space").split(",")
+ALLOWED_ORIGINS = os.getenv(
+    "NEXUS_ALLOWED_ORIGINS",
+    "https://navos.space,https://navos.online,http://localhost:8765",
+).split(",")
 
 
 class ChatRequest(BaseModel):
