@@ -31,6 +31,35 @@ logger = logging.getLogger(__name__)
 
 _DEBOUNCE_SECONDS = 30.0
 
+# Control chars: C0 (\x00-\x1f) except whitespace \t\n\r, plus C1 (\x80-\x9f).
+# These can be smuggled into a quote by a hostile or buggy LLM and break the
+# admin UI (or smuggle ANSI escape sequences into a terminal viewer).
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+# ANSI CSI escape: ESC [ ... letter (parameter range 0x30-0x3f, intermediate
+# 0x20-0x2f, final 0x40-0x7e). This regex matches the common form.
+_ANSI_CSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def _sanitize_source_quote(raw: str) -> str:
+    """Strip control chars + ANSI escapes, normalize whitespace, cap length.
+
+    Defense in depth: source_quote is stored verbatim from the LLM output.
+    A prompt-injection scenario or a buggy LLM could embed C0/C1 control
+    chars, terminal escape sequences, or other invisible text. We strip
+    those before storage so the admin UI and audit log render cleanly.
+
+    Preserves \n, \r, \t (legitimate whitespace). Strips everything else
+    in C0/C1, plus full ANSI CSI sequences (ESC [ ... letter).
+    """
+    if not raw:
+        return ""
+    cleaned = _ANSI_CSI_RE.sub("", raw)
+    cleaned = _CONTROL_CHARS_RE.sub("", cleaned)
+    # Collapse runs of spaces (NOT tabs — tabs are meaningful in a quote)
+    cleaned = re.sub(r" {2,}", " ", cleaned)
+    return cleaned.strip()[:SOURCE_QUOTE_MAX_CHARS]
+
 _EXTRACTION_PROMPT = """You are a memory curator for an AI assistant. Given the
 following conversation turn, extract 0-3 facts that would be useful to remember
 about the user in future conversations.
@@ -178,7 +207,7 @@ class MemoryExtractor:
             if not content:
                 return None
             mtype = str(fact.get("type", "")).strip()
-            quote = str(fact.get("source_quote", ""))[:SOURCE_QUOTE_MAX_CHARS]
+            quote = _sanitize_source_quote(str(fact.get("source_quote", "")))
             confidence = float(fact.get("confidence", 0))
             importance = float(fact.get("importance", 0.5))
             durability = float(fact.get("durability", 0.5))

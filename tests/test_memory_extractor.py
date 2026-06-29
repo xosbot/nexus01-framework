@@ -247,3 +247,55 @@ async def test_extract_clamps_confidence_to_valid_range(brain: SecondBrain) -> N
     ex = MemoryExtractor(llm, brain)
     result = await ex.extract_from_turn("x", "x", session_id="s1")
     assert result[0]["confidence"] == 1.0
+
+
+# ── Source-quote sanitization ───────────────────────────────────────────
+
+
+async def test_extract_strips_control_chars_from_source_quote(brain: SecondBrain) -> None:
+    """C0/C1 control chars in source_quote must be stripped before storage."""
+    from core.memory_extractor import _sanitize_source_quote
+    dirty = "I work at \x00Acme\x07Corp\x1b[31m remotely"
+    clean = _sanitize_source_quote(dirty)
+    assert "\x00" not in clean
+    assert "\x07" not in clean
+    assert "\x1b" not in clean  # ESC — terminal escape sequence starter
+    assert "AcmeCorp" in clean  # the printable content survives
+
+
+async def test_extract_preserves_newlines_tabs_in_quote(brain: SecondBrain) -> None:
+    """\\n, \\r, \\t are whitespace and must survive sanitization."""
+    from core.memory_extractor import _sanitize_source_quote
+    text = "line one\nline two\tindented\r\nline three"
+    clean = _sanitize_source_quote(text)
+    assert "\n" in clean
+    assert "\t" in clean
+
+
+async def test_extract_collapses_quote_whitespace_runs(brain: SecondBrain) -> None:
+    """Runs of spaces in a quote collapse; tabs are preserved (meaningful)."""
+    from core.memory_extractor import _sanitize_source_quote
+    text = "hello    world\t\tfoo"
+    clean = _sanitize_source_quote(text)
+    assert "    " not in clean  # runs of spaces collapsed
+    assert "hello world" in clean  # spaces normalized
+    assert "\t\t" in clean  # tabs preserved
+
+
+async def test_extract_end_to_end_sanitizes_quote(brain: SecondBrain) -> None:
+    """Full pipeline: LLM returns a fact with dirty quote → stored clean."""
+    fact = _valid_fact("escape user")
+    fact["source_quote"] = "user said \x1b[31mred\x1b[0m text\x00here"
+    llm = MockLLM(json.dumps([fact]))
+    ex = MemoryExtractor(llm, brain)
+    result = await ex.extract_from_turn("x", "x", session_id="s1")
+    assert result
+    stored_quote = result[0]["source_quote"]
+    assert "\x1b" not in stored_quote
+    assert "\x00" not in stored_quote
+    # ANSI escapes (including the visible bracket params) are stripped
+    assert "[31m" not in stored_quote
+    assert "[0m" not in stored_quote
+    # The printable content survives
+    assert "user said red text" in stored_quote
+    assert "here" in stored_quote
