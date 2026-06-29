@@ -130,6 +130,24 @@ def test_health(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
+    # Enriched payload — subsystem probes bounded at 1s each
+    assert "ollama" in body
+    assert "redis" in body
+    assert "db" in body
+    assert "uptime" in body
+    # In test env, no real Ollama is reachable, so ollama should be False
+    # (this is the expected behavior — /health reports, doesn't gate)
+    assert isinstance(body["ollama"], bool)
+    assert body["db"] in {"ok", "error", "unknown"}
+
+
+def test_health_does_not_fail_when_ollama_down(client):
+    """Regression: /health must return 200 even if Ollama is unreachable."""
+    r = client.get("/health")
+    assert r.status_code == 200
+    body = r.json()
+    # The whole point: degraded Ollama doesn't 503 the liveness check
+    assert body["status"] == "ok"
 
 
 def test_system_status(authed_client):

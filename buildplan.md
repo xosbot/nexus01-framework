@@ -786,6 +786,28 @@ Extend `core/slash.py`:
 - **Browser extension** — the web dashboard is the canonical surface
 - **Public API for third parties** — team-only auth for now
 
+## 8a. Known gaps (called out 2026-06-29 after Phase 1 audit)
+
+These are limitations in the shipped Phase 1 that we explicitly defer — they
+are not bugs, but they are worth knowing about so the system isn't oversold:
+
+- **`memory_recall` is FTS5 keyword-only.** Semantic recall via ChromaDB
+  embeddings is deferred to Phase 2 (when there are enough memories per user
+  for embeddings to add value). Don't promise "IVA will find semantically
+  similar memories" yet — it does literal token match.
+- **No headless-browser E2E in CI.** The "End-to-end test passes in headless
+  browser" success criterion is satisfied manually against `https://navos.space`
+  but is NOT yet a CI check. The `tests/test_browser.py` suite covers the
+  Playwright wrapper itself (graceful degradation when Playwright is missing)
+  but does not actually drive a real browser against a running server.
+- **`memory_recall` is per-process.** There is no shared recall service; each
+  NEXUS-01 process has its own SQLite memory file. Multi-process deployments
+  would need a shared recall layer (also Phase 2).
+- **Audit retention is opportunistic.** `prune_audit()` runs from
+  `run_decay()` (which runs from the dreaming subagent in Phase 3). Until
+  the dreamer exists, audit rows accumulate indefinitely. Workaround: call
+  `SecondBrain.prune_audit()` manually, or schedule it.
+
 ---
 
 ## 9. Risks and mitigations
@@ -815,6 +837,11 @@ Extend `core/slash.py`:
 - [ ] Cold-mode approval flow works for `exec` in the chat
 - [ ] End-to-end test passes in headless browser
 - [ ] Committed + pushed to `xosbot/nexus01-framework`
+
+**Phase 1 — Hardening (added 2026-06-29):** the 8 Phase 1 slices above ship
+the feature. Five follow-up hardening commits land the test infra,
+streaming-cancellation coverage, audit retention, source-quote sanitization,
+and an enriched `/health` endpoint. See git log for the full commit list.
 
 ### Phase 2 done when
 - [ ] Two test users can log in and see isolated sessions/memory

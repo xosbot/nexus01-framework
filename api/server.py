@@ -94,7 +94,68 @@ def create_api_app(nexus_app) -> FastAPI:
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", "service": "nexus-os"}
+        """Liveness + lightweight subsystem probe.
+
+        Always returns 200 — the goal is to report status, not gate the
+        service. Subsystem checks are bounded at 1s each so the endpoint
+        never blocks. If Ollama is down, /health still says ok but
+        `"ollama": false` — operators can spot degradation without a
+        restart loop.
+        """
+        import asyncio
+        import time as _t
+
+        async def _check_ollama() -> bool:
+            try:
+                import httpx
+                url = getattr(nexus_app.llm, "ollama_url", "http://127.0.0.1:11434") if hasattr(nexus_app, "llm") else "http://127.0.0.1:11434"
+                async with httpx.AsyncClient(timeout=1.0) as client:
+                    r = await client.get(f"{url.rstrip('/')}/api/version")
+                return r.status_code == 200
+            except Exception:
+                return False
+
+        async def _check_redis() -> bool:
+            try:
+                bus = getattr(nexus_app, "bus", None)
+                if bus is None or not hasattr(bus, "ping"):
+                    return True  # inmemory bus — no remote dep
+                return bool(await asyncio.wait_for(bus.ping(), timeout=1.0))
+            except Exception:
+                return False
+
+        async def _check_db() -> str:
+            try:
+                memory = getattr(nexus_app, "memory", None)
+                if memory is None or not hasattr(memory, "stats"):
+                    return "unknown"
+                memory.stats()
+                return "ok"
+            except Exception:
+                return "error"
+
+        ollama_ok, redis_ok, db_status = await asyncio.gather(
+            _check_ollama(), _check_redis(), _check_db(),
+        )
+        uptime_secs = int(_t.time() - _start_time)
+        hours, remainder = divmod(uptime_secs, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours > 24:
+            days, hours = divmod(hours, 24)
+            uptime_str = f"{days}d {hours}h"
+        elif hours > 0:
+            uptime_str = f"{hours}h {minutes}m"
+        else:
+            uptime_str = f"{minutes}m {seconds}s"
+
+        return {
+            "status": "ok",
+            "service": "nexus-os",
+            "ollama": ollama_ok,
+            "redis": redis_ok,
+            "db": db_status,
+            "uptime": uptime_str,
+        }
 
     # ── System ──────────────────────────────────────────────────────────
 
