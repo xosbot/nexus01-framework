@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
-from integrations.social.base import SocialAdapter, SocialPost, PostResult, AnalyticsData
+from integrations.social.base import SocialAdapter, SocialPost, AnalyticsData
 from integrations.social.calendar import ContentCalendar, CalendarEntry
 
 logger = logging.getLogger(__name__)

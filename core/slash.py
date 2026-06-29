@@ -186,7 +186,7 @@ def _memory_summary(ctx: dict) -> CommandResult:
     by_type = stats.get("by_type", {})
     type_str = ", ".join(f"{n} {t}" for t, n in sorted(by_type.items(), key=lambda x: -x[1])) or "none"
     lines = [
-        f"**Memory summary**",
+        "**Memory summary**",
         f"  active: {stats.get('total', 0) - stats.get('pending', 0)}",
         f"  pending: {stats.get('pending', 0)}",
         f"  by type: {type_str}",
@@ -210,8 +210,8 @@ def _memory_list(args: list[str], ctx: dict) -> CommandResult:
     except Exception as exc:
         return CommandResult(False, f"List failed: {exc}", title="Memory")
     if not rows:
-        return CommandResult(True, f"No active memories" + (f" of type `{type_filter}`" if type_filter else ""), title="Memory")
-    lines = [f"**Active memories" + (f" of type `{type_filter}`" if type_filter else "") + f" ({len(rows)})**", ""]
+        return CommandResult(True, "No active memories" + (f" of type `{type_filter}`" if type_filter else ""), title="Memory")
+    lines = ["**Active memories" + (f" of type `{type_filter}`" if type_filter else "") + f" ({len(rows)})**", ""]
     for m in rows:
         lines.append(f"  • `{m['id']}` [{m['type']}, conf {m['confidence']:.2f}] {m['content'][:80]}")
     return CommandResult(True, "\n".join(lines), title="Memory")

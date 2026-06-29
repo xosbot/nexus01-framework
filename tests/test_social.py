@@ -3,10 +3,9 @@
 import pytest
 import tempfile
 import os
-from datetime import datetime, timezone
 
 from integrations.social.base import SocialPost, PostResult, AnalyticsData
-from integrations.social.calendar import ContentCalendar, CalendarEntry
+from integrations.social.calendar import ContentCalendar
 from integrations.social.manager import SocialMediaManager
 
 
