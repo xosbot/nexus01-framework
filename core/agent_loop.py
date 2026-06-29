@@ -34,7 +34,10 @@ class AgentLoop:
         self._max_iter = max_iterations
         self._llm_breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0, name="llm")
 
-    async def run(self, intent: str, session_id: str = "", agent: str = "orchestrator") -> str:
+    async def run(
+        self, intent: str, session_id: str = "", agent: str = "orchestrator",
+        user_id: str = "user_legacy",
+    ) -> str:
         routing_cfg = getattr(self._router, "_routing", {})
         tier = classify_tier(intent, routing_cfg)
         if tier == "cheap":
@@ -105,6 +108,7 @@ class AgentLoop:
         *,
         session_id: str = "",
         agent: str = "chat_stream",
+        user_id: str = "user_legacy",
         max_iterations: int = _STREAM_MAX_ITERATIONS,
     ) -> AsyncGenerator[dict, None]:
         """Streaming agent loop — yields progress events for /api/chat/stream.
@@ -141,10 +145,10 @@ class AgentLoop:
                 if tools_schema:
                     return await self._router.complete_with_tools(
                         messages, tools=tools_schema,
-                        session_id=session_id, agent=agent,
+                        session_id=session_id, agent=agent, user_id=user_id,
                     )
                 return await self._router.complete_messages(
-                    messages, session_id=session_id, agent=agent,
+                    messages, session_id=session_id, agent=agent, user_id=user_id,
                 )
 
             try:

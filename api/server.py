@@ -217,6 +217,83 @@ def create_api_app(nexus_app) -> FastAPI:
     async def costs(days: int = 30):
         return nexus_app.cost_tracker.summary(days)
 
+    # ── Cost dashboard (Phase 2.6) ──────────────────────────────────
+
+    @app.get("/api/costs/dashboard")
+    async def costs_dashboard(
+        request: Request, days: int = 30,
+        include_all: bool = False, user_id_filter: str | None = None,
+    ):
+        """Full dashboard payload for the Costs admin tab.
+
+        - include_all=true: per-user breakdown + global totals (admins only)
+        - user_id_filter: scope to a specific user (admins only)
+        - default: scope to the requesting user
+        """
+        dashboard = getattr(nexus_app, "cost_dashboard", None)
+        if dashboard is None:
+            return {"error": "cost dashboard not enabled", "totals": {"requests": 0, "tokens": 0, "cost_usd": 0}}
+        # Default: scope to the caller
+        auth = getattr(request.state, "auth", None)
+        caller_user_id = auth.user_id if auth is not None else "user_legacy"
+        caller_role = auth.role if auth is not None else "admin"
+        # Admin override
+        if include_all and caller_role != "admin":
+            include_all = False
+        if user_id_filter and caller_role != "admin":
+            user_id_filter = None
+        # Decide the filter: explicit user_id_filter wins, else caller
+        target_user = user_id_filter or caller_user_id
+        return dashboard.build(
+            days=days, user_id=target_user, include_all=include_all,
+        )
+
+    @app.get("/api/costs/budget")
+    async def costs_budget(request: Request, month: str | None = None):
+        """Return this month's spend so far.
+
+        `month` is YYYY-MM, defaults to current month.
+        Reads the per-user budget from settings (key: costs.monthly_budget_usd)
+        if set; otherwise returns spend with no limit.
+        """
+        from datetime import datetime as _dt
+        dashboard = getattr(nexus_app, "cost_dashboard", None)
+        if dashboard is None:
+            return {"spend_usd": 0.0, "budget_usd": None, "month": month or _dt.now().strftime("%Y-%m")}
+        if not month:
+            month = _dt.now().strftime("%Y-%m")
+        try:
+            year, mon = month.split("-")
+            days = _dt(int(year), int(mon), 1)
+            next_month = _dt(int(year), int(mon) + 1, 1) if int(mon) < 12 else _dt(int(year) + 1, 1, 1)
+            days_in_window = (next_month - days).days
+            # Use the dashboard for a multi-day roll-up
+            auth = getattr(request.state, "auth", None)
+            caller_user_id = auth.user_id if auth is not None else "user_legacy"
+            caller_role = auth.role if auth is not None else "admin"
+            payload = dashboard.build(
+                days=days_in_window, user_id=caller_user_id, include_all=(caller_role == "admin"),
+            )
+        except (ValueError, IndexError):
+            raise HTTPException(400, "month must be YYYY-MM")
+        spend = payload["totals"]["cost_usd"]
+        # Look up budget from settings (admin-set per-deployment)
+        budget = None
+        try:
+            budget_str = memory._conn.execute(
+                "SELECT value FROM settings WHERE key='costs.monthly_budget_usd'"
+            ).fetchone()
+            if budget_str:
+                budget = float(budget_str[0])
+        except Exception:
+            pass
+        return {
+            "month": month,
+            "spend_usd": round(spend, 4),
+            "budget_usd": budget,
+            "over_budget": budget is not None and spend > budget,
+        }
+
     @app.get("/api/tools/status")
     async def tools_status():
         from tools.availability import get_tool_availability
@@ -573,6 +650,7 @@ def create_api_app(nexus_app) -> FastAPI:
                     agent_loop_done = False
                     async for event in chat_agent_loop.stream(
                         messages, session_id=session_id, agent="chat_stream",
+                        user_id=user_id,
                     ):
                         # Skip internal events not meant for SSE
                         if event["type"] in ("tool_blocked",):
@@ -588,7 +666,9 @@ def create_api_app(nexus_app) -> FastAPI:
                             full_text = event.get("content", full_text)
                 else:
                     # Legacy direct-LLM path
-                    async for token in llm.stream(messages, session_id=session_id, agent="chat_stream"):
+                    async for token in llm.stream(
+                        messages, session_id=session_id, agent="chat_stream", user_id=user_id,
+                    ):
                         if not token:
                             continue
                         full_text += token

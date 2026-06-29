@@ -1457,3 +1457,50 @@ input, textarea, select { font-family: inherit; }
 .chip-reject { background: #ef4444; color: #fff; }
 .memory-proposed-chip.accepted { opacity: 0.5; }
 .memory-proposed-chip.rejected { opacity: 0.4; text-decoration: line-through; }
+
+/* ── Costs dashboard (Phase 2.6) ────────────────────────────────── */
+.cost-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 80px;
+  padding: 4px 0;
+  overflow-x: auto;
+}
+.cost-bar-wrap {
+  flex: 1 1 0;
+  min-width: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+.cost-bar {
+  width: 100%;
+  background: var(--accent, #6366f1);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: opacity 150ms;
+}
+.cost-bar:hover { opacity: 0.7; }
+.cost-bar-label {
+  font-size: 9px;
+  color: var(--fg-muted);
+  font-family: var(--mono);
+  margin-top: 4px;
+  white-space: nowrap;
+  transform: rotate(-45deg);
+  transform-origin: top right;
+}
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-family: var(--mono);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--fg-dim);
+  margin-right: 4px;
+}

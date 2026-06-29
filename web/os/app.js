@@ -177,7 +177,7 @@ function switchAdminTab(tab) {
   const titles = {
     overview: 'Overview', memory: 'Memory', projects: 'Projects', rag: 'Knowledge',
     agents: 'Agents', approvals: 'Approvals', events: 'Event log',
-    soul: 'Soul', settings: 'Settings',
+    soul: 'Soul', costs: 'Costs', settings: 'Settings',
   };
   const t = $('#admin-title');
   if (t) t.textContent = titles[tab] || tab;
@@ -1098,7 +1098,7 @@ window.AppSwitchTab = function (tab) {
   const titles = {
     overview: 'Overview', memory: 'Memory', projects: 'Projects', rag: 'Knowledge',
     agents: 'Agents', approvals: 'Approvals', events: 'Event log',
-    soul: 'Soul', settings: 'Settings',
+    soul: 'Soul', costs: 'Costs', settings: 'Settings',
   };
   const t = $('#admin-title');
   if (t) t.textContent = titles[tab] || tab;

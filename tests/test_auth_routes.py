@@ -34,7 +34,18 @@ def _build_nexus_with_real_memory() -> SimpleNamespace:
 @pytest.fixture
 def client():
     nexus = _build_nexus_with_real_memory()
+    # Phase 2.6: attach cost dashboard so endpoint + tests can reach it
+    from core.cost_dashboard import CostDashboard
+    from core.cost_tracker import CostTracker
+    import tempfile
+    import pathlib
+    cost_db = pathlib.Path(tempfile.mkdtemp()) / "cost.db"
+    tracker = CostTracker(db_path=cost_db)
+    nexus.cost_dashboard = CostDashboard(tracker)
     app = create_api_app(nexus)
+    # Expose key handles for tests via app.state (read by _get_*_for_client)
+    app.state.cost_dashboard = nexus.cost_dashboard
+    app.state.memory = nexus.memory
     return TestClient(app)
 
 
@@ -300,3 +311,196 @@ def test_invalid_nxk_key_401(client):
     _register_and_get_token(client)
     r = client.get("/api/auth/me", headers={"X-API-Key": "nxk_fake_garbage"})
     assert r.status_code == 401
+
+
+# ── Cost dashboard endpoints ──────────────────────────────────────
+
+
+def test_costs_dashboard_returns_totals_and_daily(client):
+    # Register a user, capture their id
+    reg = client.post("/api/auth/register", json={
+        "email": "alice@example.com", "name": "Alice", "password": "secret-12",
+    })
+    token = reg.json()["token"]
+    user_id = reg.json()["user"]["id"]
+    cd = _get_dashboard_for_client(client)
+    tracker = cd._tracker
+    from core.cost_tracker import UsageRecord
+    tracker.record(UsageRecord(
+        provider="ollama", model="qwen3:8b", tier="cheap",
+        prompt_tokens=100, completion_tokens=50, cost_usd=0.001,
+        session_id="s1", agent="chat_stream", user_id=user_id,
+    ))
+    r = client.get(
+        "/api/costs/dashboard?days=30",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "totals" in body
+    assert body["totals"]["requests"] >= 1
+    assert "daily_series" in body
+    assert len(body["daily_series"]) == 30
+
+
+def test_costs_dashboard_scoped_to_user(client):
+    """Non-admin user sees only their own rows in the totals."""
+    t1 = _register_and_get_token(client, "alice@example.com")
+    t2 = _register_and_get_token(client, "bob@example.com")
+    cd = _get_dashboard_for_client(client)
+    tracker = cd._tracker
+    from core.cost_tracker import UsageRecord
+    # Record under the legacy user id — the dashboard filters to the JWT user
+    tracker.record(UsageRecord(
+        provider="ollama", model="m", tier="cheap",
+        prompt_tokens=10, completion_tokens=5, cost_usd=0.5,
+        user_id="user_legacy",
+    ))
+    tracker.record(UsageRecord(
+        provider="ollama", model="m", tier="cheap",
+        prompt_tokens=10, completion_tokens=5, cost_usd=2.0,
+        user_id="user_legacy",
+    ))
+    # Both alice and bob should see 0 because rows are under legacy
+    alice = client.get("/api/costs/dashboard?days=30", headers={"Authorization": f"Bearer {t1}"})
+    assert alice.json()["totals"]["requests"] == 0
+    # Now record under alice and bob's actual ids — get them from the Memory
+    memory = _get_memory_for_client(client)
+    alice_user = memory.users.get_by_email("alice@example.com")
+    bob_user = memory.users.get_by_email("bob@example.com")
+    tracker.record(UsageRecord(
+        provider="ollama", model="m", tier="cheap",
+        prompt_tokens=10, completion_tokens=5, cost_usd=0.5,
+        user_id=alice_user["id"],
+    ))
+    tracker.record(UsageRecord(
+        provider="ollama", model="m", tier="cheap",
+        prompt_tokens=10, completion_tokens=5, cost_usd=2.0,
+        user_id=bob_user["id"],
+    ))
+    alice = client.get("/api/costs/dashboard?days=30", headers={"Authorization": f"Bearer {t1}"})
+    bob = client.get("/api/costs/dashboard?days=30", headers={"Authorization": f"Bearer {t2}"})
+    assert alice.json()["totals"]["cost_usd"] == 0.5
+    assert bob.json()["totals"]["cost_usd"] == 2.0
+
+
+def test_costs_dashboard_admin_sees_all(client):
+    """Admin can pass include_all=true to get the per-user breakdown."""
+    reg = client.post("/api/auth/register", json={
+        "email": "admin@example.com", "name": "Admin", "password": "secret-12",
+    })
+    token = reg.json()["token"]
+    user_id = reg.json()["user"]["id"]
+    client.post("/api/auth/register", json={
+        "email": "second@example.com", "name": "Second", "password": "secret-12",
+    })
+    cd = _get_dashboard_for_client(client)
+    tracker = cd._tracker
+    from core.cost_tracker import UsageRecord
+    tracker.record(UsageRecord(
+        provider="ollama", model="m", tier="cheap",
+        prompt_tokens=10, completion_tokens=5, cost_usd=1.0,
+        user_id=user_id,
+    ))
+    tracker.record(UsageRecord(
+        provider="ollama", model="m", tier="cheap",
+        prompt_tokens=10, completion_tokens=5, cost_usd=3.0,
+        user_id="user_legacy",
+    ))
+    r = client.get(
+        "/api/costs/dashboard?days=30&include_all=true",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    # by_user only includes the rows that match the admin's view (their own + legacy)
+    by_user = {u["user_id"]: u["cost_usd"] for u in body["by_user"]}
+    # Admin sees their own cost + legacy
+    assert by_user.get(user_id) == 1.0
+    assert by_user.get("user_legacy") == 3.0
+
+
+def test_costs_dashboard_non_admin_cannot_include_all(client):
+    """A regular user passing include_all=true should be ignored."""
+    # First user (admin) creates the API. Then we register a second.
+    _register_and_get_token(client, "admin@example.com")
+    client.post("/api/auth/register", json={
+        "email": "user@example.com", "name": "U", "password": "secret-12",
+    })
+    user_token = client.post("/api/auth/login", json={
+        "email": "user@example.com", "password": "secret-12",
+    }).json()["token"]
+    r = client.get(
+        "/api/costs/dashboard?days=30&include_all=true",
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert r.status_code == 200
+    # by_user should be empty for a non-admin even though include_all was requested
+    assert r.json()["by_user"] == []
+
+
+def test_costs_budget_returns_spend(client):
+    reg = client.post("/api/auth/register", json={
+        "email": "alice@example.com", "name": "Alice", "password": "secret-12",
+    })
+    token = reg.json()["token"]
+    user_id = reg.json()["user"]["id"]
+    cd = _get_dashboard_for_client(client)
+    tracker = cd._tracker
+    from core.cost_tracker import UsageRecord
+    tracker.record(UsageRecord(
+        provider="ollama", model="m", tier="cheap",
+        prompt_tokens=100, completion_tokens=50, cost_usd=0.5,
+        user_id=user_id,
+    ))
+    r = client.get("/api/costs/budget", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["spend_usd"] == 0.5
+    # No budget configured → budget_usd is None
+    assert body["budget_usd"] is None
+    assert body["over_budget"] is False
+
+
+def test_costs_budget_with_limit_marks_over_budget(client):
+    """If a budget is set in settings and spend exceeds it, over_budget=true."""
+    reg = client.post("/api/auth/register", json={
+        "email": "alice@example.com", "name": "Alice", "password": "secret-12",
+    })
+    token = reg.json()["token"]
+    user_id = reg.json()["user"]["id"]
+    memory = _get_memory_for_client(client)
+    # Create the settings table (not in the test fixture by default)
+    memory._conn.execute(
+        """CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL
+        )"""
+    )
+    memory._conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)",
+        ("costs.monthly_budget_usd", "0.10", "2026-06-29T00:00:00"),
+    )
+    memory._conn.commit()
+    cd = _get_dashboard_for_client(client)
+    from core.cost_tracker import UsageRecord
+    cd._tracker.record(UsageRecord(
+        provider="ollama", model="m", tier="cheap",
+        prompt_tokens=10, completion_tokens=5, cost_usd=0.5,
+        user_id=user_id,
+    ))
+    r = client.get("/api/costs/budget", headers={"Authorization": f"Bearer {token}"})
+    body = r.json()
+    assert body["budget_usd"] == 0.1
+    assert body["over_budget"] is True
+
+
+# ── Helpers to reach the test client's underlying Memory / CostDashboard ──
+
+
+def _get_dashboard_for_client(client) -> object:
+    """Reach the CostDashboard instance via the FastAPI app's state."""
+    return client.app.state.cost_dashboard
+
+
+def _get_memory_for_client(client) -> object:
+    return client.app.state.memory

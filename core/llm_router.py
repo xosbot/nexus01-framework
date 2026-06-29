@@ -358,19 +358,20 @@ class LLMRouter:
         return resp.text
 
     async def complete_messages(
-        self, messages: list[dict], tier: str | None = None, session_id: str = "", agent: str = ""
+        self, messages: list[dict], tier: str | None = None, session_id: str = "",
+        agent: str = "", user_id: str = "user_legacy",
     ) -> LLMResponse:
         if not messages or messages[0].get("role") != "system":
             messages = [{"role": "system", "content": self._system_prompt}, *messages]
         prompt = messages[-1].get("content", "")
         resolved = tier or classify_tier(prompt, self._routing) or self._default_tier
         resp = await self._dispatch(messages, resolved)
-        self._record_usage(resp, session_id, agent)
+        self._record_usage(resp, session_id, agent, user_id)
         return resp
 
     async def complete_with_tools(
         self, messages: list[dict], tools: list[dict], tier: str | None = None,
-        session_id: str = "", agent: str = "",
+        session_id: str = "", agent: str = "", user_id: str = "user_legacy",
     ) -> LLMResponse:
         if not messages or messages[0].get("role") != "system":
             messages = [{"role": "system", "content": self._system_prompt}, *messages]
@@ -385,7 +386,7 @@ class LLMRouter:
                 try:
                     resp = await provider.complete_with_tools(messages, tools)
                     resp.tier_used = t
-                    self._record_usage(resp, session_id, agent)
+                    self._record_usage(resp, session_id, agent, user_id)
                     return resp
                 except Exception as exc:
                     logger.warning("%s tool-call failed: %s", provider.name, exc)
@@ -393,7 +394,7 @@ class LLMRouter:
 
     async def stream(
         self, messages: list[dict], tier: str | None = None,
-        session_id: str = "", agent: str = "",
+        session_id: str = "", agent: str = "", user_id: str = "user_legacy",
     ) -> AsyncGenerator[str, None]:
         if not messages or messages[0].get("role") != "system":
             messages = [{"role": "system", "content": self._system_prompt}, *messages]
@@ -427,6 +428,7 @@ class LLMRouter:
                             cost_usd=cost,
                             session_id=session_id,
                             agent=agent,
+                            user_id=user_id or "user_legacy",
                         ))
                     return
                 except Exception as exc:
@@ -434,7 +436,7 @@ class LLMRouter:
         fallback = await self.chat(messages, tier=resolved)
         yield fallback
 
-    def _record_usage(self, resp: LLMResponse, session_id: str, agent: str) -> None:
+    def _record_usage(self, resp: LLMResponse, session_id: str, agent: str, user_id: str = "user_legacy") -> None:
         tokens = resp.prompt_tokens + resp.completion_tokens
         self._total_tokens += tokens
         provider = self._provider_map.get(resp.provider_used)
@@ -453,6 +455,7 @@ class LLMRouter:
                 cost_usd=cost,
                 session_id=session_id,
                 agent=agent,
+                user_id=user_id or "user_legacy",
             ))
 
     async def _dispatch(self, messages: list[dict], tier: str) -> LLMResponse:

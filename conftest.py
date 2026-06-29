@@ -13,6 +13,8 @@ import os
 import pathlib
 import sys
 
+import pytest
+
 # Repo root = parent of this conftest.py
 _ROOT = pathlib.Path(__file__).resolve().parent
 if str(_ROOT) not in sys.path:
@@ -25,3 +27,30 @@ os.environ.setdefault("NEXUS_BUS_BACKEND", "inmemory")
 # permissive when both are None — which is what the test suite relies on).
 os.environ.pop("NEXUS_API_KEY", None)
 os.environ.pop("NEXUS_READONLY_KEY", None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Clear the global in-memory rate limiter between tests.
+
+    Without this, the limiter (30 req / 60s per IP) accumulates across the
+    whole test run and eventually starts returning 429 in the last few tests
+    that use the FastAPI TestClient (which always uses the same client IP).
+    """
+    try:
+        from api.auth import _rate_limiter
+        _rate_limiter._requests.clear()
+    except Exception:
+        pass
+    try:
+        from api.auth import ws_auth
+        ws_auth._ws_rate_limiter._requests.clear()
+    except Exception:
+        pass
+    yield
+    # Also clear after, so back-to-back runs in the same process start fresh
+    try:
+        from api.auth import _rate_limiter
+        _rate_limiter._requests.clear()
+    except Exception:
+        pass

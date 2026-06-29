@@ -377,6 +377,110 @@
     `;
   }
 
+  /* ── Costs (Phase 2.6) ───────────────────────────────── */
+
+  async function costs() {
+    const days = parseInt($('#costs-days')?.value || '30', 10);
+    const [data, budget] = await Promise.all([
+      api(`/api/costs/dashboard?days=${days}`).catch(() => ({})),
+      api('/api/costs/budget').catch(() => ({})),
+    ]);
+    const totals = data.totals || { requests: 0, tokens: 0, cost_usd: 0 };
+    const series = data.daily_series || [];
+    const byProv = data.by_provider || [];
+    const byAgent = data.by_agent || [];
+    const byUser = data.by_user || [];
+    const recent = data.recent || [];
+    const maxCost = series.reduce((m, d) => Math.max(m, d.cost_usd), 0.01);
+    return `
+      <div class="kv-row" style="margin-bottom:16px;">
+        <div class="kv-label">Window</div>
+        <div class="kv-value" style="display:flex;gap:8px;align-items:center;">
+          <select id="costs-days" class="form-input" style="width:auto;">
+            <option value="7"  ${days===7?'selected':''}>Last 7 days</option>
+            <option value="30" ${days===30?'selected':''}>Last 30 days</option>
+            <option value="90" ${days===90?'selected':''}>Last 90 days</option>
+          </select>
+          <button id="costs-refresh" class="btn btn-sm">Refresh</button>
+        </div>
+      </div>
+
+      <div class="section-title">Cost overview <span style="color:var(--fg-muted);font-size:12px;">last ${days} days</span></div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total spend</div><div class="stat-value accent">$${Number(totals.cost_usd).toFixed(4)}</div></div>
+        <div class="stat-card"><div class="stat-label">Requests</div><div class="stat-value">${esc(totals.requests)}</div></div>
+        <div class="stat-card"><div class="stat-label">Tokens</div><div class="stat-value">${esc(totals.tokens.toLocaleString())}</div></div>
+        <div class="stat-card"><div class="stat-label">Avg $/req</div><div class="stat-value">$${totals.requests ? (totals.cost_usd / totals.requests).toFixed(5) : '0'}</div></div>
+      </div>
+
+      <div class="section-title">Daily spend</div>
+      <div class="cost-chart" id="cost-chart">
+        ${series.map(d => {
+          const h = Math.max(2, Math.round((d.cost_usd / maxCost) * 60));
+          return `<div class="cost-bar-wrap" title="${d.date}: $${d.cost_usd.toFixed(4)} (${d.requests} req)">
+            <div class="cost-bar" style="height:${h}px"></div>
+            <div class="cost-bar-label">${d.date.slice(5)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="section-title">By provider</div>
+      <div class="kv-list">
+        ${byProv.length ? byProv.map(p => `
+          <div class="kv-row">
+            <div class="kv-label">${esc(p.provider)}</div>
+            <div class="kv-value">$${Number(p.cost_usd).toFixed(4)} <span style="color:var(--fg-muted);">(${p.requests} req · ${p.tokens.toLocaleString()} tok)</span></div>
+          </div>
+        `).join('') : '<div class="empty-hint">No usage yet</div>'}
+      </div>
+
+      <div class="section-title">By agent</div>
+      <div class="kv-list">
+        ${byAgent.length ? byAgent.map(a => `
+          <div class="kv-row">
+            <div class="kv-label">${esc(a.agent)}</div>
+            <div class="kv-value">$${Number(a.cost_usd).toFixed(4)} <span style="color:var(--fg-muted);">(${a.requests} req)</span></div>
+          </div>
+        `).join('') : '<div class="empty-hint">No usage yet</div>'}
+      </div>
+
+      ${byUser.length ? `
+        <div class="section-title">By user (admin view)</div>
+        <div class="kv-list">
+          ${byUser.map(u => `
+            <div class="kv-row">
+              <div class="kv-label" style="font-family:var(--mono);font-size:11px;">${esc(u.user_id)}</div>
+              <div class="kv-value">$${Number(u.cost_usd).toFixed(4)} <span style="color:var(--fg-muted);">(${u.requests} req)</span></div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      ${budget.budget_usd != null ? `
+        <div class="section-title">Monthly budget</div>
+        <div class="kv-row">
+          <div class="kv-label">${esc(budget.month)}</div>
+          <div class="kv-value">$${Number(budget.spend_usd).toFixed(4)} / $${Number(budget.budget_usd).toFixed(2)} ${budget.over_budget ? '<span style="color:var(--err);">over budget</span>' : ''}</div>
+        </div>
+      ` : ''}
+
+      <div class="section-title">Recent requests</div>
+      <div class="kv-list">
+        ${recent.length ? recent.map(r => `
+          <div class="kv-row" style="display:block;">
+            <div style="font-size:12px;">
+              <span class="badge">${esc(r.provider)}</span>
+              <span style="color:var(--fg-muted);">${esc(r.model || '')}</span>
+              <span style="color:var(--fg-muted);">${esc(r.agent || '')}</span>
+              <span style="color:var(--fg-muted);">${esc(r.user_id || '')}</span>
+            </div>
+            <div style="color:var(--fg-dim);font-size:12px;margin-top:2px;">$${Number(r.cost_usd).toFixed(5)} · ${r.tokens} tok · ${fmtTime(r.timestamp)}</div>
+          </div>
+        `).join('') : '<div class="empty-hint">No recent requests</div>'}
+      </div>
+    `;
+  }
+
   /* ── Wire up event listeners after render ──────────────── */
 
   function bind() {
@@ -471,6 +575,18 @@
         } catch (err) { toast('Reload failed', 'error'); }
       });
     }
+
+    if (tab === 'costs') {
+      const daysEl = $('#costs-days');
+      if (daysEl) {
+        daysEl.addEventListener('change', () => {
+          if (window.AdminViews?.reload) window.AdminViews.reload('costs');
+        });
+      }
+      $('#costs-refresh')?.addEventListener('click', () => {
+        if (window.AdminViews?.reload) window.AdminViews.reload('costs');
+      });
+    }
   }
 
   /* ── Public action handlers (called from onclick) ────── */
@@ -523,7 +639,7 @@
   window.AdminActions = AdminActions;
   window.AdminViews = {
     activeTab: 'overview',
-    overview, memory, projects, rag, agents, approvals, events, soul, settings,
+    overview, memory, projects, rag, agents, approvals, events, soul, costs, settings,
     bind,
     reload(tab) {
       if (window.AppSwitchTab) window.AppSwitchTab(tab);

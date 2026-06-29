@@ -62,6 +62,8 @@ class NexusApp:
     cold_mode: Any = None
     sandbox: Any = None
     memory_extraction_enabled: bool = True
+    # Phase 2.6
+    cost_dashboard: Any = None
 
     async def shutdown(self) -> None:
         for channel in self.channels:
@@ -171,6 +173,9 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
 
     tools = _build_orchestrator_tools(rag, msg_bus)
     agent_loop = AgentLoop(llm.router, tools, memory) if cfg.use_react_loop else None
+
+    from core.cost_dashboard import CostDashboard
+    cost_dashboard = CostDashboard(cost_tracker)
 
     sandbox = None
     if cfg.executor_sandbox_enabled:
@@ -282,6 +287,7 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
         _channel_tasks=[],
         _api_server=None,
         config_manager=config_manager,
+        cost_dashboard=cost_dashboard,
     )
 
     from core.brain import IVABrain

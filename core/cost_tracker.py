@@ -14,6 +14,7 @@ class UsageRecord:
     cost_usd: float
     session_id: str = ""
     agent: str = ""
+    user_id: str = "user_legacy"
 
 
 class CostTracker:
@@ -32,20 +33,37 @@ class CostTracker:
                 cost_usd REAL DEFAULT 0,
                 session_id TEXT,
                 agent TEXT,
+                user_id TEXT NOT NULL DEFAULT 'user_legacy',
                 timestamp TEXT NOT NULL
             )
         """)
+        # Phase 2.6: idempotent migration
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(llm_usage)").fetchall()}
+        if "user_id" not in cols:
+            self._conn.execute(
+                "ALTER TABLE llm_usage ADD COLUMN user_id TEXT NOT NULL DEFAULT 'user_legacy'"
+            )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_llm_usage_user "
+            "ON llm_usage(user_id, timestamp DESC)"
+        )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_llm_usage_ts "
+            "ON llm_usage(timestamp DESC)"
+        )
         self._conn.commit()
 
     def record(self, rec: UsageRecord) -> None:
         self._conn.execute(
             """INSERT INTO llm_usage
-               (provider, model, tier, prompt_tokens, completion_tokens, cost_usd, session_id, agent, timestamp)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (provider, model, tier, prompt_tokens, completion_tokens, cost_usd,
+                session_id, agent, user_id, timestamp)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 rec.provider, rec.model, rec.tier,
                 rec.prompt_tokens, rec.completion_tokens, rec.cost_usd,
-                rec.session_id, rec.agent, datetime.now().isoformat(),
+                rec.session_id, rec.agent, rec.user_id or "user_legacy",
+                datetime.now().isoformat(),
             ),
         )
         self._conn.commit()
