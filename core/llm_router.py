@@ -102,6 +102,7 @@ class LLMProvider:
             "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
             "openai": "https://api.openai.com/v1",
             "anthropic": "https://api.anthropic.com",
+            "nim": "https://integrate.api.nvidia.com/v1",
         }.get(self.provider, "")
 
     def is_available(self) -> bool:
@@ -390,7 +391,10 @@ class LLMRouter:
                     logger.warning("%s tool-call failed: %s", provider.name, exc)
         raise RuntimeError("All providers failed for tool calling")
 
-    async def stream(self, messages: list[dict], tier: str | None = None) -> AsyncGenerator[str, None]:
+    async def stream(
+        self, messages: list[dict], tier: str | None = None,
+        session_id: str = "", agent: str = "",
+    ) -> AsyncGenerator[str, None]:
         if not messages or messages[0].get("role") != "system":
             messages = [{"role": "system", "content": self._system_prompt}, *messages]
         prompt = messages[-1].get("content", "")
@@ -403,12 +407,32 @@ class LLMRouter:
                 if not provider.is_available():
                     continue
                 try:
+                    completion_text = ""
                     async for token in provider.stream(messages):
+                        completion_text += token
                         yield token
+                    if completion_text and self._cost_tracker and provider:
+                        approx_completion_tokens = max(1, len(completion_text) // 4)
+                        approx_prompt_tokens = sum(len(m.get("content", "")) for m in messages) // 4
+                        cost = (approx_prompt_tokens + approx_completion_tokens) / 1_000_000 * provider.cost_per_1m
+                        self._total_tokens += approx_prompt_tokens + approx_completion_tokens
+                        self._total_cost += cost
+                        from core.cost_tracker import UsageRecord
+                        self._cost_tracker.record(UsageRecord(
+                            provider=provider.provider,
+                            model=provider.model,
+                            tier=t,
+                            prompt_tokens=approx_prompt_tokens,
+                            completion_tokens=approx_completion_tokens,
+                            cost_usd=cost,
+                            session_id=session_id,
+                            agent=agent,
+                        ))
                     return
                 except Exception as exc:
                     logger.warning("%s stream failed: %s", provider.name, exc)
-        yield await self.chat(messages, tier=resolved)
+        fallback = await self.chat(messages, tier=resolved)
+        yield fallback
 
     def _record_usage(self, resp: LLMResponse, session_id: str, agent: str) -> None:
         tokens = resp.prompt_tokens + resp.completion_tokens
