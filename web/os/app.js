@@ -1,387 +1,40 @@
-/* IVA OS — VS Code-style Frontend Controller */
+/* IVA OS — chat controller */
 
-const $ = (s, p = document) => p.querySelector(s);
+const $  = (s, p = document) => p.querySelector(s);
 const $$ = (s, p = document) => [...p.querySelectorAll(s)];
 
 const state = {
-  ws: null,
-  sessions: [],
   currentSession: null,
-  panel: 'overview',
-  connected: false,
-  authenticated: false,
-  chart: null,
-  wsRetries: 0,
-  wsMaxRetries: 5,
-  wsBackoff: 1000,
+  streaming: false,
+  theme: 'dark',
   pendingApproval: null,
-  termLog: [],
+  attachments: [],
+  voice: null,
+  voiceRecording: false,
+  drawerOpen: null,   // 'sessions' | 'admin' | null
+  activeAdminTab: 'overview',
+  recognition: null,
+  voiceBase: '',
+  hljsThemeDark: 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css',
+  hljsThemeLight: 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css',
+  permissionMode: 'ask',
 };
 
-const MAX_TERM_LINES = 100;
+/* ── Theme ───────────────────────────────────────────────────────── */
 
-/* ── Terminal Log ──────────────────────────── */
-
-function logTerminal(message, level = 'info') {
-  state.termLog.push({ message, level, ts: new Date() });
-  const feed = $('#term-feed');
-  if (feed) {
-    const line = document.createElement('div');
-    line.className = 'term-line';
-    const ts = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const icons = { ok: '●', warn: '◆', error: '▲', info: '■' };
-    line.innerHTML = `<span class="term-ts" style="color:var(--fg-muted);margin-right:6px;">[${ts}]</span><span style="color:${level === 'ok' ? 'var(--green)' : level === 'warn' ? 'var(--amber)' : level === 'error' ? 'var(--red)' : 'var(--accent)'};margin-right:4px;">${icons[level] || icons.info}</span> ${escapeHtml(message)}`;
-    feed.appendChild(line);
-    feed.scrollTop = feed.scrollHeight;
-    while (feed.children.length > MAX_TERM_LINES) feed.removeChild(feed.firstChild);
-  }
-  const body = $('#term-body');
-  if (body && !feed) {
-    const line = document.createElement('div');
-    line.className = 'term-line';
-    line.innerHTML = `<span class="term-prompt">nexus@os:~$</span> ${escapeHtml(message)}`;
-    body.appendChild(line);
-    body.scrollTop = body.scrollHeight;
-    while (body.children.length > MAX_TERM_LINES) body.removeChild(body.firstChild);
-  }
-  const cnt = $('#term-count');
-  if (cnt) cnt.textContent = state.termLog.length;
+function applyTheme(theme) {
+  state.theme = theme;
+  document.documentElement.dataset.theme = theme;
+  const link = document.getElementById('hljs-theme');
+  if (link) link.href = theme === 'light' ? state.hljsThemeLight : state.hljsThemeDark;
+  try { localStorage.setItem('iva_theme', theme); } catch {}
 }
 
-/* ── Init ──────────────────────────────────── */
-
-document.addEventListener('DOMContentLoaded', () => {
-  initNav();
-  initChat();
-  initSettings();
-  initRAG();
-  initMemory();
-  initProjects();
-  initSessions();
-  initTerminal();
-  initApprovals();
-  loadOverview();
-  loadSessions();
-  loadProjects();
-  loadBrain();
-  loadKnowledge();
-  loadAgents();
-  loadIntegrations();
-  loadWebhooks();
-  loadRAGStats();
-  loadApprovals();
-  connectWS();
-});
-
-/* ── Navigation (Activity Bar + Tabs + Sidebar) ── */
-
-function initNav() {
-  // Activity bar clicks
-  $$('.activity-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchPanel(btn.dataset.panel));
-  });
-
-  // Sidebar close
-  $('#side-close')?.addEventListener('click', () => {
-    $('#side')?.classList.remove('open');
-  });
-
-  // Tab clicks
-  $('#tabs')?.addEventListener('click', e => {
-    const tab = e.target.closest('.tab');
-    if (!tab) return;
-    if (e.button === 1 || e.ctrlKey || e.metaKey) {
-      // Middle-click or Ctrl+click to close
-      const panel = tab.dataset.panel;
-      if (panel && panel !== 'overview') closeTab(panel);
-      return;
-    }
-    switchPanel(tab.dataset.panel);
-  });
-
-  // Keyboard shortcuts
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') $('#side')?.classList.remove('open');
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); focusChat(); }
-    if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); toggleTerminal(); }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-    const n = parseInt(e.key);
-    if (n >= 1 && n <= 9) {
-      const panels = ['overview','chat','memory','projects','sessions','rag','agents','integrations','approvals'];
-      if (panels[n - 1]) {
-        e.preventDefault();
-        switchPanel(panels[n - 1]);
-      }
-    }
-  });
+function getTheme() {
+  try { return localStorage.getItem('iva_theme') || 'dark'; } catch { return 'dark'; }
 }
 
-function switchPanel(id) {
-  if (!id) return;
-  state.panel = id;
-
-  // Update activity bar
-  $$('.activity-btn').forEach(b => b.classList.toggle('active', b.dataset.panel === id));
-
-  // Update panels
-  $$('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${id}`));
-
-  // Update tabs
-  $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.panel === id));
-  ensureTab(id);
-
-  // Update sidebar title
-  const titles = {
-    overview: 'Overview', chat: 'Chat', memory: 'Memory',
-    projects: 'Projects', sessions: 'Sessions', rag: 'RAG',
-    agents: 'Agents', integrations: 'Integrations', approvals: 'Approvals', settings: 'Settings'
-  };
-  const titleEl = $('#side-title');
-  if (titleEl) titleEl.textContent = titles[id] || id;
-
-  // Update sidebar content per panel
-  updateSidebar(id);
-
-  // Reload data for the active panel
-  if (id === 'overview') loadOverview();
-  if (id === 'chat') { loadSessions(); renderChatSessions(); }
-  if (id === 'memory') { loadBrain(); loadKnowledge(); }
-  if (id === 'projects') loadProjects();
-  if (id === 'sessions') loadSessions();
-  if (id === 'rag') loadRAGStats();
-  if (id === 'agents') loadAgents();
-  if (id === 'integrations') { loadIntegrations(); loadWebhooks(); }
-  if (id === 'approvals') loadApprovals();
-}
-
-function ensureTab(id) {
-  const tabs = $('#tabs');
-  if (!tabs) return;
-  if ($(`.tab[data-panel="${id}"]`)) return;
-  const titles = {
-    overview: 'Overview', chat: 'Chat', memory: 'Memory',
-    projects: 'Projects', sessions: 'Sessions', rag: 'RAG',
-    agents: 'Agents', integrations: 'Integrations', approvals: 'Approvals', settings: 'Settings'
-  };
-  const icons = {
-    overview: '⬡', chat: '💬', memory: '🧠', projects: '📁',
-    sessions: '⌘', rag: '📚', agents: '🤖', integrations: '🔗', approvals: '✓', settings: '⚙'
-  };
-  const tab = document.createElement('div');
-  tab.className = 'tab active';
-  tab.dataset.panel = id;
-  tab.innerHTML = `<span class="tab-icon">${icons[id] || '⬡'}</span><span class="tab-label">${titles[id] || id}</span>`;
-  tabs.appendChild(tab);
-}
-
-function closeTab(id) {
-  if (id === 'overview') return;
-  const tab = $(`.tab[data-panel="${id}"]`);
-  if (tab) tab.remove();
-  if (state.panel === id) {
-    // Switch to first available tab
-    const firstTab = $('.tab');
-    if (firstTab) switchPanel(firstTab.dataset.panel);
-  }
-}
-
-function toggleSidebar() {
-  $('#side')?.classList.toggle('open');
-}
-
-function updateSidebar(id) {
-  const body = $('#side-body');
-  if (!body) return;
-
-  // Default sidebar: providers + stats for overview
-  if (id === 'overview') {
-    body.innerHTML = `
-      <div class="side-section">
-        <div class="side-label">LLM Providers</div>
-        <div class="provider-list" id="provider-list"></div>
-      </div>
-      <div class="side-section">
-        <div class="side-label">Quick Stats</div>
-        <div class="side-stats" id="side-stats">
-          <div class="side-stat"><span class="side-stat-label">Sessions</span><span class="side-stat-value" id="stat-sessions">—</span></div>
-          <div class="side-stat"><span class="side-stat-label">Messages</span><span class="side-stat-value" id="stat-messages">—</span></div>
-          <div class="side-stat"><span class="side-stat-label">Knowledge</span><span class="side-stat-value" id="stat-knowledge">—</span></div>
-          <div class="side-stat"><span class="side-stat-label">Uptime</span><span class="side-stat-value" id="stat-uptime">—</span></div>
-        </div>
-      </div>
-    `;
-    loadOverview();
-    return;
-  }
-
-  if (id === 'chat') {
-    body.innerHTML = `
-      <div class="side-section">
-        <div class="side-label">Current Session</div>
-        <div id="chat-side-info">
-          <div style="padding:8px;font-size:11px;color:var(--fg-dim);">
-            ${state.currentSession ? `<div>Session: <span style="color:var(--accent);font-family:var(--mono);">${escapeHtml(state.currentSession.substring(0, 12))}</span></div>` : '<div>No active session</div>'}
-            <div style="margin-top:6px;">Messages: <span style="color:var(--fg);">${state.sessions.filter(s => s.id === state.currentSession)[0]?.message_count || $$('#chat-msgs .msg').length || 0}</span></div>
-          </div>
-        </div>
-      </div>
-      <div class="side-section">
-        <div class="side-label">Quick Actions</div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          <button class="btn btn-sm" id="btn-new-session-side">New Session</button>
-        </div>
-      </div>
-    `;
-    $('#btn-new-session-side')?.addEventListener('click', createSession);
-    return;
-  }
-
-  if (id === 'memory') {
-    body.innerHTML = `
-      <div class="side-section">
-        <div class="side-label">Knowledge Store</div>
-        <div id="memory-side-list"></div>
-      </div>
-    `;
-    // Show recent knowledge in sidebar
-    const list = $('#memory-side-list');
-    if (list) {
-      apiFetch('/api/memory/knowledge?limit=10').then(data => {
-        const items = Array.isArray(data) ? data : [];
-        if (!items.length) { list.innerHTML = '<div style="padding:8px;color:var(--fg-dim);font-size:11px;">No knowledge stored</div>'; return; }
-        list.innerHTML = items.map(k => `<div style="padding:6px 8px;font-size:11px;color:var(--fg-dim);border-bottom:1px solid var(--border);">${escapeHtml(k.key?.substring(0, 30) || '')}</div>`).join('');
-      }).catch(() => {});
-    }
-    return;
-  }
-
-  if (id === 'projects') {
-    body.innerHTML = `
-      <div class="side-section">
-        <div class="side-label">Create Project</div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          <input class="input" id="project-name" placeholder="Project name">
-          <input class="input" id="project-desc" placeholder="Description">
-          <button class="btn btn-primary btn-sm" id="btn-new-project">Create</button>
-        </div>
-      </div>
-    `;
-    $('#btn-new-project')?.addEventListener('click', async () => {
-      const name = $('#project-name').value.trim();
-      const desc = $('#project-desc').value.trim();
-      if (!name) return;
-      try {
-        await apiFetch('/api/projects', { method: 'POST', body: JSON.stringify({ name, description: desc }) });
-        $('#project-name').value = '';
-        $('#project-desc').value = '';
-        loadProjects();
-        toast('Project created', 'success');
-      } catch { toast('Failed to create project', 'error'); }
-    });
-    return;
-  }
-
-  if (id === 'sessions') {
-    body.innerHTML = `
-      <div class="side-section">
-        <div class="side-label">Filter</div>
-        <input class="input" id="sessions-filter" placeholder="Filter sessions...">
-      </div>
-    `;
-    $('#sessions-filter')?.addEventListener('input', e => {
-      const q = e.target.value.toLowerCase();
-      $$('#sessions-table tr').forEach(row => {
-        const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(q) ? '' : 'none';
-      });
-    });
-    return;
-  }
-
-  if (id === 'rag') {
-    body.innerHTML = `
-      <div class="side-section">
-        <div class="side-label">RAG Status</div>
-        <div class="side-stats">
-          <div class="side-stat"><span class="side-stat-label">Collection</span><span class="side-stat-value" style="font-size:11px;" id="rag-collection-side">—</span></div>
-          <div class="side-stat"><span class="side-stat-label">Documents</span><span class="side-stat-value" id="rag-docs-side">0</span></div>
-        </div>
-      </div>
-    `;
-    loadRAGStats();
-    return;
-  }
-
-  if (id === 'agents') {
-    body.innerHTML = `
-      <div class="side-section">
-        <div class="side-label">Agent Status</div>
-        <div id="agent-side-list"></div>
-      </div>
-    `;
-    apiFetch('/api/system/status').then(data => {
-      const agents = data.agents || [];
-      const list = $('#agent-side-list');
-      if (!list) return;
-      if (!agents.length) { list.innerHTML = '<div style="padding:8px;color:var(--fg-dim);font-size:11px;">No agents</div>'; return; }
-      list.innerHTML = agents.map(a => `<div class="side-stat"><span class="side-stat-label">${escapeHtml(a)}</span><span class="side-stat-value badge ok">Online</span></div>`).join('');
-    }).catch(() => {});
-    return;
-  }
-
-  if (id === 'integrations') {
-    body.innerHTML = `
-      <div class="side-section">
-        <div class="side-label">Connected Apps</div>
-        <div id="integration-side-list"></div>
-      </div>
-    `;
-    apiFetch('/api/integrations').then(data => {
-      const items = Array.isArray(data) ? data : [];
-      const list = $('#integration-side-list');
-      if (!list) return;
-      if (!items.length) { list.innerHTML = '<div style="padding:8px;color:var(--fg-dim);font-size:11px;">None</div>'; return; }
-      list.innerHTML = items.map(i => `<div class="side-stat"><span class="side-stat-label">${escapeHtml(i.name)}</span><span class="badge ${i.enabled ? 'ok' : 'off'}">${i.enabled ? 'On' : 'Off'}</span></div>`).join('');
-    }).catch(() => {});
-    return;
-  }
-
-  if (id === 'approvals') {
-    body.innerHTML = `
-      <div class="side-section">
-        <div class="side-label">Pending Approvals</div>
-        <div id="approvals-side-count" style="padding:8px;font-size:11px;color:var(--fg-dim);">Loading...</div>
-      </div>
-      <div class="side-section">
-        <div class="side-label">Quick Actions</div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          <button class="btn btn-sm" id="btn-approvals-refresh">Refresh</button>
-        </div>
-      </div>
-    `;
-    loadApprovals();
-    $('#btn-approvals-refresh')?.addEventListener('click', loadApprovals);
-    return;
-  }
-
-  if (id === 'settings') {
-    body.innerHTML = `
-      <div class="side-section">
-        <div class="side-label">Keyboard Shortcuts</div>
-        <div style="padding:4px 0;">
-          <div class="side-stat"><span class="side-stat-label">Ctrl+K</span><span class="side-stat-value" style="color:var(--fg-muted)">Chat</span></div>
-          <div class="side-stat"><span class="side-stat-label">Ctrl+\`</span><span class="side-stat-value" style="color:var(--fg-muted)">Terminal</span></div>
-          <div class="side-stat"><span class="side-stat-label">Ctrl+B</span><span class="side-stat-value" style="color:var(--fg-muted)">Sidebar</span></div>
-          <div class="side-stat"><span class="side-stat-label">Alt+1-9</span><span class="side-stat-value" style="color:var(--fg-muted)">Panels</span></div>
-        </div>
-      </div>
-    `;
-    return;
-  }
-}
-
-/* ── API Helper ────────────────────────────── */
+/* ── API helper ──────────────────────────────────────────────────── */
 
 function apiHeaders() {
   return {
@@ -392,1123 +45,842 @@ function apiHeaders() {
 
 async function apiFetch(url, options = {}) {
   const res = await fetch(url, { ...options, headers: { ...apiHeaders(), ...(options.headers || {}) } });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  if (res.status === 401) {
+    showKeyModal();
+    throw new Error('Unauthorized');
+  }
+  if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json();
 }
 
-/* ── WebSocket ─────────────────────────────── */
+/* ── Marked.js / syntax highlight ────────────────────────────────── */
 
-function connectWS() {
-  if (state.wsRetries >= state.wsMaxRetries) {
-    updateWSStatus('disconnected');
-    toast('WebSocket connection failed. Refresh to retry.', 'error');
-    return;
-  }
-
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const url = `${proto}://${location.host}/ws`;
-
-  try { state.ws = new WebSocket(url); }
-  catch { updateWSStatus('disconnected'); return; }
-
-  updateWSStatus('reconnecting');
-
-  state.ws.onopen = () => {
-    state.connected = true;
-    state.wsRetries = 0;
-    state.wsBackoff = 1000;
-    updateWSStatus('connected');
-    logTerminal('WebSocket connected', 'ok');
-    authWS();
-  };
-
-  state.ws.onclose = () => {
-    state.connected = false;
-    state.authenticated = false;
-    state.wsRetries++;
-    updateWSStatus('disconnected');
-    if (state.wsRetries < state.wsMaxRetries) {
-      setTimeout(connectWS, state.wsBackoff);
-      state.wsBackoff = Math.min(state.wsBackoff * 1.5, 10000);
+function initMarked() {
+  if (typeof marked === 'undefined') return;
+  marked.setOptions({ breaks: true, gfm: true });
+  const renderer = new marked.Renderer();
+  renderer.code = function(code, lang) {
+    const label = lang || 'text';
+    let highlighted = escapeHtml(code);
+    if (typeof hljs !== 'undefined') {
+      try {
+        highlighted = lang && hljs.getLanguage(lang)
+          ? hljs.highlight(code, { language: lang }).value
+          : hljs.highlightAuto(code).value;
+      } catch { /* keep escaped */ }
     }
+    return `<div class="code-head"><span>${escapeHtml(label)}</span><button onclick="copyCode(this)">copy</button></div><pre><code class="hljs language-${escapeHtml(label)}">${highlighted}</code></pre>`;
   };
-
-  state.ws.onerror = () => updateWSStatus('disconnected');
-
-  state.ws.onmessage = e => {
-    try { handleWSMessage(JSON.parse(e.data)); } catch {}
-  };
+  marked.setOptions({ renderer });
 }
 
-function authWS() {
-  let key = localStorage.getItem('iva_api_key');
-  if (!key) {
-    key = prompt('Enter IVA API key:');
-    if (key) localStorage.setItem('iva_api_key', key);
-  }
-  if (key) state.ws.send(JSON.stringify({ type: 'auth', api_key: key }));
+function copyCode(btn) {
+  const pre = btn.closest('.code-head')?.nextElementSibling;
+  const code = pre?.querySelector('code')?.textContent || '';
+  navigator.clipboard.writeText(code).then(() => {
+    btn.textContent = 'copied!';
+    setTimeout(() => { btn.textContent = 'copy'; }, 1500);
+  }).catch(() => toast('Copy failed', 'error'));
 }
 
-function handleWSMessage(msg) {
-  if (msg.type === 'auth_ok') {
-    state.authenticated = true;
-    logTerminal('Authenticated', 'ok');
-    return;
-  }
-  if (msg.type === 'auth_failed') {
-    toast('Invalid API key', 'error');
-    localStorage.removeItem('iva_api_key');
-    state.authenticated = false;
-    return;
-  }
-  if (msg.type === 'auth_required') { authWS(); return; }
-  if (msg.type === 'typing') { showTyping(); return; }
-  if (msg.type === 'chat_response') {
-    hideTyping();
-    appendMessage('assistant', msg.content, msg.route);
-    if (msg.session_id) state.currentSession = msg.session_id;
-    loadSessions();
-    logTerminal(`IVA response via ${msg.route || 'direct'}`, 'info');
-    return;
-  }
-  if (msg.type === 'approval_required') {
-    showApproval(msg);
-    logTerminal('Approval required for execution', 'warn');
-    return;
-  }
-  if (msg.type === 'system_log') {
-    logTerminal(msg.message, msg.level || 'info');
-    return;
-  }
+function renderMarkdown(text) {
+  if (!text) return '';
+  if (typeof marked === 'undefined') return escapeHtml(text);
+  try { return marked.parse(text); } catch { return escapeHtml(text); }
 }
 
-function updateWSStatus(status) {
-  const badge = $('#ws-badge');
-  if (!badge) return;
-  badge.className = 'ws-badge';
-  if (status === 'disconnected') badge.classList.add('disconnected');
-  if (status === 'reconnecting') badge.classList.add('reconnecting');
-  const dot = badge.querySelector('.ws-dot');
-  if (dot) {
-    dot.style.background = status === 'connected' ? 'var(--green)' :
-      status === 'reconnecting' ? 'var(--amber)' : 'var(--red)';
-  }
-  const label = $('#ws-label');
-  if (label) {
-    label.textContent = status === 'connected' ? 'Connected' :
-      status === 'reconnecting' ? 'Reconnecting...' : 'Disconnected';
-  }
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-/* ── Chat ──────────────────────────────────── */
+/* ── Init ────────────────────────────────────────────────────────── */
 
-function initChat() {
-  const input = $('#chat-input');
-  const send = $('#btn-send');
+document.addEventListener('DOMContentLoaded', () => {
+  applyTheme(getTheme());
+  initMarked();
+  bindGlobalEvents();
+  initChat();
+  initComposer();
+  initVoice();
+  initAdmin();
+  initKeyModal();
+  loadOverview();
+  loadSessions();
+  loadPermissionMode();
+});
 
-  input?.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+function bindGlobalEvents() {
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (state.drawerOpen) closeDrawer();
+      else if ($('#modal-key') && !$('#modal-key').hidden) hideKeyModal();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      const i = $('#chat-input');
+      if (i) { i.focus(); i.select(); }
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+      e.preventDefault();
+      openDrawer('sessions');
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault();
+      toggleDrawer();
+    }
   });
+
+  $('#drawer-backdrop')?.addEventListener('click', closeDrawer);
+  $$('[data-close-drawer]').forEach(el => el.addEventListener('click', closeDrawer));
+  $$('[data-close-modal]').forEach(el => el.addEventListener('click', hideKeyModal));
+}
+
+/* ── Drawers ─────────────────────────────────────────────────────── */
+
+function openDrawer(name, tab) {
+  state.drawerOpen = name;
+  if (name === 'sessions') {
+    $('#drawer-sessions').hidden = false;
+    $('#drawer-admin').hidden = true;
+    loadSessions();
+  } else if (name === 'admin') {
+    $('#drawer-sessions').hidden = true;
+    $('#drawer-admin').hidden = false;
+    if (tab) switchAdminTab(tab);
+    else renderActiveAdmin();
+  }
+  $('#drawer-backdrop').hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDrawer() {
+  state.drawerOpen = null;
+  $('#drawer-sessions').hidden = true;
+  $('#drawer-admin').hidden = true;
+  $('#drawer-backdrop').hidden = true;
+  document.body.style.overflow = '';
+}
+
+function toggleDrawer() {
+  if (state.drawerOpen === 'admin') openDrawer('sessions');
+  else openDrawer('admin', state.activeAdminTab);
+}
+
+/* ── Admin tabs ──────────────────────────────────────────────────── */
+
+function switchAdminTab(tab) {
+  state.activeAdminTab = tab;
+  $$('.admin-tab').forEach(t => t.classList.toggle('active', t.dataset.admin === tab));
+  const titles = {
+    overview: 'Overview', memory: 'Memory', projects: 'Projects', rag: 'Knowledge',
+    agents: 'Agents', approvals: 'Approvals', events: 'Event log',
+    soul: 'Soul', settings: 'Settings',
+  };
+  const t = $('#admin-title');
+  if (t) t.textContent = titles[tab] || tab;
+  renderActiveAdmin();
+}
+
+function renderActiveAdmin() {
+  const fn = window.AdminViews && window.AdminViews[state.activeAdminTab];
+  const body = $('#admin-body');
+  if (!body) return;
+  if (typeof fn === 'function') {
+    body.innerHTML = '<div class="empty-hint">Loading…</div>';
+    Promise.resolve(fn()).then(html => { body.innerHTML = html; bindAdminActions(); }).catch(err => {
+      body.innerHTML = `<div class="empty-hint">Error: ${escapeHtml(err.message)}</div>`;
+    });
+  } else {
+    body.innerHTML = '<div class="empty-hint">View not found</div>';
+  }
+}
+
+function bindAdminActions() {
+  if (window.AdminViews) {
+    window.AdminViews.activeTab = state.activeAdminTab;
+    if (typeof window.AdminViews.bind === 'function') window.AdminViews.bind();
+  }
+}
+
+function initAdmin() {
+  $$('.admin-tab').forEach(t => t.addEventListener('click', () => switchAdminTab(t.dataset.admin)));
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action="open-admin"]');
+    if (btn) {
+      e.preventDefault();
+      openDrawer('admin', btn.dataset.adminTab || 'overview');
+    }
+    const drawerBtn = e.target.closest('[data-action="open-sessions"]');
+    if (drawerBtn) {
+      e.preventDefault();
+      openDrawer('sessions');
+    }
+  });
+}
+
+/* ── Composer ────────────────────────────────────────────────────── */
+
+function initComposer() {
+  const input = $('#chat-input');
+  const form  = $('#composer-form');
+  const send  = $('#btn-send');
 
   input?.addEventListener('input', () => {
     input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+    send.disabled = !input.value.trim() && state.attachments.length === 0;
   });
 
-  send?.addEventListener('click', sendMessage);
-  $('#btn-approve')?.addEventListener('click', () => handleApproval(true));
-  $('#btn-reject')?.addEventListener('click', () => handleApproval(false));
+  input?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  form?.addEventListener('submit', e => {
+    e.preventDefault();
+    sendMessage();
+  });
+
+  $('#btn-attach')?.addEventListener('click', () => $('#file-input')?.click());
+  $('#file-input')?.addEventListener('change', e => {
+    [...(e.target.files || [])].forEach(addAttachment);
+    e.target.value = '';
+  });
+
+  $$('.welcome-card').forEach(b => b.addEventListener('click', () => {
+    const prompt = b.dataset.prompt;
+    if (input) { input.value = prompt; input.focus(); input.dispatchEvent(new Event('input')); sendMessage(); }
+  }));
 }
 
-function sendMessage() {
-  const input = $('#chat-input');
-  const text = input.value.trim();
-  if (!text) return;
+function addAttachment(file) {
+  if (file.size > 1024 * 1024) { toast(`${file.name} is too large (max 1MB)`, 'warn'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.attachments.push({ name: file.name, size: file.size, content: reader.result, type: file.type });
+    renderAttachments();
+    const send = $('#btn-send');
+    if (send) send.disabled = false;
+  };
+  if (file.type.startsWith('text/') || /\.(txt|md|json|ya?ml|toml|csv|log|py|js|ts|sh|css|html|xml)$/i.test(file.name)) {
+    reader.readAsText(file);
+  } else {
+    reader.readAsDataURL(file);
+  }
+}
 
-  appendMessage('user', text);
+function renderAttachments() {
+  const el = $('#chat-attachments');
+  if (!el) return;
+  if (!state.attachments.length) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = state.attachments.map((a, i) => `
+    <span class="attachment-chip">
+      <span>${escapeHtml(a.name)}</span>
+      <span style="color:var(--fg-muted)">${(a.size/1024).toFixed(1)}KB</span>
+      <button onclick="removeAttachment(${i})" aria-label="Remove">×</button>
+    </span>
+  `).join('');
+}
+
+function removeAttachment(i) {
+  state.attachments.splice(i, 1);
+  renderAttachments();
+  const send = $('#btn-send');
+  if (send) send.disabled = !($('#chat-input')?.value.trim()) && state.attachments.length === 0;
+}
+
+/* ── Chat send / stream ─────────────────────────────────────────── */
+
+function initChat() {
+  $('#btn-approve')?.addEventListener('click', () => respondApproval(true));
+  $('#btn-reject')?.addEventListener('click', () => respondApproval(false));
+  $('#topbar-mode')?.addEventListener('click', () => {
+    const next = state.permissionMode === 'ask' ? 'allow' : 'ask';
+    setPermissionMode(next);
+  });
+}
+
+async function sendMessage() {
+  const input = $('#chat-input');
+  const raw = input.value.trim();
+  if (!raw && !state.attachments.length) return;
+
+  let messageText = raw;
+  if (state.attachments.length) {
+    const att = state.attachments.map(a =>
+      `\n\n[Attached: ${a.name} (${(a.size/1024).toFixed(1)} KB)]\n\`\`\`\n${a.content.substring(0, 8000)}\n\`\`\``
+    ).join('');
+    messageText = raw ? raw + att : att.replace(/^\n+/, '');
+  }
+  state.attachments = [];
+  renderAttachments();
   input.value = '';
   input.style.height = 'auto';
-  showTyping();
+  const send = $('#btn-send');
+  if (send) send.disabled = true;
 
-  if (state.ws?.readyState === WebSocket.OPEN && state.authenticated) {
-    state.ws.send(JSON.stringify({
-      type: 'chat',
-      content: text,
-      session_id: state.currentSession,
-    }));
-  } else {
-    apiFetch('/api/chat', {
+  const welcome = $('#chat-welcome');
+  if (welcome) welcome.remove();
+  const typing = ensureTypingIndicator();
+  appendUserMessage(messageText);
+
+  try {
+    const res = await fetch('/api/chat/stream', {
       method: 'POST',
-      body: JSON.stringify({ message: text, session_id: state.currentSession }),
-    })
-    .then(data => {
-      hideTyping();
-      appendMessage('assistant', data.response, data.route);
-      if (data.session_id) state.currentSession = data.session_id;
-      loadSessions();
-    })
-    .catch(() => {
-      hideTyping();
-      appendMessage('assistant', 'Connection lost. Please try again.');
+      headers: apiHeaders(),
+      body: JSON.stringify({ message: messageText, session_id: state.currentSession }),
     });
+    if (!res.ok || !res.body) {
+      removeTyping(typing);
+      appendAssistantMessage('**Error.** Connection failed.', 'error');
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let currentBubble = null;
+    let full = '';
+    let sources = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (!payload) continue;
+        let evt;
+        try { evt = JSON.parse(payload); } catch { continue; }
+
+        if (evt.type === 'sources') {
+          sources = evt.sources || [];
+        } else if (evt.type === 'chunk') {
+          if (!currentBubble) {
+            removeTyping(typing);
+            currentBubble = createAssistantBubble();
+          }
+          full += evt.content;
+          updateAssistantBubble(currentBubble, full, sources);
+        } else if (evt.type === 'command') {
+          removeTyping(typing);
+          currentBubble = null;
+          appendCommandResult(evt);
+          if (evt.session_id) state.currentSession = evt.session_id;
+          if (evt.side_effect === 'theme_changed') {
+            applyTheme(evt.data?.mode || 'dark');
+          } else if (evt.side_effect === 'mode_changed') {
+            state.permissionMode = evt.data?.mode || 'ask';
+            updateModeBadge();
+          } else if (evt.side_effect === 'new_session') {
+            state.currentSession = null;
+            updateTopbarTitle('New chat');
+          }
+        } else if (evt.type === 'done') {
+          if (evt.session_id) state.currentSession = evt.session_id;
+          if (currentBubble) finalizeAssistantBubble(currentBubble, full, sources);
+          loadSessions();
+        } else if (evt.type === 'error') {
+          removeTyping(typing);
+          if (!currentBubble) appendAssistantMessage(`**Error.** ${escapeHtml(evt.error || 'unknown')}`, 'error');
+          else finalizeAssistantBubble(currentBubble, full, sources);
+        }
+      }
+    }
+  } catch (err) {
+    removeTyping(typing);
+    appendAssistantMessage('**Connection lost.** Please try again.', 'error');
   }
 }
 
-function appendMessage(role, content, route) {
+function appendUserMessage(text) {
   const container = $('#chat-msgs');
   if (!container) return;
-  const empty = container.querySelector('.empty-state');
-  if (empty) empty.remove();
-
   const div = document.createElement('div');
-  div.className = `msg ${role}`;
+  div.className = 'msg user';
+  div.innerHTML = `
+    <div class="msg-content">${renderMarkdown(text)}</div>
+    <div class="msg-actions">
+      <button class="msg-action" title="Edit" onclick="editUserMessage(this)" aria-label="Edit">✎</button>
+      <button class="msg-action" title="Copy" onclick="copyUserMessage(this)" aria-label="Copy">⧉</button>
+    </div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  updateTopbarTitle(text.slice(0, 60) || 'New chat');
+}
 
-  let html = '';
-  if (route) {
-    const routeStr = Array.isArray(route) ? route.join(' → ') : route;
-    html += `<div class="msg-route">${escapeHtml(routeStr)}</div>`;
+function createAssistantBubble() {
+  const container = $('#chat-msgs');
+  if (!container) return null;
+  const div = document.createElement('div');
+  div.className = 'msg assistant streaming';
+  div.innerHTML = `
+    <div class="msg-role"><span>IVA</span></div>
+    <div class="msg-content"></div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function updateAssistantBubble(bubble, full, sources) {
+  if (!bubble) return;
+  const c = bubble.querySelector('.msg-content');
+  if (c) c.innerHTML = renderMarkdown(full);
+  bubble.dataset.content = full;
+  const container = $('#chat-msgs');
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+function finalizeAssistantBubble(bubble, full, sources) {
+  if (!bubble) return;
+  bubble.classList.remove('streaming');
+  const c = bubble.querySelector('.msg-content');
+  if (c) c.innerHTML = renderMarkdown(full);
+  bubble.dataset.content = full;
+
+  const actions = document.createElement('div');
+  actions.className = 'msg-actions';
+  actions.innerHTML = `
+    <button class="msg-action" title="Copy" onclick="copyAssistantMessage(this)" aria-label="Copy">⧉</button>
+    <button class="msg-action" title="Regenerate" onclick="regenerateLast(this)" aria-label="Regenerate">↻</button>
+  `;
+  bubble.appendChild(actions);
+
+  if (sources?.length) {
+    const cEl = document.createElement('div');
+    cEl.className = 'msg citations';
+    cEl.innerHTML = `
+      <div class="citations-head" onclick="this.parentElement.classList.toggle('open')">
+        <span>📄 ${sources.length} source${sources.length === 1 ? '' : 's'}</span>
+        <span class="chev">▾</span>
+      </div>
+      <div class="citations-body">
+        ${sources.map((s, i) => `
+          <div class="citation">
+            <span class="citation-num">[${i+1}]</span>
+            ${s.title ? `<div><strong>${escapeHtml(s.title)}</strong></div>` : ''}
+            ${s.source ? `<div class="citation-source">${escapeHtml(s.source)}</div>` : ''}
+            <div class="citation-content">${escapeHtml(s.content || '').substring(0, 240)}${(s.content||'').length > 240 ? '…' : ''}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    bubble.appendChild(cEl);
   }
-  html += renderMarkdown(content);
-  html += `<div class="msg-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>`;
 
-  div.innerHTML = html;
+  const container = $('#chat-msgs');
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+function appendAssistantMessage(text, role = 'assistant') {
+  const container = $('#chat-msgs');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'msg assistant';
+  div.innerHTML = `<div class="msg-role"><span>${role.toUpperCase()}</span></div><div class="msg-content">${renderMarkdown(text)}</div>`;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
 }
 
-function showTyping() { $('#typing-indicator')?.classList.add('visible'); }
-function hideTyping() { $('#typing-indicator')?.classList.remove('visible'); }
-function focusChat() { switchPanel('chat'); setTimeout(() => $('#chat-input')?.focus(), 100); }
-
-/* ── Sessions ──────────────────────────────── */
-
-function initSessions() {
-  // Session filter initialized in sidebar as needed
+function appendCommandResult(evt) {
+  const container = $('#chat-msgs');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'command-result';
+  div.innerHTML = `
+    <div class="command-card">
+      <div class="command-title">/${escapeHtml(evt.title || 'command')}</div>
+      <div class="command-text">${renderMarkdown(evt.text || '')}</div>
+    </div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
 }
+
+function ensureTypingIndicator() {
+  const container = $('#chat-msgs');
+  if (!container) return null;
+  let el = $('#typing-indicator');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'typing-indicator';
+  el.className = 'typing';
+  el.innerHTML = '<span class="typing-dots"><span></span><span></span><span></span></span><span>IVA thinking…</span>';
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+  return el;
+}
+
+function removeTyping(el) {
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+  const t = $('#typing-indicator');
+  if (t && t !== el) t.remove();
+}
+
+/* ── Message actions ────────────────────────────────────────────── */
+
+function copyUserMessage(btn) {
+  const msg = btn.closest('.msg');
+  const text = msg?.querySelector('.msg-content')?.textContent || '';
+  doCopy(btn, text);
+}
+
+function copyAssistantMessage(btn) {
+  const msg = btn.closest('.msg');
+  const text = msg?.dataset.content || msg?.querySelector('.msg-content')?.textContent || '';
+  doCopy(btn, text);
+}
+
+function doCopy(btn, text) {
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.classList.add('ok');
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    setTimeout(() => { btn.classList.remove('ok'); btn.textContent = orig; }, 1500);
+  }).catch(() => toast('Copy failed', 'error'));
+}
+
+function editUserMessage(btn) {
+  const msg = btn.closest('.msg');
+  if (!msg) return;
+  const text = msg.querySelector('.msg-content')?.textContent || '';
+  let next = msg.nextElementSibling;
+  while (next) { const n = next.nextElementSibling; next.remove(); next = n; }
+  msg.remove();
+  const input = $('#chat-input');
+  if (input) {
+    input.value = text;
+    input.focus();
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+    const send = $('#btn-send'); if (send) send.disabled = false;
+  }
+}
+
+function regenerateLast(btn) {
+  const msg = btn.closest('.msg');
+  if (!msg) return;
+  const prev = msg.previousElementSibling;
+  while (prev && !prev.classList.contains('user')) prev.remove();
+  if (!prev || !prev.classList.contains('user')) {
+    toast('No previous user message to regenerate from', 'warn');
+    return;
+  }
+  const text = prev.querySelector('.msg-content')?.textContent || '';
+  msg.remove();
+  prev.remove();
+  const input = $('#chat-input');
+  if (input) {
+    input.value = text;
+    sendMessage();
+  }
+}
+
+/* ── Voice input ────────────────────────────────────────────────── */
+
+function initVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = $('#btn-voice');
+  if (!SR) { if (btn) btn.hidden = true; return; }
+  if (btn) btn.hidden = false;
+  const r = new SR();
+  r.continuous = false;
+  r.interimResults = true;
+  r.lang = navigator.language || 'en-US';
+
+  r.onresult = (e) => {
+    let final = '', interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t; else interim += t;
+    }
+    const input = $('#chat-input');
+    if (input) {
+      input.value = (state.voiceBase || '') + (final || interim);
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+      const send = $('#btn-send'); if (send) send.disabled = false;
+    }
+    if (final) state.voiceBase = input?.value || '';
+  };
+  r.onend = () => {
+    state.voiceRecording = false;
+    btn?.classList.remove('recording');
+    state.voiceBase = '';
+  };
+  r.onerror = (e) => {
+    state.voiceRecording = false;
+    btn?.classList.remove('recording');
+    state.voiceBase = '';
+    if (e.error === 'not-allowed') toast('Microphone access denied', 'error');
+    else if (e.error !== 'aborted') toast(`Voice: ${e.error}`, 'warn');
+  };
+  state.recognition = r;
+
+  btn?.addEventListener('click', () => {
+    if (state.voiceRecording) {
+      r.stop();
+    } else {
+      const input = $('#chat-input');
+      state.voiceBase = input?.value ? input.value + ' ' : '';
+      try { r.start(); state.voiceRecording = true; btn.classList.add('recording'); }
+      catch (err) { toast('Voice failed: ' + err.message, 'error'); }
+    }
+  });
+}
+
+/* ── Sessions ───────────────────────────────────────────────────── */
 
 async function loadSessions() {
   try {
     const data = await apiFetch('/api/sessions');
-    state.sessions = data.sessions || [];
-    renderChatSessions();
-    renderSessionsTable();
-  } catch { logTerminal('Failed to load sessions', 'error'); }
-}
-
-function renderChatSessions() {
-  const container = $('#chat-sessions');
-  if (!container) return;
-  container.innerHTML = state.sessions.map(s => `
-    <div class="session-item ${s.id === state.currentSession ? 'active' : ''}" data-id="${escapeHtml(s.id)}">
-      <div class="session-title">${escapeHtml(s.title || 'Untitled')}</div>
-      <div class="session-meta">${s.channel || 'web'} · ${formatTime(s.updated_at)}</div>
-    </div>
-  `).join('');
-
-  $$('.session-item', container).forEach(el => {
-    el.addEventListener('click', () => selectSession(el.dataset.id));
-  });
-}
-
-function renderSessionsTable() {
-  const el = $('#sessions-table');
-  if (!el) return;
-  if (!state.sessions.length) {
-    el.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--fg-muted);padding:24px;">No sessions yet</td></tr>';
-    return;
-  }
-  el.innerHTML = state.sessions.map(s => `
-    <tr>
-      <td><strong>${escapeHtml(s.title || 'Untitled')}</strong></td>
-      <td><span class="badge info">${s.channel || 'web'}</span></td>
-      <td style="color:var(--fg-dim)">${s.project_id || '—'}</td>
-      <td style="color:var(--fg-dim)">${formatTime(s.updated_at)}</td>
-    </tr>
-  `).join('');
-}
-
-function selectSession(id) {
-  state.currentSession = id;
-  renderChatSessions();
-  loadChatHistory(id);
-}
-
-async function createSession() {
-  try {
-    const data = await apiFetch('/api/sessions', {
-      method: 'POST',
-      body: JSON.stringify({ title: 'New Session' }),
+    const list = $('#sessions-list');
+    if (!list) return;
+    if (!data.sessions?.length) {
+      list.innerHTML = '<div class="drawer-empty">No sessions yet — start chatting to create one.</div>';
+      return;
+    }
+    list.innerHTML = data.sessions.slice(0, 50).map(s => `
+      <div class="session-item ${s.id === state.currentSession ? 'active' : ''}" data-id="${escapeHtml(s.id)}">
+        <div class="session-title">${escapeHtml(s.title || 'Untitled')}</div>
+        <div class="session-meta">${escapeHtml(s.channel || 'web')} · ${formatRelative(s.updated_at)}</div>
+      </div>
+    `).join('');
+    list.querySelectorAll('.session-item').forEach(el => {
+      el.addEventListener('click', () => loadSession(el.dataset.id));
     });
-    state.currentSession = data.id;
-    await loadSessions();
-    toast('Session created', 'success');
-  } catch { toast('Failed to create session', 'error'); }
+  } catch {}
 }
 
-async function loadChatHistory(sessionId) {
+async function loadSession(id) {
+  state.currentSession = id;
   try {
-    const data = await apiFetch(`/api/sessions/${sessionId}/messages`);
+    const data = await apiFetch(`/api/sessions/${id}/messages`);
     const container = $('#chat-msgs');
     if (!container) return;
     container.innerHTML = '';
     const messages = data.messages || [];
-    if (messages.length === 0) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-title">No messages yet</div><div class="empty-desc">Start a conversation with IVA</div></div>';
-      return;
-    }
-    messages.forEach(m => appendMessage(m.role, m.content));
-  } catch {}
+    if (!messages.length) { showWelcome(); }
+    else messages.forEach(m => {
+      if (m.role === 'user') appendUserMessage(m.content);
+      else {
+        const bubble = createAssistantBubble();
+        finalizeAssistantBubble(bubble, m.content, null);
+      }
+    });
+    const sess = data.messages?.[0];
+    updateTopbarTitle((sess?.content?.slice(0, 60)) || 'Session');
+    closeDrawer();
+    loadSessions();
+  } catch (err) {
+    toast('Failed to load session', 'error');
+  }
 }
 
-/* ── Overview ──────────────────────────────── */
+function showWelcome() {
+  const container = $('#chat-msgs');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="welcome" id="chat-welcome">
+      <div class="welcome-logo">N1</div>
+      <h1 class="welcome-title">How can I help today?</h1>
+      <p class="welcome-sub">Ask me anything. I can research, analyze, write code, run commands, and remember our conversations.</p>
+      <div class="welcome-grid">
+        <button class="welcome-card" data-prompt="What systems are currently online?">
+          <span class="welcome-card-icon">⚡</span>
+          <span class="welcome-card-title">Check status</span>
+          <span class="welcome-card-desc">Get a snapshot of running services and agents</span>
+        </button>
+        <button class="welcome-card" data-prompt="Search the knowledge base for recent project documentation">
+          <span class="welcome-card-icon">📚</span>
+          <span class="welcome-card-title">Search knowledge</span>
+          <span class="welcome-card-desc">Find docs and notes in the RAG index</span>
+        </button>
+        <button class="welcome-card" data-prompt="Write a Python function that fetches JSON from a URL with retries">
+          <span class="welcome-card-icon">💻</span>
+          <span class="welcome-card-title">Write code</span>
+          <span class="welcome-card-desc">Generate scripts in any language</span>
+        </button>
+        <button class="welcome-card" data-prompt="Analyze the most recent 5 messages and summarize any action items">
+          <span class="welcome-card-icon">📊</span>
+          <span class="welcome-card-title">Analyze &amp; summarize</span>
+          <span class="welcome-card-desc">Find patterns and extract insights</span>
+        </button>
+      </div>
+      <div class="welcome-stats" id="welcome-stats">
+        <div class="welcome-stat"><span class="welcome-stat-value" id="ws-sessions">—</span><span class="welcome-stat-label">Sessions</span></div>
+        <div class="welcome-stat"><span class="welcome-stat-value" id="ws-messages">—</span><span class="welcome-stat-label">Messages</span></div>
+        <div class="welcome-stat"><span class="welcome-stat-value" id="ws-knowledge">—</span><span class="welcome-stat-label">Knowledge</span></div>
+        <div class="welcome-stat"><span class="welcome-stat-value" id="ws-rag">—</span><span class="welcome-stat-label">RAG docs</span></div>
+        <div class="welcome-stat"><span class="welcome-stat-value" id="ws-uptime">—</span><span class="welcome-stat-label">Uptime</span></div>
+      </div>
+      <div class="welcome-hint">Tip: type <code>/help</code> for commands, or <code>/status</code> to see what's online.</div>
+    </div>
+  `;
+  $$('.welcome-card').forEach(b => b.addEventListener('click', () => {
+    input.value = b.dataset.prompt;
+    sendMessage();
+  }));
+  loadOverview();
+}
+
+function newChat() {
+  state.currentSession = null;
+  const container = $('#chat-msgs');
+  if (container) container.innerHTML = '';
+  showWelcome();
+  updateTopbarTitle('New chat');
+  closeDrawer();
+}
+
+function updateTopbarTitle(t) {
+  const el = $('#topbar-title');
+  if (el) el.textContent = t;
+}
+
+/* ── Overview / welcome stats ────────────────────────────────────── */
 
 async function loadOverview() {
   try {
     const data = await apiFetch('/api/overview');
-    renderStats(data);
-    renderProviders(data.providers || []);
-    renderChart(data.agent_activity || {});
-    logTerminal('Overview data loaded', 'ok');
-  } catch {
-    renderStats({});
-    renderProviders([]);
-    renderChart({});
-    logTerminal('Failed to load overview', 'error');
-  }
-}
-
-function renderStats(data) {
-  const update = (id, val) => { const e = $(`#${id}`); if (e) e.textContent = val; };
-  update('stat-sessions-ov', data.total_sessions ?? '—');
-  update('stat-messages-ov', data.total_messages ?? '—');
-  update('stat-knowledge-ov', data.knowledge_count ?? '—');
-  update('stat-uptime-ov', data.uptime ?? '—');
-  update('stat-sessions', data.total_sessions ?? '—');
-  update('stat-messages', data.total_messages ?? '—');
-  update('stat-knowledge', data.knowledge_count ?? '—');
-  update('stat-uptime', data.uptime ?? '—');
-}
-
-function renderProviders(providers) {
-  const el = $('#provider-list');
-  if (!el) return;
-  if (!providers?.length) { el.innerHTML = '<div class="empty-desc">No providers configured</div>'; return; }
-  el.innerHTML = providers.map(p => {
-    const providerData = p.model ? { name: p.name, model: p.model } : { name: p.name, model: '' };
-    return `
-      <div class="provider-row">
-        <div>
-          <div class="provider-name">${escapeHtml(providerData.name)}</div>
-          ${providerData.model ? `<div class="provider-model">${escapeHtml(providerData.model)}</div>` : ''}
-        </div>
-        <span class="badge ${p.available ? 'ok' : 'off'}">${p.available ? 'Active' : 'Off'}</span>
-      </div>
-    `;
-  }).join('');
-}
-
-function renderChart(activity) {
-  const ctx = $('#agent-chart');
-  if (!ctx) return;
-  if (state.chart) { state.chart.destroy(); state.chart = null; }
-
-  // Clear previous empty state
-  const parent = ctx.parentElement;
-  const existingEmpty = parent.querySelector('.empty-desc');
-  if (existingEmpty && !Object.keys(activity).length) return;
-
-  const labels = Object.keys(activity);
-  const values = Object.values(activity);
-
-  if (!labels.length) {
-    parent.innerHTML += '<div class="empty-desc" style="margin-top:12px;">No activity yet</div>';
-    return;
-  }
-
-  state.chart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        data: values,
-        backgroundColor: 'rgba(118, 185, 0, 0.3)',
-        borderColor: 'rgba(118, 185, 0, 0.8)',
-        borderWidth: 1,
-        borderRadius: 4,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#71717a', font: { size: 11 } } },
-        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#71717a', font: { size: 11 } } },
-      },
-    },
-  });
-}
-
-/* ── Projects ──────────────────────────────── */
-
-function initProjects() {
-  // Project creation handled in sidebar
-}
-
-async function loadProjects() {
-  try {
-    const data = await apiFetch('/api/projects');
-    renderProjects(data.projects || []);
-  } catch { renderProjects([]); }
-}
-
-function renderProjects(projects) {
-  const el = $('#projects-table');
-  if (!el) return;
-  if (!projects.length) {
-    el.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--fg-muted);padding:24px;">No projects yet</td></tr>';
-    return;
-  }
-  el.innerHTML = projects.map(p => {
-    const progress = p.progress || { total: 0, done: 0, percent: 0 };
-    const progressClass = progress.percent >= 100 ? 'ok' : progress.percent >= 50 ? 'info' : 'warn';
-    return `
-      <tr>
-        <td><strong>${escapeHtml(p.name)}</strong></td>
-        <td><span class="badge ${p.status === 'active' ? 'ok' : p.status === 'completed' ? 'info' : 'warn'}">${p.status || 'active'}</span></td>
-        <td>
-          <div class="progress-bar">
-            <div class="progress-fill ${progressClass}" style="width:${progress.percent}%"></div>
-            <span class="progress-text">${progress.done}/${progress.total} (${progress.percent}%)</span>
-          </div>
-        </td>
-        <td style="color:var(--fg-dim)">${formatTime(p.updated_at)}</td>
-      </tr>
-    `;
-  }).join('');
-}
-
-/* ── Brain / Memory ────────────────────────── */
-
-function initMemory() {
-  $('#btn-memory-search')?.addEventListener('click', async () => {
-    const query = $('#memory-search').value.trim();
-    if (!query) return;
-    try {
-      const data = await apiFetch(`/api/memory/search?q=${encodeURIComponent(query)}`);
-      const el = $('#search-results');
-      const results = data.results || [];
-      if (!results.length) { el.innerHTML = '<div class="empty-state"><div class="empty-title">No results</div></div>'; return; }
-      el.innerHTML = results.map(r => `
-        <div style="padding:10px;background:var(--bg);border:1px solid var(--border);margin-bottom:6px;">
-          <div style="color:var(--fg-dim);margin-bottom:4px;">${escapeHtml(r.content?.substring(0, 200) || '')}</div>
-          <div style="color:var(--fg-muted);font-size:11px;">Score: ${(r.score || 0).toFixed(2)}</div>
-        </div>
-      `).join('');
-    } catch { toast('Search failed', 'error'); }
-  });
-}
-
-async function loadBrain() {
-  try {
-    const data = await apiFetch('/api/brain/stats');
-    renderBrainStats(data);
-  } catch { renderBrainStats({}); }
-}
-
-function renderBrainStats(data) {
-  const update = (id, val) => { const e = $(`#${id}`); if (e) e.textContent = val ?? 0; };
-  update('brain-episodic', data.episodic_count);
-  update('brain-semantic', data.semantic_count);
-  update('brain-procedural', data.procedural_count);
-  update('brain-working', data.working_count);
-}
-
-async function loadKnowledge() {
-  try {
-    const data = await apiFetch('/api/memory/knowledge?limit=50');
-    const el = $('#knowledge-table');
-    if (!el) return;
-    const items = Array.isArray(data) ? data : [];
-    if (!items.length) {
-      el.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--fg-muted);padding:24px;">No knowledge stored</td></tr>';
-      return;
-    }
-    el.innerHTML = items.map(k => `
-      <tr>
-        <td style="font-family:var(--mono);font-size:12px;color:var(--accent);">${escapeHtml(k.key?.substring(0, 40) || '')}</td>
-        <td style="color:var(--fg-dim);font-size:12px;">${escapeHtml(k.value?.substring(0, 80) || '')}</td>
-      </tr>
-    `).join('');
+    setText('ws-sessions', data.total_sessions);
+    setText('ws-messages', data.total_messages);
+    setText('ws-knowledge', data.knowledge_count);
+    setText('ws-rag', data.rag_docs);
+    setText('ws-uptime', data.uptime);
+    const prov = $('#stat-providers');
+    if (prov) prov.textContent = (data.providers || []).filter(p => p.available).length + ' / ' + (data.providers || []).length;
   } catch {}
 }
 
-/* ── RAG ───────────────────────────────────── */
-
-function initRAG() {
-  $('#btn-rag-search')?.addEventListener('click', async () => {
-    const query = $('#rag-query').value.trim();
-    if (!query) return;
-    try {
-      const data = await apiFetch(`/api/rag/search?q=${encodeURIComponent(query)}`);
-      const el = $('#rag-results');
-      const results = Array.isArray(data) ? data : [];
-      if (!results.length) { el.innerHTML = '<div class="empty-state"><div class="empty-title">No results</div></div>'; return; }
-      el.innerHTML = results.map(r => {
-        const content = typeof r === 'string' ? r : (r.content || r.document || JSON.stringify(r));
-        const meta = r.metadata || {};
-        const source = meta.source || meta.url || '';
-        const score = r.score != null ? `<span style="color:var(--accent);font-size:11px;">score:${r.score.toFixed(3)}</span> ` : '';
-        const sourceEl = source ? `<span style="color:var(--fg-muted);font-size:11px;"> ${escapeHtml(source)}</span>` : '';
-        return `<div style="padding:10px;background:var(--bg);border:1px solid var(--border);margin-bottom:6px;"><div>${score}${sourceEl}</div><div style="color:var(--fg-dim);margin-top:4px;">${escapeHtml(content?.substring(0, 300) || '')}</div></div>`;
-      }).join('');
-    } catch { toast('RAG search failed', 'error'); }
-  });
-
-  $('#btn-rag-ingest')?.addEventListener('click', async () => {
-    try {
-      toast('Re-ingesting documents...', 'info');
-      await apiFetch('/api/rag/ingest', { method: 'POST', body: JSON.stringify({ path: '../docs' }) });
-      toast('RAG re-ingested', 'success');
-      logTerminal('RAG documents re-ingested', 'ok');
-      loadRAGStats();
-    } catch { toast('Re-ingest failed', 'error'); logTerminal('RAG re-ingest failed', 'error'); }
-  });
-
-  $('#btn-rag-ingest-url')?.addEventListener('click', async () => {
-    const url = $('#rag-ingest-url')?.value.trim();
-    if (!url) { toast('Enter a URL', 'error'); return; }
-    try {
-      toast('Fetching URL...', 'info');
-      await apiFetch('/api/rag/ingest', { method: 'POST', body: JSON.stringify({ url }) });
-      toast('URL ingested', 'success');
-      logTerminal(`Ingested: ${url}`, 'ok');
-      $('#rag-ingest-url').value = '';
-      loadRAGStats();
-    } catch { toast('URL ingest failed', 'error'); }
-  });
-
-  $('#btn-rag-ingest-text')?.addEventListener('click', async () => {
-    const text = $('#rag-ingest-text')?.value.trim();
-    if (!text) { toast('Enter text to ingest', 'error'); return; }
-    try {
-      toast('Ingesting text...', 'info');
-      await apiFetch('/api/rag/ingest', { method: 'POST', body: JSON.stringify({ text, source: 'dashboard' }) });
-      toast('Text ingested', 'success');
-      logTerminal(`Ingested ${text.length} chars`, 'ok');
-      $('#rag-ingest-text').value = '';
-      loadRAGStats();
-    } catch { toast('Text ingest failed', 'error'); }
-  });
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val ?? '—';
 }
 
-async function loadRAGStats() {
-  try {
-    const data = await apiFetch('/api/rag/stats');
-    const update = (id, val) => { const e = $(`#${id}`); if (e) e.textContent = val; };
-    update('rag-collection', data.collection || '—');
-    update('rag-documents', data.documents ?? 0);
-    update('rag-chroma', data.chroma_enabled ? 'Active' : 'Off');
-    update('rag-embedder', data.embedder ? 'Active' : 'Off');
-    update('rag-collection-side', data.collection || '—');
-    update('rag-docs-side', data.documents ?? 0);
-  } catch {}
+function formatRelative(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  if (diff < 604800) return Math.floor(diff/86400) + 'd ago';
+  return d.toLocaleDateString();
 }
 
-/* ── Agents ────────────────────────────────── */
-
-async function loadAgents() {
-  try {
-    const data = await apiFetch('/api/system/status');
-    renderAgents(data.agents || []);
-  } catch { renderAgents([]); }
-}
-
-function renderAgents(agents) {
-  const el = $('#agent-grid');
-  if (!el) return;
-
-  const agentInfo = {
-    orchestrator: {
-      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path d="M12 8v3M7 17l2-3M17 17l-2-3"/></svg>',
-      role: 'Routes tasks to specialized agents'
-    },
-    osint: {
-      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/><circle cx="12" cy="12" r="10" stroke-dasharray="4 4"/></svg>',
-      role: 'Open-source intelligence gathering'
-    },
-    analyst: {
-      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/></svg>',
-      role: 'Data analysis and reporting'
-    },
-    executor: {
-      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>',
-      role: 'Command execution in sandbox'
-    },
-  };
-
-  if (!agents.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-title">No agents loaded</div></div>';
-    return;
-  }
-
-  el.innerHTML = agents.map(name => {
-    const info = agentInfo[name] || {
-      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/><path d="M10 12h4"/></svg>',
-      role: 'Agent'
-    };
-    return `
-      <div class="agent-card">
-        <div class="agent-icon">${info.icon}</div>
-        <div class="agent-name">${escapeHtml(name)}</div>
-        <div class="agent-role">${info.role}</div>
-        <div class="agent-status"><span class="badge ok">Online</span></div>
-      </div>
-    `;
-  }).join('');
-}
-
-/* ── Integrations ──────────────────────────── */
-
-async function loadIntegrations() {
-  try {
-    const data = await apiFetch('/api/integrations');
-    const el = $('#integrations-list');
-    if (!el) return;
-    const items = Array.isArray(data) ? data : [];
-    if (!items.length) {
-      el.innerHTML = '<div class="empty-state"><div class="empty-title">No integrations yet</div><div class="empty-desc">Connect your apps to IVA via API</div></div>';
-      return;
-    }
-    el.innerHTML = items.map(i => `
-      <div class="provider-row">
-        <div>
-          <div class="provider-name">${escapeHtml(i.name)}</div>
-          <div class="provider-model">${i.type} · ${i.event_count || 0} events</div>
-        </div>
-        <span class="badge ${i.enabled ? 'ok' : 'off'}">${i.enabled ? 'Active' : 'Off'}</span>
-      </div>
-    `).join('');
-  } catch {}
-}
-
-async function loadWebhooks() {
-  try {
-    const data = await apiFetch('/api/webhooks/events');
-    const el = $('#webhooks-list');
-    if (!el) return;
-    const events = Array.isArray(data) ? data : [];
-    if (!events.length) {
-      el.innerHTML = '<div class="empty-state"><div class="empty-title">No events yet</div><div class="empty-desc">Webhook events will appear here</div></div>';
-      return;
-    }
-    el.innerHTML = events.slice(-10).reverse().map(e => `
-      <div class="provider-row">
-        <div>
-          <div class="provider-name">${escapeHtml(e.source || 'unknown')}:${escapeHtml(e.event_type || 'event')}</div>
-          <div class="provider-model">${formatTime(e.timestamp)}</div>
-        </div>
-        <span class="badge ${e.processed ? 'ok' : 'warn'}">${e.processed ? 'Processed' : 'Pending'}</span>
-      </div>
-    `).join('');
-  } catch {}
-}
-
-/* ── Settings ──────────────────────────────── */
-
-let _modalProvider = null;
-
-function initSettings() {
-  const proto = location.protocol;
-  const host = location.host;
-  const apiUrl = `${proto}//${host}/api`;
-  const wsUrl = `${proto === 'https:' ? 'wss' : 'ws'}://${host}/ws`;
-
-  const apiUrlEl = $('#api-url');
-  const wsUrlEl = $('#ws-url');
-  if (apiUrlEl) apiUrlEl.textContent = apiUrl;
-  if (wsUrlEl) wsUrlEl.textContent = wsUrl;
-
-  $('#btn-copy-api')?.addEventListener('click', () => {
-    navigator.clipboard.writeText(apiUrl).then(() => toast('Copied', 'success'));
-  });
-
-  $('#btn-copy-ws')?.addEventListener('click', () => {
-    navigator.clipboard.writeText(wsUrl).then(() => toast('Copied', 'success'));
-  });
-
-  $('#btn-restart')?.addEventListener('click', () => {
-    if (confirm('Restart IVA? This will interrupt all active sessions.')) {
-      toast('Restart requested — SSH to restart manually', 'warning');
-    }
-  });
-
-  $('#btn-reload-rag')?.addEventListener('click', async () => {
-    try {
-      toast('Reloading RAG...', 'info');
-      await apiFetch('/api/rag/ingest', { method: 'POST', body: JSON.stringify({ path: '../docs' }) });
-      toast('RAG reloaded', 'success');
-      loadRAGStats();
-    } catch { toast('Reload failed', 'error'); }
-  });
-
-  $('#btn-clear-key')?.addEventListener('click', () => {
-    localStorage.removeItem('iva_api_key');
-    toast('API key cleared. Refresh to re-enter.', 'info');
-  });
-
-  // Reload providers button
-  $('#btn-reload-providers')?.addEventListener('click', loadProviders);
-
-  // Modal handlers
-  $('#modal-close')?.addEventListener('click', closeKeyModal);
-  $('#modal-cancel')?.addEventListener('click', closeKeyModal);
-  $('#modal-save')?.addEventListener('click', saveModalKey);
-  $('#modal-toggle-visibility')?.addEventListener('click', () => {
-    const input = $('#modal-key-input');
-    if (input) input.type = input.type === 'password' ? 'text' : 'password';
-  });
-  $('#modal-overlay')?.addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) closeKeyModal();
-  });
-
-  // System setting toggles
-  $('#toggle-cold-mode')?.addEventListener('change', (e) => saveSetting('cold_mode', e.target.checked));
-  $('#toggle-react-loop')?.addEventListener('change', (e) => saveSetting('use_react_loop', e.target.checked));
-  $('#toggle-rag')?.addEventListener('change', (e) => saveSetting('rag_enabled', e.target.checked));
-  $('#toggle-sandbox')?.addEventListener('change', (e) => saveSetting('executor_sandbox_enabled', e.target.checked));
-  $('#select-tier')?.addEventListener('change', (e) => saveSetting('default_tier', e.target.value));
-
-  // Reload config button
-  $('#btn-reload-config')?.addEventListener('click', async () => {
-    try {
-      await apiFetch('/api/config/reload', { method: 'POST' });
-      toast('Config reloaded', 'success');
-      loadProviders();
-    } catch { toast('Reload failed', 'error'); }
-  });
-}
-
-async function loadProviders() {
-  try {
-    const data = await apiFetch('/api/config');
-    renderProviders(data.providers || {});
-    applySystemSettings(data.settings || {});
-  } catch {
-    const el = $('#settings-providers');
-    if (el) el.innerHTML = '<div class="provider-empty">Could not load providers</div>';
-  }
-}
-
-function renderProviders(providers) {
-  const el = $('#settings-providers');
-  if (!el) return;
-
-  const names = Object.keys(providers);
-  if (!names.length) {
-    el.innerHTML = '<div class="provider-empty">No providers configured</div>';
-    return;
-  }
-
-  const providerIcons = {
-    ollama: '🦙', groq: '⚡', gemini: '🔷', openai: '🟢', anthropic: '🟠',
-  };
-
-  el.innerHTML = `<div class="provider-cards">${names.map(name => {
-    const p = providers[name];
-    const hasKey = p.has_key;
-    const enabled = p.enabled;
-    const statusClass = !enabled ? 'unconfigured' : (p.has_key || name === 'ollama') ? 'online' : 'offline';
-    const model = p.model || '—';
-    const keyDisplay = p.key_masked || 'Not set';
-    const icon = providerIcons[name] || '●';
-
-    return `
-      <div class="provider-card ${enabled ? '' : 'disabled'}" data-provider="${escapeHtml(name)}">
-        <div class="provider-status ${statusClass}"></div>
-        <div class="provider-info">
-          <div class="provider-name">${icon} ${escapeHtml(name)}</div>
-          <div class="provider-meta">
-            <span>Model: ${escapeHtml(model)}</span>
-            ${p.tier ? `<span>Tier: ${escapeHtml(p.tier)}</span>` : ''}
-          </div>
-        </div>
-        <div class="provider-key">${escapeHtml(keyDisplay)}</div>
-        <div class="provider-actions">
-          <label class="toggle" title="${enabled ? 'Disable' : 'Enable'}">
-            <input type="checkbox" ${enabled ? 'checked' : ''} onchange="toggleProvider('${escapeHtml(name)}', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-          ${name !== 'ollama' ? `
-            <button class="btn btn-sm btn-ghost" onclick="openKeyModal('${escapeHtml(name)}')" title="Set API Key">🔑</button>
-            <button class="btn btn-sm btn-ghost" onclick="testProvider('${escapeHtml(name)}')" title="Test connection">▶</button>
-          ` : ''}
-        </div>
-      </div>
-    `;
-  }).join('')}</div>`;
-}
-
-function openKeyModal(provider) {
-  _modalProvider = provider;
-  const modal = $('#modal-overlay');
-  const title = $('#modal-title');
-  const desc = $('#modal-desc');
-  const input = $('#modal-key-input');
-  if (title) title.textContent = `Set API Key — ${provider}`;
-  if (desc) desc.textContent = `Enter the API key for ${provider}. The key will be stored securely.`;
-  if (input) { input.value = ''; input.type = 'password'; }
-  if (modal) modal.style.display = 'flex';
-  setTimeout(() => input?.focus(), 100);
-}
-
-function closeKeyModal() {
-  _modalProvider = null;
-  const modal = $('#modal-overlay');
-  if (modal) modal.style.display = 'none';
-}
-
-async function saveModalKey() {
-  if (!_modalProvider) return;
-  const input = $('#modal-key-input');
-  const key = input?.value?.trim();
-  if (!key) { toast('Enter an API key', 'warning'); return; }
-
-  try {
-    await apiFetch(`/api/config/providers/${_modalProvider}/key`, {
-      method: 'PUT',
-      body: JSON.stringify({ api_key: key }),
-    });
-    toast(`${_modalProvider} API key saved`, 'success');
-    closeKeyModal();
-    loadProviders();
-  } catch { toast('Failed to save key', 'error'); }
-}
-
-async function testProvider(name) {
-  toast(`Testing ${name}...`, 'info');
-  try {
-    const result = await apiFetch(`/api/config/providers/${name}/test`, { method: 'POST' });
-    if (result.ok) {
-      toast(`${name}: Connected!`, 'success');
-    } else {
-      toast(`${name}: ${result.error || 'Connection failed'}`, 'error');
-    }
-  } catch { toast(`${name}: Test failed`, 'error'); }
-}
-
-async function toggleProvider(name, enabled) {
-  try {
-    await apiFetch(`/api/config/providers/${name}/toggle`, {
-      method: 'POST',
-      body: JSON.stringify({ enabled }),
-    });
-    toast(`${name} ${enabled ? 'enabled' : 'disabled'}`, 'success');
-    loadProviders();
-  } catch { toast('Toggle failed', 'error'); }
-}
-
-function applySystemSettings(settings) {
-  const coldMode = settings.cold_mode;
-  const reactLoop = settings.use_react_loop;
-  const ragEnabled = settings.rag_enabled;
-  const sandbox = settings.executor_sandbox_enabled;
-  const tier = settings.default_tier;
-
-  if (coldMode !== undefined) {
-    const el = $('#toggle-cold-mode');
-    if (el) el.checked = coldMode === 'true' || coldMode === true;
-  }
-  if (reactLoop !== undefined) {
-    const el = $('#toggle-react-loop');
-    if (el) el.checked = reactLoop === 'true' || reactLoop === true;
-  }
-  if (ragEnabled !== undefined) {
-    const el = $('#toggle-rag');
-    if (el) el.checked = ragEnabled === 'true' || ragEnabled === true;
-  }
-  if (sandbox !== undefined) {
-    const el = $('#toggle-sandbox');
-    if (el) el.checked = sandbox === 'true' || sandbox === true;
-  }
-  if (tier) {
-    const el = $('#select-tier');
-    if (el) el.value = tier;
-  }
-}
-
-async function saveSetting(key, value) {
-  try {
-    await apiFetch('/api/config/settings', {
-      method: 'PUT',
-      body: JSON.stringify({ key, value: String(value) }),
-    });
-    toast(`${key} updated`, 'success');
-  } catch { toast('Failed to update setting', 'error'); }
-}
-
-/* ── Terminal Panel ────────────────────────── */
-
-function initTerminal() {
-  const input = $('#term-input');
-  const clearBtn = $('#btn-term-clear');
-  const toggleBtn = $('#btn-term-toggle');
-
-  input?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleTermCommand(input.value.trim());
-      input.value = '';
-    }
-  });
-
-  clearBtn?.addEventListener('click', () => {
-    const body = $('#term-body');
-    if (body) body.innerHTML = '';
-    const feed = $('#term-feed');
-    if (feed) feed.innerHTML = '';
-  });
-
-  toggleBtn?.addEventListener('click', toggleTerminal);
-}
-
-function toggleTerminal() {
-  const term = $('#term');
-  if (!term) return;
-  term.classList.toggle('collapsed');
-}
-
-function handleTermCommand(cmd) {
-  const body = $('#term-body');
-  if (!body) return;
-
-  // Echo the command
-  const echoLine = document.createElement('div');
-  echoLine.className = 'term-line';
-  echoLine.innerHTML = `<span class="term-prompt">nexus@os:~$</span> ${escapeHtml(cmd)}`;
-  body.appendChild(echoLine);
-
-  if (!cmd) { body.scrollTop = body.scrollHeight; return; }
-
-  const parts = cmd.split(/\s+/);
-  const command = parts[0].toLowerCase();
-  const args = parts.slice(1);
-
-  let response = '';
-
-  switch (command) {
-    case 'help':
-      response = `Available commands:
-  help       — Show this help
-  clear      — Clear terminal
-  status     — Show system status
-  sessions   — List active sessions
-  agents     — List running agents
-  rag        — Show RAG stats
-  echo       — Echo text
-  uptime     — Show system uptime`;
-      break;
-
-    case 'clear':
-      body.innerHTML = '';
-      body.scrollTop = body.scrollHeight;
-      return;
-
-    case 'status':
-      apiFetch('/api/system/status').then(data => {
-        const lines = [
-          `System Status: OK`,
-          `Bus: ${data.bus_backend || 'memory'}`,
-          `Cold Mode: ${data.cold_mode ? 'Enabled' : 'Disabled'}`,
-          `React Loop: ${data.react_loop ? 'Enabled' : 'Disabled'}`,
-          `Agents: ${(data.agents || []).join(', ')}`,
-          `Channels: ${(data.channels || []).map(c => c.name).join(', ') || 'none'}`,
-          `LLM Providers: ${(data.llm_providers || []).map(p => p.name || p).join(', ') || 'none'}`,
-        ];
-        lines.forEach(l => {
-          const line = document.createElement('div');
-          line.className = 'term-line';
-          line.style.color = 'var(--green)';
-          line.textContent = l;
-          body.appendChild(line);
-        });
-        body.scrollTop = body.scrollHeight;
-      }).catch(() => {
-        const line = document.createElement('div');
-        line.className = 'term-line';
-        line.style.color = 'var(--red)';
-        line.textContent = 'Error: Could not fetch status';
-        body.appendChild(line);
-        body.scrollTop = body.scrollHeight;
-      });
-      return;
-
-    case 'sessions':
-      apiFetch('/api/sessions').then(data => {
-        const sessions = data.sessions || [];
-        if (!sessions.length) {
-          const line = document.createElement('div');
-          line.className = 'term-line';
-          line.style.color = 'var(--fg-dim)';
-          line.textContent = 'No active sessions.';
-          body.appendChild(line);
-        } else {
-          sessions.slice(-10).forEach(s => {
-            const line = document.createElement('div');
-            line.className = 'term-line';
-            line.textContent = `${s.id?.substring(0, 8) || '—'}  ${s.title || 'Untitled'}  [${s.channel || 'web'}]  ${formatTime(s.updated_at)}`;
-            body.appendChild(line);
-          });
-        }
-        body.scrollTop = body.scrollHeight;
-      }).catch(() => {});
-      return;
-
-    case 'agents':
-      apiFetch('/api/system/status').then(data => {
-        const agents = data.agents || [];
-        if (!agents.length) {
-          const line = document.createElement('div');
-          line.className = 'term-line';
-          line.style.color = 'var(--fg-dim)';
-          line.textContent = 'No agents running.';
-          body.appendChild(line);
-        } else {
-          agents.forEach(a => {
-            const line = document.createElement('div');
-            line.className = 'term-line';
-            line.style.color = 'var(--green)';
-            line.textContent = `● ${a} — Online`;
-            body.appendChild(line);
-          });
-        }
-        body.scrollTop = body.scrollHeight;
-      }).catch(() => {});
-      return;
-
-    case 'rag':
-      apiFetch('/api/rag/stats').then(data => {
-        const lines = [
-          `Collection: ${data.collection || '—'}`,
-          `Documents: ${data.documents || 0}`,
-          `Chunks: ${data.chunks || 0}`,
-          `ChromaDB: ${data.chroma_enabled ? 'Active' : 'Off'}`,
-          `Embedder: ${data.embedder || '—'}`,
-        ];
-        lines.forEach(l => {
-          const line = document.createElement('div');
-          line.className = 'term-line';
-          line.textContent = l;
-          body.appendChild(line);
-        });
-        body.scrollTop = body.scrollHeight;
-      }).catch(() => {});
-      return;
-
-    case 'echo':
-      response = args.join(' ') || '';
-      break;
-
-    case 'uptime':
-      apiFetch('/api/overview').then(data => {
-        const line = document.createElement('div');
-        line.className = 'term-line';
-        line.style.color = 'var(--accent)';
-        line.textContent = `Uptime: ${data.uptime || '—'}`;
-        body.appendChild(line);
-        body.scrollTop = body.scrollHeight;
-      }).catch(() => {});
-      return;
-
-    default:
-      response = `Unknown command: ${command}. Type 'help' for available commands.`;
-  }
-
-  if (response) {
-    response.split('\n').forEach(l => {
-      const line = document.createElement('div');
-      line.className = 'term-line';
-      line.textContent = l;
-      body.appendChild(line);
-    });
-  }
-  body.scrollTop = body.scrollHeight;
-}
-
-/* ── Approval ──────────────────────────────── */
+/* ── Approvals ──────────────────────────────────────────────────── */
 
 function showApproval(msg) {
   state.pendingApproval = msg;
-  $('#approval-bar')?.classList.add('visible');
+  const bar = $('#approval-bar');
+  const text = $('#approval-text');
+  if (bar) bar.hidden = false;
+  if (text) text.textContent = msg.description || 'Execution requires approval';
 }
 
-function handleApproval(approved) {
+function respondApproval(approved) {
   if (!state.pendingApproval) return;
-  state.ws?.send(JSON.stringify({
-    type: 'approval_response',
-    approved,
-    approval_id: state.pendingApproval.approval_id,
-    session_id: state.currentSession,
-  }));
-  $('#approval-bar')?.classList.remove('visible');
-  if (approved) showTyping();
-  state.pendingApproval = null;
+  apiFetch('/api/approvals/' + state.pendingApproval.approval_id + '/respond', {
+    method: 'POST',
+    body: JSON.stringify({ approved }),
+  }).then(() => {
+    $('#approval-bar').hidden = true;
+    state.pendingApproval = null;
+  }).catch(() => toast('Failed to respond', 'error'));
 }
 
-/* ── Approvals Panel ─────────────────────── */
+/* ── Permission mode ────────────────────────────────────────────── */
 
-function initApprovals() {
-  $('#btn-approvals-refresh')?.addEventListener('click', loadApprovals);
-}
-
-async function loadApprovals() {
-  try {
-    const data = await apiFetch('/api/approvals?include_expired=true');
-    renderApprovals(data.approvals || []);
-  } catch { renderApprovals([]); }
-}
-
-function renderApprovals(approvals) {
-  const el = $('#approvals-list');
-  if (!el) return;
-  if (!approvals.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-title">No pending approvals</div><div class="empty-desc">Customer reply drafts will appear here for review</div></div>';
+async function loadPermissionMode() {
+  if (!state.currentSession) {
+    updateModeBadge();
     return;
   }
-  el.innerHTML = approvals.map(a => `
-    <div class="approval-card ${a.expired ? 'expired' : ''}" data-id="${escapeHtml(a.id)}">
-      <div class="approval-header">
-        <span class="badge info">${escapeHtml(a.channel)}</span>
-        <span class="approval-time">${formatTime(a.created_at)}</span>
-        ${a.expired ? '<span class="badge warn">Expired</span>' : ''}
-      </div>
-      <div class="approval-session">Session: ${escapeHtml(a.session_id?.substring(0, 12) || '')}</div>
-      <div class="approval-text">${escapeHtml(a.text?.substring(0, 200) || '')}</div>
-      ${!a.expired ? `
-        <div class="approval-actions">
-          <button class="btn btn-sm btn-primary" onclick="respondApproval('${a.id}', true)">Approve</button>
-          <button class="btn btn-sm" onclick="respondApproval('${a.id}', false)">Reject</button>
-        </div>
-      ` : ''}
-    </div>
-  `).join('');
-}
-
-async function respondApproval(approvalId, approved) {
   try {
-    await apiFetch(`/api/approvals/${approvalId}/respond`, {
-      method: 'POST',
-      body: JSON.stringify({ approved }),
-    });
-    toast(approved ? 'Approved' : 'Rejected', approved ? 'success' : 'info');
-    loadApprovals();
-  } catch { toast('Failed to respond', 'error'); }
+    const data = await apiFetch('/api/permissions/' + state.currentSession);
+    state.permissionMode = data.mode;
+    updateModeBadge();
+  } catch {}
 }
 
-/* ── Toast ─────────────────────────────────── */
+async function setPermissionMode(mode) {
+  if (!state.currentSession) {
+    state.permissionMode = mode;
+    updateModeBadge();
+    toast(`Mode set to ${mode} for next session`, 'info');
+    return;
+  }
+  try {
+    const data = await apiFetch('/api/permissions/' + state.currentSession, {
+      method: 'PUT', body: JSON.stringify({ mode }),
+    });
+    state.permissionMode = data.mode;
+    updateModeBadge();
+    toast(`Permission mode: ${mode}`, 'success');
+  } catch (err) {
+    toast('Failed to set mode', 'error');
+  }
+}
+
+function updateModeBadge() {
+  const el = $('#topbar-mode');
+  if (!el) return;
+  el.dataset.mode = state.permissionMode;
+  const label = el.querySelector('.topbar-mode-label');
+  if (label) label.textContent = state.permissionMode;
+}
+
+/* ── API key modal ──────────────────────────────────────────────── */
+
+function initKeyModal() {
+  if (localStorage.getItem('iva_api_key')) return;
+  showKeyModal();
+}
+
+function showKeyModal() {
+  const m = $('#modal-key');
+  if (m) m.hidden = false;
+  setTimeout(() => $('#modal-key-input')?.focus(), 100);
+}
+
+function hideKeyModal() {
+  const m = $('#modal-key');
+  if (m) m.hidden = true;
+}
+
+$('#modal-key-save')?.addEventListener('click', () => {
+  const v = $('#modal-key-input')?.value?.trim();
+  if (!v) return;
+  localStorage.setItem('iva_api_key', v);
+  hideKeyModal();
+  toast('API key saved', 'success');
+  loadOverview();
+  loadSessions();
+});
+
+$('#modal-key-toggle')?.addEventListener('click', () => {
+  const i = $('#modal-key-input');
+  if (i) i.type = i.type === 'password' ? 'text' : 'password';
+});
+
+/* ── Toasts ─────────────────────────────────────────────────────── */
 
 function toast(msg, type = 'info') {
-  const container = $('#toast-container');
+  const container = $('#toasts');
   if (!container) return;
   const el = document.createElement('div');
   el.className = `toast ${type}`;
@@ -1520,51 +892,33 @@ function toast(msg, type = 'info') {
   }, 3000);
 }
 
-/* ── Utilities ─────────────────────────────── */
+/* ── Theme button ──────────────────────────────────────────────── */
 
-function escapeHtml(s) {
-  if (!s) return '';
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
+document.addEventListener('click', e => {
+  const themeBtn = e.target.closest('[data-action="theme"]');
+  if (themeBtn) {
+    applyTheme(state.theme === 'dark' ? 'light' : 'dark');
+    toast(`Theme: ${state.theme}`, 'info');
+  }
+  const newBtn = e.target.closest('[data-action="new-chat"]');
+  if (newBtn) { e.preventDefault(); newChat(); }
+});
 
-function formatTime(ts) {
-  if (!ts) return '—';
-  const d = new Date(ts);
-  const now = new Date();
-  const diff = now - d;
-  if (diff < 60000) return 'just now';
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-  return d.toLocaleDateString();
-}
+/* ── Cross-script bridge (admin.js needs to refresh tabs) ──── */
 
-function renderMarkdown(text) {
-  if (!text) return '';
-  let html = text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="lang-$1">$2</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
-    .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
-    .replace(/<\/ul>\s*<ul>/g, '')
-    .replace(/\n{2,}/g, '</p><p>')
-    .replace(/\n/g, '<br>');
-  return html;
-}
+window.AppSwitchTab = function (tab) {
+  if (!tab) return;
+  if (window.AdminViews) window.AdminViews.activeTab = tab;
+  state.activeAdminTab = tab;
+  $$('.admin-tab').forEach(t => t.classList.toggle('active', t.dataset.admin === tab));
+  const titles = {
+    overview: 'Overview', memory: 'Memory', projects: 'Projects', rag: 'Knowledge',
+    agents: 'Agents', approvals: 'Approvals', events: 'Event log',
+    soul: 'Soul', settings: 'Settings',
+  };
+  const t = $('#admin-title');
+  if (t) t.textContent = titles[tab] || tab;
+  renderActiveAdmin();
+};
 
-/* ── Periodic Refresh ──────────────────────── */
-
-setInterval(() => {
-  if (state.panel === 'overview') loadOverview();
-  loadBrain();
-  loadKnowledge();
-  loadRAGStats();
-}, 30000);
+window.appState = state;
