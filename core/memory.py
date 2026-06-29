@@ -1,9 +1,14 @@
 import sqlite3
 import json
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from core.stores import ProjectStore, SessionStore, TaskStore
+from core.users import UserStore
+from core.api_keys import ApiKeyStore
+
+logger = logging.getLogger(__name__)
 
 
 class Memory:
@@ -16,6 +21,8 @@ class Memory:
         self.projects = ProjectStore(self._conn)
         self.sessions = SessionStore(self._conn)
         self.tasks = TaskStore(self._conn)
+        self.users = UserStore(self._conn)
+        self.api_keys = ApiKeyStore(self._conn)
 
     def _init_sqlite(self, path: str):
         self._conn = sqlite3.connect(path, check_same_thread=False)
@@ -68,6 +75,28 @@ class Memory:
                 expires_at TEXT,
                 metadata TEXT DEFAULT '{}'
             );
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'user',
+                password_hash TEXT,
+                oauth_provider TEXT,
+                oauth_id TEXT,
+                created_at TEXT NOT NULL,
+                last_seen TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id);
+            CREATE TABLE IF NOT EXISTS api_keys (
+                key_hash TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                scope TEXT NOT NULL DEFAULT 'user',
+                name TEXT,
+                created_at TEXT NOT NULL,
+                last_used TEXT,
+                expires_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id, created_at DESC);
         """)
         self._migrate_columns()
 
