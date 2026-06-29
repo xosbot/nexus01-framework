@@ -55,6 +55,7 @@ DECAY_IMPORTANCE_FLOOR = 0.1
 DECAY_RATE = 0.95
 CONFLICT_SCAN_CAP = 1000
 CONFLICT_SUBSTRING_MIN_LEN = 12
+AUDIT_RETENTION_DAYS = 90
 
 CORE_BLOCK_LABELS = ("user", "persona", "project_state", "current_focus")
 CORE_BLOCK_MAX_CHARS = 2000
@@ -556,7 +557,28 @@ class SecondBrain:
                 memory_id=mid, op="decay_archive", old_content=content, new_content=None,
                 actor="dreamer", session_id="", note=f"effective={effective:.3f} < {floor}",
             )
+        # Opportunistic: prune audit log rows older than retention cutoff
+        # (does not block on result — best-effort, safe to call from any path)
+        self.prune_audit()
         return len(archived_ids)
+
+    # ── Audit retention ─────────────────────────────────────────────────
+
+    def prune_audit(self, *, days: int = AUDIT_RETENTION_DAYS) -> int:
+        """Delete audit rows older than `days`. Returns count deleted.
+
+        Keeps the audit table from growing unbounded over years of use.
+        Memories themselves are not affected — only the per-op audit trail.
+        Call explicitly (e.g. from the dreaming subagent) or let
+        `run_decay()` do it opportunistically.
+        """
+        cutoff = _now() - days * 86400
+        with self._conn() as c:
+            cur = c.execute("DELETE FROM memory_audit WHERE ts < ?", (cutoff,))
+        deleted = cur.rowcount
+        if deleted:
+            logger.info("audit: pruned %d rows older than %dd", deleted, days)
+        return deleted
 
     # ── Audit ───────────────────────────────────────────────────────────
 

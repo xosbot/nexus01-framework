@@ -462,3 +462,80 @@ def test_concurrent_adds_dont_busy_error(tmp_path: Path) -> None:
 
     assert errors == [], f"concurrent writes failed: {errors}"
     assert len(brain.list_memories(status="active")) == 10
+
+
+# ── Audit retention ────────────────────────────────────────────────────
+
+
+def test_prune_audit_deletes_old_rows_keeps_new(tmp_path: Path) -> None:
+    """prune_audit(days) should drop rows older than the cutoff and keep newer ones."""
+    import time
+    from core.second_brain import AUDIT_RETENTION_DAYS
+
+    db = tmp_path / "audit_prune.db"
+    brain = SecondBrain(db_path=db)
+
+    # Add one memory to generate real audit rows via the proper API
+    mem = brain.add_memory(
+        type="identity", content="auditable fact",
+        confidence=0.9, importance=0.5, durability=0.5,
+        source_session_id="s", source_quote="q",
+    )
+
+    # Manually backdate 100 audit rows to be very old, plus 100 fresh ones
+    very_old_ts = time.time() - (AUDIT_RETENTION_DAYS + 30) * 86400
+    with brain._conn() as c:
+        for _ in range(100):
+            c.execute(
+                "INSERT INTO memory_audit (ts, memory_id, op, actor, session_id, note) "
+                "VALUES (?, ?, 'synthetic', 'test', 's', 'old')",
+                (very_old_ts, mem["id"]),
+            )
+        for _ in range(100):
+            c.execute(
+                "INSERT INTO memory_audit (ts, memory_id, op, actor, session_id, note) "
+                "VALUES (?, ?, 'synthetic', 'test', 's', 'new')",
+                (time.time(), mem["id"]),
+            )
+
+    pre = brain.audit_log(limit=1000)
+    assert len(pre) >= 200  # 100 old + 100 new (plus add_memory's own rows)
+
+    deleted = brain.prune_audit()
+    assert deleted == 100, f"expected 100 old rows pruned, got {deleted}"
+
+    post = brain.audit_log(limit=1000)
+    # No row should have a note of 'old' anymore
+    assert not any(r.get("note") == "old" for r in post)
+    # All remaining rows have note 'new' or are from add_memory's own audit
+    notes = {r.get("note") for r in post}
+    assert "old" not in notes
+
+
+def test_prune_audit_with_no_old_rows_is_noop(tmp_path: Path) -> None:
+    """prune_audit() on a fresh DB returns 0 and does nothing harmful."""
+    db = tmp_path / "fresh.db"
+    brain = SecondBrain(db_path=db)
+    deleted = brain.prune_audit()
+    assert deleted == 0
+
+
+def test_run_decay_triggers_prune_audit_opportunistically(tmp_path: Path) -> None:
+    """run_decay() should call prune_audit() at the end (opportunistic retention)."""
+    import time
+    db = tmp_path / "decay_prune.db"
+    brain = SecondBrain(db_path=db)
+
+    # Insert a very old synthetic audit row
+    very_old_ts = time.time() - (365 * 86400)  # 1 year old
+    with brain._conn() as c:
+        c.execute(
+            "INSERT INTO memory_audit (ts, memory_id, op, actor, session_id, note) "
+            "VALUES (?, NULL, 'synthetic', 'test', 's', 'very old')",
+            (very_old_ts,),
+        )
+
+    # run_decay() will see no memories to decay but should still prune audit
+    brain.run_decay()
+    post = brain.audit_log(limit=1000)
+    assert not any(r.get("note") == "very old" for r in post)
