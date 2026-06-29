@@ -22,6 +22,11 @@ pytest tests/ -v
 
 # Run single test
 pytest tests/test_cold_mode.py -v
+```
+
+`conftest.py` at the repo root adds the project to `sys.path` and sets
+defensive env defaults, so `pytest tests/` works from a fresh shell with no
+`PYTHONPATH` or env exports.
 
 # Lint
 ruff check .
