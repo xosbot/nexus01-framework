@@ -161,7 +161,10 @@ async def web_search(query: str, n: int = 5) -> str:
     """Search the web via DuckDuckGo HTML. Returns a JSON list of results."""
     if not query or not query.strip():
         return json.dumps({"error": "empty query"})
-    n = max(1, min(10, n))
+    try:
+        n = max(1, min(10, int(n)))
+    except (TypeError, ValueError):
+        n = 5
     url = "https://html.duckduckgo.com/html/"
     try:
         async with httpx.AsyncClient(
@@ -289,7 +292,10 @@ async def rag_query(query: str, n: int = 5, rag: Any = None) -> str:
         return json.dumps({"error": "empty query"})
     if rag is None:
         return json.dumps({"error": "RAG not configured", "results": []})
-    n = max(1, min(20, n))
+    try:
+        n = max(1, min(20, int(n)))
+    except (TypeError, ValueError):
+        n = 5
     try:
         hits = rag.search(query.strip(), n=n) or []
     except Exception as exc:
