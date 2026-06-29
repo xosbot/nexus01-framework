@@ -7,7 +7,12 @@ the frontend renders as a system message.
 Available commands:
   /help            — list commands
   /status          — system + provider status
-  /memory <query>  — search long-term memory
+  /memory [sub]    — long-term memory (summary | list | show | forget | pause | resume | audit)
+                    or `/memory <query>` to search (legacy)
+  /remember <text> — store a high-confidence memory
+  /forget <id>     — delete a memory (alias for /memory forget)
+  /tools           — list available chat tools
+  /who             — show current core blocks (user/persona/project_state/current_focus)
   /clear           — start a new session
   /theme [dark|light|auto] — toggle/set theme (UI side; backend records)
   /agents          — list running agents
@@ -66,7 +71,17 @@ async def cmd_help(args, session_id, ctx) -> CommandResult:
         "  `/agents`          — list registered agents",
         "  `/providers`       — LLM provider status",
         "  `/budget`          — token usage + cost",
-        "  `/memory <query>`  — search long-term memory",
+        "  `/who`             — show core blocks (user/persona/project_state/current_focus)",
+        "  `/tools`           — list available chat tools",
+        "  `/memory`          — memory summary (active, pending, by type)",
+        "  `/memory list [type]`   — list active memories of a type",
+        "  `/memory show <id>`     — full memory record + source quote",
+        "  `/memory forget <id>`   — delete a memory",
+        "  `/memory pause|resume`  — pause/resume auto-extraction this session",
+        "  `/memory audit [N=20]`  — last N memory operations",
+        "  `/memory <query>`  — search long-term memory (legacy)",
+        "  `/remember <text>` — store a high-confidence memory",
+        "  `/forget <id>`     — alias for /memory forget",
         "  `/events [N=20]`   — show recent event log entries",
         "  `/mode [ask|allow]`— set session permission mode (default: ask)",
         "  `/soul`            — show soul section sizes",
@@ -133,9 +148,152 @@ async def cmd_budget(args, session_id, ctx) -> CommandResult:
 
 
 async def cmd_memory(args, session_id, ctx) -> CommandResult:
+    """Memory control surface.
+
+    With no args: show summary (active count, pending count, by type).
+    With subcommand: list, show, forget, pause, resume, audit.
+    Otherwise: search the long-term memory (legacy behavior).
+    """
     if not args:
-        return CommandResult(True, "Usage: `/memory <query>`", title="Memory")
-    query = " ".join(args)
+        return _memory_summary(ctx)
+    sub = args[0].lower()
+    rest = args[1:]
+    if sub == "list":
+        return _memory_list(rest, ctx)
+    if sub == "show":
+        return _memory_show(rest, ctx)
+    if sub == "forget":
+        return _memory_forget(rest, ctx)
+    if sub == "pause":
+        return _memory_pause(session_id, ctx)
+    if sub == "resume":
+        return _memory_resume(session_id, ctx)
+    if sub == "audit":
+        return _memory_audit(rest, ctx)
+    # Legacy: treat all args as a search query
+    return _memory_legacy_search(" ".join(args), ctx)
+
+
+def _get_brain(ctx: dict):
+    return ctx.get("nexus_app") and getattr(ctx["nexus_app"], "second_brain", None)
+
+
+def _memory_summary(ctx: dict) -> CommandResult:
+    brain = _get_brain(ctx)
+    if brain is None:
+        return CommandResult(True, "Memory not enabled (set PHASE1_ENABLED=true).", title="Memory")
+    stats = brain.stats()
+    by_type = stats.get("by_type", {})
+    type_str = ", ".join(f"{n} {t}" for t, n in sorted(by_type.items(), key=lambda x: -x[1])) or "none"
+    lines = [
+        f"**Memory summary**",
+        f"  active: {stats.get('total', 0) - stats.get('pending', 0)}",
+        f"  pending: {stats.get('pending', 0)}",
+        f"  by type: {type_str}",
+    ]
+    pending = brain.list_pending(limit=3)
+    if pending:
+        lines.append("")
+        lines.append("**Recent pending** (use `/memory show <id>` to inspect):")
+        for m in pending:
+            lines.append(f"  • `{m['id']}` [{m['type']}, conf {m['confidence']:.2f}] {m['content'][:80]}")
+    return CommandResult(True, "\n".join(lines), title="Memory", data=stats)
+
+
+def _memory_list(args: list[str], ctx: dict) -> CommandResult:
+    brain = _get_brain(ctx)
+    if brain is None:
+        return CommandResult(False, "Memory not enabled.", title="Memory")
+    type_filter = args[0] if args else None
+    try:
+        rows = brain.list_memories(status="active", type=type_filter, limit=50)
+    except Exception as exc:
+        return CommandResult(False, f"List failed: {exc}", title="Memory")
+    if not rows:
+        return CommandResult(True, f"No active memories" + (f" of type `{type_filter}`" if type_filter else ""), title="Memory")
+    lines = [f"**Active memories" + (f" of type `{type_filter}`" if type_filter else "") + f" ({len(rows)})**", ""]
+    for m in rows:
+        lines.append(f"  • `{m['id']}` [{m['type']}, conf {m['confidence']:.2f}] {m['content'][:80]}")
+    return CommandResult(True, "\n".join(lines), title="Memory")
+
+
+def _memory_show(args: list[str], ctx: dict) -> CommandResult:
+    brain = _get_brain(ctx)
+    if brain is None:
+        return CommandResult(False, "Memory not enabled.", title="Memory")
+    if not args:
+        return CommandResult(False, "Usage: `/memory show <id>`", title="Memory")
+    mid = args[0]
+    m = brain.get(mid)
+    if not m:
+        return CommandResult(False, f"Memory `{mid}` not found.", title="Memory")
+    lines = [
+        f"**Memory `{m['id']}`**",
+        f"  type: {m['type']}",
+        f"  status: {m['status']}" + (" (pinned)" if m.get("pinned") else ""),
+        f"  confidence: {m['confidence']:.2f}  importance: {m['importance']:.2f}  durability: {m['durability']:.2f}",
+        f"  content: {m['content']}",
+    ]
+    if m.get("source_quote"):
+        lines.append(f"  source: *\"{m['source_quote']}\"*")
+    if m.get("source_session_id"):
+        lines.append(f"  session: `{m['source_session_id']}`")
+    if m.get("last_referenced"):
+        lines.append(f"  last referenced: {m['access_count']} time(s)")
+    return CommandResult(True, "\n".join(lines), title=f"Memory {mid}")
+
+
+def _memory_forget(args: list[str], ctx: dict) -> CommandResult:
+    brain = _get_brain(ctx)
+    if brain is None:
+        return CommandResult(False, "Memory not enabled.", title="Memory")
+    if not args:
+        return CommandResult(False, "Usage: `/memory forget <id>`", title="Memory")
+    mid = args[0]
+    if brain.delete_memory(mid):
+        return CommandResult(True, f"Forgot memory `{mid}`.", title="Memory")
+    return CommandResult(False, f"Memory `{mid}` not found.", title="Memory")
+
+
+def _memory_pause(session_id: str, ctx: dict) -> CommandResult:
+    if not session_id:
+        return CommandResult(False, "No active session.", title="Memory")
+    _PAUSED_SESSIONS.add(session_id)
+    return CommandResult(True, "Memory extraction **paused** for this session.", title="Memory",
+                         side_effect="memory_paused")
+
+
+def _memory_resume(session_id: str, ctx: dict) -> CommandResult:
+    if not session_id:
+        return CommandResult(False, "No active session.", title="Memory")
+    _PAUSED_SESSIONS.discard(session_id)
+    return CommandResult(True, "Memory extraction **resumed** for this session.", title="Memory",
+                         side_effect="memory_resumed")
+
+
+def _memory_audit(args: list[str], ctx: dict) -> CommandResult:
+    brain = _get_brain(ctx)
+    if brain is None:
+        return CommandResult(False, "Memory not enabled.", title="Memory")
+    limit = 20
+    if args and args[0].isdigit():
+        limit = min(int(args[0]), 200)
+    entries = brain.audit_log(limit=limit)
+    if not entries:
+        return CommandResult(True, "No memory operations yet.", title="Memory")
+    lines = [f"**Last {len(entries)} memory operations**", ""]
+    for e in entries:
+        ts = time.strftime("%H:%M:%S", time.localtime(e["ts"]))
+        op = e["op"]
+        mid = (e.get("memory_id") or "")[:14]
+        actor = e.get("actor", "")
+        note = (e.get("note") or "")[:60]
+        lines.append(f"  `{ts}` `{op:<14}` `{mid}` ({actor}) {note}")
+    return CommandResult(True, "\n".join(lines), title="Memory audit")
+
+
+def _memory_legacy_search(query: str, ctx: dict) -> CommandResult:
+    """Legacy ChromaDB-backed search via core.memory.Memory.search_similar."""
     memory = ctx.get("memory")
     if not memory or not hasattr(memory, "search_similar"):
         return CommandResult(False, "Memory backend unavailable.", title="Memory")
@@ -233,6 +391,78 @@ async def cmd_clear(args, session_id, ctx) -> CommandResult:
     )
 
 
+async def cmd_remember(args, session_id, ctx) -> CommandResult:
+    """Store a high-confidence memory manually."""
+    if not args:
+        return CommandResult(False, "Usage: `/remember <text>`", title="Remember")
+    text = " ".join(args)
+    brain = _get_brain(ctx)
+    if brain is None:
+        return CommandResult(False, "Memory not enabled.", title="Remember")
+    try:
+        m = brain.add_memory(
+            type="identity", content=text, confidence=0.95,
+            importance=0.8, durability=0.9,
+            source_session_id=session_id,
+            source_quote=text[:200],
+        )
+    except Exception as exc:
+        return CommandResult(False, f"Failed to store: {exc}", title="Remember")
+    if m.get("status") == "discarded":
+        return CommandResult(True, "Stored (note: short or duplicate content).", title="Remember", data=m)
+    return CommandResult(
+        True, f"Stored memory `{m['id']}` (status: {m['status']}).",
+        title="Remember", data=m,
+    )
+
+
+async def cmd_forget(args, session_id, ctx) -> CommandResult:
+    """Alias for /memory forget."""
+    return await cmd_memory(["forget", *args], session_id, ctx)
+
+
+async def cmd_tools(args, session_id, ctx) -> CommandResult:
+    """List registered chat tools (Phase 1)."""
+    nexus = ctx.get("nexus_app")
+    tools_reg = nexus and getattr(nexus, "chat_tools", None)
+    if tools_reg is None:
+        return CommandResult(True, "No chat tools registered (Phase 1 not enabled).", title="Tools")
+    names = tools_reg.tool_names()
+    schemas = tools_reg.as_openai_tools()
+    lines = [f"**Available tools ({len(names)})**", ""]
+    for s in schemas:
+        func = s.get("function", {})
+        lines.append(f"  • `{func.get('name', '?')}` — {func.get('description', '')}")
+    return CommandResult(True, "\n".join(lines), title="Tools", data={"names": names})
+
+
+async def cmd_who(args, session_id, ctx) -> CommandResult:
+    """Show current core blocks (user / persona / project_state / current_focus)."""
+    brain = _get_brain(ctx)
+    if brain is None:
+        return CommandResult(False, "Memory not enabled.", title="Who")
+    blocks = brain.get_core_blocks()
+    if not blocks:
+        return CommandResult(True, "No core blocks set yet. Edit them in the Memory tab or via `/memory core <label>`.", title="Who")
+    lines = ["**Core blocks (in-context persona)**", ""]
+    for label, value in blocks.items():
+        if not value:
+            continue
+        lines.append(f"### {label}")
+        lines.append(value[:500] + ("…" if len(value) > 500 else ""))
+        lines.append("")
+    return CommandResult(True, "\n".join(lines), title="Who", data={"blocks": blocks})
+
+
+def is_paused(session_id: str) -> bool:
+    """Called by the API layer to skip extraction for paused sessions."""
+    return session_id in _PAUSED_SESSIONS
+
+
+# Session IDs that have paused memory extraction
+_PAUSED_SESSIONS: set[str] = set()
+
+
 _REGISTRY: dict[str, Handler] = {
     "help": cmd_help,
     "status": cmd_status,
@@ -240,6 +470,10 @@ _REGISTRY: dict[str, Handler] = {
     "providers": cmd_providers,
     "budget": cmd_budget,
     "memory": cmd_memory,
+    "remember": cmd_remember,
+    "forget": cmd_forget,
+    "tools": cmd_tools,
+    "who": cmd_who,
     "events": cmd_events,
     "mode": cmd_mode,
     "soul": cmd_soul,
