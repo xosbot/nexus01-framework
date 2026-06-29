@@ -185,7 +185,6 @@ class TestColdModeIntegration:
         )
         results = cold.evaluate(ctx)
         passed_checks = [r for r in results if r.passed]
-        failed_checks = [r for r in results if not r.passed]
         assert len(passed_checks) >= 3
 
 
