@@ -9,6 +9,7 @@ import asyncio
 import inspect
 import json
 import logging
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import Callable
 
@@ -87,6 +88,73 @@ class ToolRegistry:
         except Exception as exc:
             logger.error("[tools] %s failed: %s", name, exc)
             return ToolResult(tool_call_id=tool_call_id, name=name, content=f"Error executing {name}: {exc}")
+
+    async def stream_invoke(
+        self, name: str, arguments: str, tool_call_id: str,
+    ) -> AsyncGenerator[dict, None]:
+        """Async generator that yields progress events for a single tool call.
+
+        Events:
+          {type: "tool_started", id, name, args}
+          {type: "tool_finished", id, name, content, ok, duration_ms}
+          {type: "tool_blocked", id, name, approval_id, description}  (cold-mode)
+
+        If the tool function returns a dict with a "needs_approval" key, the
+        generator emits tool_blocked instead of tool_finished. This lets cold-mode
+        gated tools signal the agent loop that an approval is required.
+        """
+        import time
+        start = time.monotonic()
+        try:
+            args = json.loads(arguments) if arguments else {}
+        except json.JSONDecodeError:
+            yield {"type": "tool_finished", "id": tool_call_id, "name": name,
+                   "content": f"Error: invalid JSON arguments: {arguments!r}",
+                   "ok": False, "duration_ms": 0}
+            return
+
+        yield {"type": "tool_started", "id": tool_call_id, "name": name, "args": args}
+
+        if name not in self._tools:
+            yield {"type": "tool_finished", "id": tool_call_id, "name": name,
+                   "content": f"Error: tool '{name}' not found. Available: {self.tool_names()}",
+                   "ok": False, "duration_ms": int((time.monotonic() - start) * 1000)}
+            return
+
+        fn = self._tools[name]["fn"]
+
+        async def _execute():
+            if asyncio.iscoroutinefunction(fn):
+                return await fn(**args)
+            return await asyncio.get_event_loop().run_in_executor(None, lambda: fn(**args))
+
+        try:
+            result = await asyncio.wait_for(_execute(), timeout=self._tool_timeout)
+        except asyncio.TimeoutError:
+            yield {"type": "tool_finished", "id": tool_call_id, "name": name,
+                   "content": f"Error: tool '{name}' timed out after {self._tool_timeout}s",
+                   "ok": False, "duration_ms": int((time.monotonic() - start) * 1000)}
+            return
+        except Exception as exc:
+            logger.error("[tools] %s failed: %s", name, exc)
+            yield {"type": "tool_finished", "id": tool_call_id, "name": name,
+                   "content": f"Error executing {name}: {exc}",
+                   "ok": False, "duration_ms": int((time.monotonic() - start) * 1000)}
+            return
+
+        duration_ms = int((time.monotonic() - start) * 1000)
+
+        # Tools that need approval return a dict with needs_approval=True
+        if isinstance(result, dict) and result.get("needs_approval"):
+            yield {"type": "tool_blocked", "id": tool_call_id, "name": name,
+                   "approval_id": result.get("approval_id", ""),
+                   "description": result.get("description", f"Tool '{name}' needs approval"),
+                   "duration_ms": duration_ms}
+            return
+
+        content = str(result)[:4000] if result is not None else ""
+        yield {"type": "tool_finished", "id": tool_call_id, "name": name,
+               "content": content, "ok": True, "duration_ms": duration_ms}
 
     async def call_many(self, tool_calls: list) -> list[ToolResult]:
         return list(await asyncio.gather(*(self.call(tc.name, tc.arguments, tc.id) for tc in tool_calls)))
