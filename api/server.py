@@ -489,6 +489,7 @@ def create_api_app(nexus_app) -> FastAPI:
 
                 if use_agent_loop:
                     # AgentLoop.stream yields progress events
+                    agent_loop_done = False
                     async for event in chat_agent_loop.stream(
                         messages, session_id=session_id, agent="chat_stream",
                     ):
@@ -497,6 +498,10 @@ def create_api_app(nexus_app) -> FastAPI:
                             continue  # already emitted as approval_requested
                         if event["type"] == "chunk":
                             full_text += event.get("content", "")
+                        # Merge session_id into the done event so we don't need a duplicate
+                        if event["type"] == "done":
+                            event = {**event, "session_id": session_id}
+                            agent_loop_done = True
                         yield f"data: {json.dumps(event)}\n\n"
                         if event["type"] == "done":
                             full_text = event.get("content", full_text)
@@ -537,7 +542,10 @@ def create_api_app(nexus_app) -> FastAPI:
                     except Exception as exc:
                         logger.debug("Memory extraction failed: %s", exc)
 
-                yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'content': full_text})}\n\n"
+                # If agent loop emitted its own done, skip the duplicate.
+                # The legacy path (and any agent loop that errored out) still needs one.
+                if not (use_agent_loop and agent_loop_done):
+                    yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'content': full_text})}\n\n"
             except Exception as exc:
                 _events.emit("error", f"chat_stream failed: {exc}", session_id=session_id, agent="chat_stream", level="error")
                 logger.exception("Streaming chat failed")
