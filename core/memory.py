@@ -23,6 +23,8 @@ class Memory:
         self.tasks = TaskStore(self._conn)
         self.users = UserStore(self._conn)
         self.api_keys = ApiKeyStore(self._conn)
+        # Phase 2.3: add user_id columns + backfill (idempotent)
+        self._migrate_user_id()
 
     def _init_sqlite(self, path: str):
         self._conn = sqlite3.connect(path, check_same_thread=False)
@@ -110,6 +112,54 @@ class Memory:
             self._conn.execute("ALTER TABLE sessions ADD COLUMN expires_at TEXT")
             self._conn.commit()
 
+    def _migrate_user_id(self):
+        """Phase 2.3: add nullable user_id to user-owned tables, backfill to legacy user.
+
+        Idempotent — safe to run on every boot. The legacy user is created
+        by UserStore._ensure_legacy_user() before this runs, so the FK
+        target exists.
+        """
+        from core.users import LEGACY_USER_ID
+        # user_id column on: sessions, conversations, projects, tasks
+        for table in ("sessions", "conversations", "projects", "tasks"):
+            cols = {r[1] for r in self._conn.execute(f"PRAGMA table_info({table})").fetchall()}
+            if "user_id" not in cols:
+                # Default to legacy so the column is non-null on the migrated schema
+                self._conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN user_id TEXT NOT NULL DEFAULT '{LEGACY_USER_ID}'"
+                )
+                logger.info("[memory] added user_id column to %s", table)
+        # Backfill: any row where user_id IS NULL or = 'legacy' pre-migration
+        # will already have the default. Idempotent UPDATE for safety.
+        for table in ("sessions", "conversations", "projects", "tasks"):
+            cur = self._conn.execute(
+                f"UPDATE {table} SET user_id = ? WHERE user_id IS NULL OR user_id = ''",
+                (LEGACY_USER_ID,),
+            )
+            if cur.rowcount:
+                logger.info("[memory] backfilled %d rows in %s to legacy user", cur.rowcount, table)
+        # Indexes for per-user queries (conversations has 'timestamp', others 'updated_at')
+        per_table_order = {
+            "sessions": "updated_at DESC",
+            "conversations": "id DESC",  # conversations has no updated_at
+            "projects": "updated_at DESC",
+            "tasks": "created_at DESC",
+        }
+        for table, order_col in per_table_order.items():
+            idx = f"idx_{table}_user"
+            self._conn.execute(
+                f"CREATE INDEX IF NOT EXISTS {idx} ON {table}(user_id, {order_col})"
+            )
+        self._conn.commit()
+
+    def backfill_user_id_done(self) -> bool:
+        """Return True if a row exists for the legacy user (sanity check)."""
+        from core.users import LEGACY_USER_ID
+        row = self._conn.execute(
+            "SELECT 1 FROM users WHERE id = ?", (LEGACY_USER_ID,)
+        ).fetchone()
+        return row is not None
+
     def _init_chroma(self, path: str):
         try:
             import chromadb
@@ -138,17 +188,25 @@ class Memory:
         )
         self._conn.commit()
 
-    def save_conversation(self, agent: str, role: str, content: str, session_id: str | None = None):
+    def save_conversation(
+        self, agent: str, role: str, content: str, session_id: str | None = None,
+        *, user_id: str | None = None,
+    ):
         now = datetime.now().isoformat()
         if session_id:
             row = self._conn.execute(
-                "SELECT expires_at FROM sessions WHERE id = ?", (session_id,)
+                "SELECT expires_at, user_id FROM sessions WHERE id = ?", (session_id,)
             ).fetchone()
             if row and row["expires_at"] and row["expires_at"] < now:
                 return
+            # If user_id not passed, inherit from the session
+            if user_id is None and row and row["user_id"]:
+                user_id = row["user_id"]
+        from core.users import LEGACY_USER_ID
+        conv_user_id = user_id or LEGACY_USER_ID
         self._conn.execute(
-            "INSERT INTO conversations (session_id, agent, role, content, timestamp) VALUES (?, ?, ?, ?, ?)",
-            (session_id, agent, role, content, now),
+            "INSERT INTO conversations (session_id, agent, role, content, timestamp, user_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (session_id, agent, role, content, now, conv_user_id),
         )
         self._conn.commit()
         if session_id:
@@ -160,16 +218,23 @@ class Memory:
                 ids=[f"conv_{now}_{agent}_{hash(content) % 10**8}"],
             )
 
-    def list_conversations(self, session_id: str | None = None, agent: str | None = None, limit: int = 100) -> list[dict]:
-        query = "SELECT * FROM conversations WHERE 1=1"
+    def list_conversations(
+        self, session_id: str | None = None, agent: str | None = None,
+        limit: int = 100, *,
+        user_id: str | None = None, include_all: bool = False,
+    ) -> list[dict]:
+        where = ["1=1"]
         params: list = []
         if session_id:
-            query += " AND session_id = ?"
+            where.append("session_id = ?")
             params.append(session_id)
         if agent:
-            query += " AND agent = ?"
+            where.append("agent = ?")
             params.append(agent)
-        query += " ORDER BY id DESC LIMIT ?"
+        if user_id is not None and not include_all:
+            where.append("user_id = ?")
+            params.append(user_id)
+        query = f"SELECT * FROM conversations WHERE {' AND '.join(where)} ORDER BY id DESC LIMIT ?"
         params.append(limit)
         rows = self._conn.execute(query, params).fetchall()
         return [dict(r) for r in reversed(rows)]

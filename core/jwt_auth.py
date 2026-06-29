@@ -13,7 +13,6 @@ import logging
 import os
 import secrets
 import time
-from typing import Any
 
 import jwt
 

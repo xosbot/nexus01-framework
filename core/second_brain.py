@@ -85,12 +85,14 @@ CREATE TABLE IF NOT EXISTS memories (
     pinned INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL,
     last_referenced REAL,
+    user_id TEXT NOT NULL DEFAULT 'user_legacy',
     access_count INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status, confidence DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(source_session_id);
 CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type, status);
+CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id, status, created_at DESC);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
     content, type,
@@ -194,6 +196,13 @@ class SecondBrain:
             cols = {r[1] for r in c.execute("PRAGMA table_info(memories)").fetchall()}
             if "pinned" not in cols:
                 c.execute("ALTER TABLE memories ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
+            # Phase 2.3: user_id column on memories (idempotent)
+            if "user_id" not in cols:
+                c.execute(
+                    "ALTER TABLE memories ADD COLUMN user_id TEXT NOT NULL DEFAULT 'user_legacy'"
+                )
+                c.execute("CREATE INDEX IF NOT EXISTS idx_memories_user "
+                          "ON memories(user_id, status, created_at DESC)")
 
     # ── Core blocks ─────────────────────────────────────────────────────
 
@@ -244,6 +253,7 @@ class SecondBrain:
         source_session_id: str = "",
         source_quote: str = "",
         status: str | None = None,
+        user_id: str | None = None,
     ) -> dict:
         if type not in VALID_TYPES:
             raise ValueError(f"invalid memory type: {type}")
@@ -255,12 +265,15 @@ class SecondBrain:
             raise ValueError("content cannot be empty")
         source_quote = (source_quote or "")[:SOURCE_QUOTE_MAX_CHARS]
 
+        from core.users import LEGACY_USER_ID
+        owner = user_id or LEGACY_USER_ID
+
         # Confidence gating: discard below threshold
         if confidence < CONFIDENCE_DISCARD_MAX:
             self._audit(
                 memory_id=None, op="discard", old_content=None, new_content=content,
                 actor="extractor", session_id=source_session_id,
-                note=f"low confidence {confidence:.2f}",
+                note=f"low confidence {confidence:.2f} user={owner}",
             )
             return {"status": "discarded", "reason": f"confidence {confidence:.2f} < {CONFIDENCE_DISCARD_MAX}"}
 
@@ -270,14 +283,14 @@ class SecondBrain:
         if status not in VALID_STATUSES:
             raise ValueError(f"invalid status: {status}")
 
-        # Conflict resolution: scan active memories for substring match
-        conflict = self._find_conflict(content, type)
+        # Conflict resolution: scan active memories for substring match (within same user)
+        conflict = self._find_conflict(content, type, user_id=owner)
         if conflict is not None:
             return self._resolve_conflict(
                 candidate={"type": type, "content": content, "confidence": confidence,
                            "importance": importance, "durability": durability,
                            "source_session_id": source_session_id, "source_quote": source_quote,
-                           "status": status},
+                           "status": status, "user_id": owner},
                 existing=conflict,
             )
 
@@ -285,12 +298,13 @@ class SecondBrain:
             type=type, content=content, confidence=confidence,
             importance=importance, durability=durability,
             source_session_id=source_session_id, source_quote=source_quote,
-            status=status,
+            status=status, user_id=owner,
         )
 
     def _insert_memory(
         self, *, type: str, content: str, confidence: float, importance: float,
         durability: float, source_session_id: str, source_quote: str, status: str,
+        user_id: str,
     ) -> dict:
         mid = _new_id()
         now = _now()
@@ -299,16 +313,16 @@ class SecondBrain:
                 """INSERT INTO memories
                    (id, type, content, confidence, importance, durability,
                     source_session_id, source_quote, status, pinned,
-                    created_at, last_referenced, access_count)
-                   VALUES (?,?,?,?,?,?,?,?,?,0,?,NULL,0)""",
+                    created_at, last_referenced, access_count, user_id)
+                   VALUES (?,?,?,?,?,?,?,?,?,0,?,NULL,0,?)""",
                 (mid, type, content, confidence, importance, durability,
-                 source_session_id, source_quote, status, now),
+                 source_session_id, source_quote, status, now, user_id),
             )
             row = c.execute("SELECT * FROM memories WHERE id=?", (mid,)).fetchone()
         self._audit(
             memory_id=mid, op="add", old_content=None, new_content=content,
             actor="extractor" if status == "pending" else "user",
-            session_id=source_session_id, note=f"type={type} conf={confidence:.2f}",
+            session_id=source_session_id, note=f"type={type} conf={confidence:.2f} user={user_id}",
         )
         return _row_to_dict(row) or {}
 
@@ -396,16 +410,16 @@ class SecondBrain:
 
     # ── Conflict resolution ──────────────────────────────────────────────
 
-    def _find_conflict(self, content: str, type: str) -> dict | None:
-        """Substring match for v1. Scans active+pending. Capped at CONFLICT_SCAN_CAP rows."""
+    def _find_conflict(self, content: str, type: str, *, user_id: str = "user_legacy") -> dict | None:
+        """Substring match for v1, scoped to one user. Capped at CONFLICT_SCAN_CAP rows."""
         content_lower = content.lower()
         if len(content_lower) < CONFLICT_SUBSTRING_MIN_LEN:
             return None
         with self._conn() as c:
             rows = c.execute(
-                "SELECT * FROM memories WHERE status IN ('active','pending') AND type=? "
+                "SELECT * FROM memories WHERE status IN ('active','pending') AND type=? AND user_id=? "
                 "ORDER BY confidence DESC LIMIT ?",
-                (type, CONFLICT_SCAN_CAP),
+                (type, user_id, CONFLICT_SCAN_CAP),
             ).fetchall()
         for r in rows:
             existing = (r["content"] or "").lower()
@@ -427,6 +441,7 @@ class SecondBrain:
                 durability=candidate["durability"],
                 source_session_id=candidate["source_session_id"],
                 source_quote=candidate["source_quote"], status=candidate["status"],
+                user_id=candidate.get("user_id", "user_legacy"),
             )
         # Old high, new low → keep old, discard new
         if old_conf >= CONFIDENCE_PENDING_MAX and new_conf < CONFIDENCE_PENDING_MAX:
@@ -458,64 +473,80 @@ class SecondBrain:
 
     def list_memories(
         self, *, status: str = "active", type: str | None = None, limit: int = 50,
+        user_id: str | None = None, include_all: bool = False,
     ) -> list[dict]:
         sql = "SELECT * FROM memories WHERE status=?"
         params: list[Any] = [status]
         if type is not None:
             sql += " AND type=?"
             params.append(type)
+        if user_id is not None and not include_all:
+            sql += " AND user_id=?"
+            params.append(user_id)
         sql += " ORDER BY confidence DESC, created_at DESC LIMIT ?"
         params.append(limit)
         with self._conn() as c:
             rows = c.execute(sql, params).fetchall()
         return [d for d in (_row_to_dict(r) for r in rows) if d is not None]
 
-    def list_pending(self, limit: int = 50) -> list[dict]:
-        return self.list_memories(status="pending", limit=limit)
+    def list_pending(self, limit: int = 50, *, user_id: str | None = None, include_all: bool = False) -> list[dict]:
+        return self.list_memories(status="pending", limit=limit, user_id=user_id, include_all=include_all)
 
-    def search(self, query: str, n: int = 10) -> list[dict]:
+    def search(
+        self, query: str, n: int = 10, *,
+        user_id: str | None = None, include_all: bool = False,
+    ) -> list[dict]:
         """FTS5 keyword search. Returns memories with status='active' (any confidence)."""
         if not query.strip():
             return []
         escaped = _fts_escape(query)
+        sql = """SELECT m.* FROM memories m
+                 JOIN memories_fts f ON m.rowid = f.rowid
+                 WHERE memories_fts MATCH ? AND m.status='active'"""
+        params: list[Any] = [escaped]
+        if user_id is not None and not include_all:
+            sql += " AND m.user_id=?"
+            params.append(user_id)
+        sql += " ORDER BY rank LIMIT ?"
+        params.append(n)
         with self._conn() as c:
-            rows = c.execute(
-                """SELECT m.* FROM memories m
-                   JOIN memories_fts f ON m.rowid = f.rowid
-                   WHERE memories_fts MATCH ? AND m.status='active'
-                   ORDER BY rank LIMIT ?""",
-                (escaped, n),
-            ).fetchall()
+            rows = c.execute(sql, params).fetchall()
         return [d for d in (_row_to_dict(r) for r in rows) if d is not None]
 
     def recall_for_context(
         self, query: str, n: int = 5, min_confidence: float = 0.7,
+        *, user_id: str | None = None, include_all: bool = False,
     ) -> list[dict]:
         """FTS5 + confidence filter. Bumps access counters atomically before returning."""
         if not query.strip():
             return []
         escaped = _fts_escape(query)
         now = _now()
+        where_extra = ""
+        params_pre: list[Any] = []
+        if user_id is not None and not include_all:
+            where_extra = " AND m.user_id=?"
+            params_pre.append(user_id)
         with self._conn() as c:
             # Pre-bump access counters for matching rows so the returned
             # records reflect the access that just happened.
             c.execute(
-                """UPDATE memories
+                f"""UPDATE memories
                    SET access_count=access_count+1, last_referenced=?
                    WHERE id IN (
                      SELECT m.id FROM memories m
                      JOIN memories_fts f ON m.rowid = f.rowid
-                     WHERE memories_fts MATCH ? AND m.status='active' AND m.confidence >= ?
+                     WHERE memories_fts MATCH ? AND m.status='active' AND m.confidence >= ?{where_extra}
                      ORDER BY rank, m.confidence DESC LIMIT ?
                    )""",
-                (now, escaped, min_confidence, n),
+                (now, escaped, min_confidence, *params_pre, n),
             )
             rows = c.execute(
-                """SELECT m.* FROM memories m
+                f"""SELECT m.* FROM memories m
                    JOIN memories_fts f ON m.rowid = f.rowid
-                   WHERE memories_fts MATCH ? AND m.status='active' AND m.confidence >= ?
+                   WHERE memories_fts MATCH ? AND m.status='active' AND m.confidence >= ?{where_extra}
                    ORDER BY rank, m.confidence DESC LIMIT ?""",
-                (escaped, min_confidence, n),
+                (escaped, min_confidence, *params_pre, n),
             ).fetchall()
         return [d for d in (_row_to_dict(r) for r in rows) if d is not None]
 

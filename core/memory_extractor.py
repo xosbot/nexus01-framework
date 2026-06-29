@@ -98,7 +98,7 @@ class MemoryExtractor:
 
     async def extract_from_turn(
         self, user_msg: str, assistant_msg: str, session_id: str = "",
-        *, debounce: bool = True,
+        *, debounce: bool = True, user_id: str = "user_legacy",
     ) -> list[dict]:
         """Extract memories from a single turn. Returns list of stored memory dicts.
 
@@ -132,10 +132,9 @@ class MemoryExtractor:
         facts = self._parse_facts(raw)
         stored: list[dict] = []
         for fact in facts:
-            memory = self._store_fact(fact, session_id)
+            memory = self._store_fact(fact, session_id, user_id=user_id)
             if memory is None:
                 continue
-            # Filter out discarded/conflict results — only count actually stored memories
             status = memory.get("status", "")
             if status in {"discarded", "rejected"}:
                 continue
@@ -144,6 +143,7 @@ class MemoryExtractor:
 
     async def extract_from_conversation(
         self, messages: list[dict[str, str]], session_id: str = "",
+        *, user_id: str = "user_legacy",
     ) -> list[dict]:
         """Extract from a full conversation. Splits into (user, assistant) pairs.
 
@@ -158,6 +158,7 @@ class MemoryExtractor:
                     messages[i + 1]["content"],
                     session_id=session_id,
                     debounce=False,
+                    user_id=user_id,
                 )
                 stored.extend(turn_memories)
                 i += 2
@@ -200,7 +201,7 @@ class MemoryExtractor:
             return []
         return [f for f in parsed if isinstance(f, dict)]
 
-    def _store_fact(self, fact: dict, session_id: str) -> dict | None:
+    def _store_fact(self, fact: dict, session_id: str, *, user_id: str = "user_legacy") -> dict | None:
         """Validate and persist a single fact. Returns the memory dict or None."""
         try:
             content = str(fact.get("content", "")).strip()
@@ -224,6 +225,7 @@ class MemoryExtractor:
                 durability=durability,
                 source_session_id=session_id,
                 source_quote=quote,
+                user_id=user_id,
             )
         except ValueError as exc:
             # Invalid type or empty content — skip silently

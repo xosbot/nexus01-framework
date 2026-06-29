@@ -4,27 +4,53 @@ import json
 import sqlite3
 import uuid
 from datetime import datetime
+from typing import Any
+
+from core.users import LEGACY_USER_ID
+
+
+def _user_or_legacy(user_id: str | None) -> str:
+    """Default any unspecified user to the legacy user (back-compat)."""
+    return user_id or LEGACY_USER_ID
 
 
 class ProjectStore:
     def __init__(self, conn: sqlite3.Connection):
         self._conn = conn
 
-    def create(self, name: str, description: str = "", metadata: dict | None = None) -> dict:
+    def create(
+        self, name: str, description: str = "", metadata: dict | None = None,
+        *, user_id: str | None = None,
+    ) -> dict:
         pid = uuid.uuid4().hex[:12]
         now = datetime.now().isoformat()
         self._conn.execute(
-            "INSERT INTO projects (id, name, description, status, created_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (pid, name, description, "active", now, now, json.dumps(metadata or {})),
+            "INSERT INTO projects (id, name, description, status, created_at, updated_at, metadata, user_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (pid, name, description, "active", now, now,
+             json.dumps(metadata or {}), _user_or_legacy(user_id)),
         )
         self._conn.commit()
         return self.get(pid)
 
-    def list(self, status: str | None = None) -> list[dict]:
+    def list(
+        self, status: str | None = None, *,
+        user_id: str | None = None, include_all: bool = False,
+    ) -> list[dict]:
+        """List projects. If user_id is given (and not include_all), filter to that user."""
+        where = []
+        params: list[Any] = []
         if status:
-            rows = self._conn.execute("SELECT * FROM projects WHERE status = ? ORDER BY updated_at DESC", (status,)).fetchall()
-        else:
-            rows = self._conn.execute("SELECT * FROM projects ORDER BY updated_at DESC").fetchall()
+            where.append("status = ?")
+            params.append(status)
+        if user_id is not None and not include_all:
+            where.append("user_id = ?")
+            params.append(user_id)
+        sql = "SELECT * FROM projects"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY updated_at DESC"
+        rows = self._conn.execute(sql, params).fetchall()
         return [self._row(r) for r in rows]
 
     def get(self, project_id: str) -> dict | None:
@@ -62,6 +88,7 @@ class ProjectStore:
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
             "metadata": json.loads(row["metadata"] or "{}"),
+            "user_id": row["user_id"],
         }
 
 
@@ -69,26 +96,40 @@ class SessionStore:
     def __init__(self, conn: sqlite3.Connection):
         self._conn = conn
 
-    def create(self, title: str = "New Session", project_id: str | None = None, channel: str = "web", metadata: dict | None = None) -> dict:
+    def create(
+        self, title: str = "New Session", project_id: str | None = None,
+        channel: str = "web", metadata: dict | None = None,
+        *, user_id: str | None = None,
+    ) -> dict:
         sid = uuid.uuid4().hex[:12]
         now = datetime.now().isoformat()
         self._conn.execute(
-            "INSERT INTO sessions (id, project_id, title, channel, created_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (sid, project_id, title, channel, now, now, json.dumps(metadata or {})),
+            "INSERT INTO sessions (id, project_id, title, channel, created_at, updated_at, metadata, user_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (sid, project_id, title, channel, now, now,
+             json.dumps(metadata or {}), _user_or_legacy(user_id)),
         )
         self._conn.commit()
         return self.get(sid)
 
-    def list(self, project_id: str | None = None, limit: int = 50) -> list[dict]:
+    def list(
+        self, project_id: str | None = None, limit: int = 50,
+        *, user_id: str | None = None, include_all: bool = False,
+    ) -> list[dict]:
+        where = []
+        params: list[Any] = []
         if project_id:
-            rows = self._conn.execute(
-                "SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC LIMIT ?",
-                (project_id, limit),
-            ).fetchall()
-        else:
-            rows = self._conn.execute(
-                "SELECT * FROM sessions ORDER BY updated_at DESC LIMIT ?", (limit,)
-            ).fetchall()
+            where.append("project_id = ?")
+            params.append(project_id)
+        if user_id is not None and not include_all:
+            where.append("user_id = ?")
+            params.append(user_id)
+        sql = "SELECT * FROM sessions"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY updated_at DESC LIMIT ?"
+        params.append(limit)
+        rows = self._conn.execute(sql, params).fetchall()
         return [self._row(r) for r in rows]
 
     def get(self, session_id: str) -> dict | None:
@@ -119,6 +160,7 @@ class SessionStore:
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
             "metadata": json.loads(row["metadata"] or "{}"),
+            "user_id": row["user_id"],
         }
 
 
@@ -133,27 +175,37 @@ class TaskStore:
         description: str = "",
         status: str = "pending",
         metadata: dict | None = None,
+        *,
+        user_id: str | None = None,
     ) -> dict:
         tid = uuid.uuid4().hex[:12]
         now = datetime.now().isoformat()
         self._conn.execute(
-            """INSERT INTO tasks (id, project_id, title, description, status, payload, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (tid, project_id, title, description, status, json.dumps(metadata or {}), now, now),
+            """INSERT INTO tasks (id, project_id, title, description, status, payload, created_at, updated_at, user_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (tid, project_id, title, description, status, json.dumps(metadata or {}), now, now,
+             _user_or_legacy(user_id)),
         )
         self._conn.commit()
         return self.get(tid)
 
-    def list(self, project_id: str | None = None, status: str | None = None, limit: int = 100) -> list[dict]:
-        query = "SELECT * FROM tasks WHERE 1=1"
-        params: list = []
+    def list(
+        self, project_id: str | None = None, status: str | None = None,
+        limit: int = 100, *,
+        user_id: str | None = None, include_all: bool = False,
+    ) -> list[dict]:
+        where = ["1=1"]
+        params: list[Any] = []
         if project_id:
-            query += " AND project_id = ?"
+            where.append("project_id = ?")
             params.append(project_id)
         if status:
-            query += " AND status = ?"
+            where.append("status = ?")
             params.append(status)
-        query += " ORDER BY created_at DESC LIMIT ?"
+        if user_id is not None and not include_all:
+            where.append("user_id = ?")
+            params.append(user_id)
+        query = f"SELECT * FROM tasks WHERE {' AND '.join(where)} ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
         rows = self._conn.execute(query, params).fetchall()
         return [self._row(r) for r in rows]
@@ -218,6 +270,7 @@ class TaskStore:
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
             "completed_at": row["completed_at"],
+            "user_id": row["user_id"],
         }
 
 

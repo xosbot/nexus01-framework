@@ -178,26 +178,34 @@ def _get_brain(ctx: dict):
     return ctx.get("nexus_app") and getattr(ctx["nexus_app"], "second_brain", None)
 
 
+def _ctx_user_id(ctx: dict) -> str:
+    return ctx.get("user_id") or "user_legacy"
+
+
 def _memory_summary(ctx: dict) -> CommandResult:
     brain = _get_brain(ctx)
     if brain is None:
         return CommandResult(True, "Memory not enabled (set PHASE1_ENABLED=true).", title="Memory")
-    stats = brain.stats()
-    by_type = stats.get("by_type", {})
+    user_id = _ctx_user_id(ctx)
+    active = brain.list_memories(status="active", user_id=user_id, limit=10_000)
+    pending = brain.list_pending(limit=10_000, user_id=user_id)
+    by_type: dict = {}
+    for m in active:
+        t = m.get("type", "memory")
+        by_type[t] = by_type.get(t, 0) + 1
     type_str = ", ".join(f"{n} {t}" for t, n in sorted(by_type.items(), key=lambda x: -x[1])) or "none"
     lines = [
         "**Memory summary**",
-        f"  active: {stats.get('total', 0) - stats.get('pending', 0)}",
-        f"  pending: {stats.get('pending', 0)}",
+        f"  active: {len(active)}",
+        f"  pending: {len(pending)}",
         f"  by type: {type_str}",
     ]
-    pending = brain.list_pending(limit=3)
     if pending:
         lines.append("")
         lines.append("**Recent pending** (use `/memory show <id>` to inspect):")
-        for m in pending:
+        for m in pending[:3]:
             lines.append(f"  • `{m['id']}` [{m['type']}, conf {m['confidence']:.2f}] {m['content'][:80]}")
-    return CommandResult(True, "\n".join(lines), title="Memory", data=stats)
+    return CommandResult(True, "\n".join(lines), title="Memory", data={"total": len(active) + len(pending), "pending": len(pending), "by_type": by_type})
 
 
 def _memory_list(args: list[str], ctx: dict) -> CommandResult:
@@ -205,8 +213,9 @@ def _memory_list(args: list[str], ctx: dict) -> CommandResult:
     if brain is None:
         return CommandResult(False, "Memory not enabled.", title="Memory")
     type_filter = args[0] if args else None
+    user_id = _ctx_user_id(ctx)
     try:
-        rows = brain.list_memories(status="active", type=type_filter, limit=50)
+        rows = brain.list_memories(status="active", type=type_filter, user_id=user_id, limit=50)
     except Exception as exc:
         return CommandResult(False, f"List failed: {exc}", title="Memory")
     if not rows:

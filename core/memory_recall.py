@@ -30,9 +30,16 @@ class MemoryRecall:
 
     def recall(
         self, query: str, n: int = 5, min_confidence: float = 0.7,
+        *, user_id: str | None = None, include_all: bool = False,
     ) -> list[dict]:
-        """Return up to n active memories matching the query, confidence >= min_confidence."""
-        return self._brain.recall_for_context(query, n=n, min_confidence=min_confidence)
+        """Return up to n active memories matching the query, confidence >= min_confidence.
+
+        If user_id is given (and not include_all), results are scoped to that user.
+        """
+        return self._brain.recall_for_context(
+            query, n=n, min_confidence=min_confidence,
+            user_id=user_id, include_all=include_all,
+        )
 
     def format_for_context(
         self, memories: list[dict], budget_chars: int = DEFAULT_BUDGET_CHARS,
@@ -57,17 +64,28 @@ class MemoryRecall:
 
     def format_compact(
         self, n_active: int | None = None, n_pending: int | None = None,
-        by_type: dict[str, int] | None = None,
+        by_type: dict[str, int] | None = None, *,
+        user_id: str | None = None, include_all: bool = False,
     ) -> str:
         """One-line summary for the /memory slash command and Memory admin tab.
 
         If n_active/n_pending/by_type are not provided, queries the brain.
+        If user_id is given (and not include_all), counts are scoped to that user.
         """
         if n_active is None or n_pending is None or by_type is None:
-            stats = self._brain.stats()
-            n_active = n_active if n_active is not None else stats["total"] - stats.get("pending", 0)
-            n_pending = n_pending if n_pending is not None else stats.get("pending", 0)
-            by_type = by_type if by_type is not None else stats.get("by_type", {})
+            active = self._brain.list_memories(
+                status="active", limit=10_000, user_id=user_id, include_all=include_all,
+            )
+            pending = self._brain.list_pending(
+                limit=10_000, user_id=user_id, include_all=include_all,
+            )
+            n_active = n_active if n_active is not None else len(active)
+            n_pending = n_pending if n_pending is not None else len(pending)
+            if by_type is None:
+                by_type = {}
+                for m in active:
+                    t = m.get("type", "memory")
+                    by_type[t] = by_type.get(t, 0) + 1
         if not by_type:
             return f"{n_active} active memories, {n_pending} pending review"
         type_str = ", ".join(f"{count} {t}" for t, count in sorted(by_type.items(), key=lambda x: -x[1]))

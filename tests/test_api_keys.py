@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from core.api_keys import (
-    ApiKeyStore,
     KEY_PREFIX,
     generate_key,
     hash_key,

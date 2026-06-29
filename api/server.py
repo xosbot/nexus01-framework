@@ -424,7 +424,7 @@ def create_api_app(nexus_app) -> FastAPI:
         return {"text": response.text, "success": response.success}
 
     @app.post("/api/chat/stream")
-    async def chat_stream(req: ChatRequest):
+    async def chat_stream(req: ChatRequest, request: Request):
         """Server-Sent Events streaming chat. Bypasses orchestrator for low-latency conversational responses.
 
         Wire format: each event is `data: <json>\\n\\n`.
@@ -449,14 +449,23 @@ def create_api_app(nexus_app) -> FastAPI:
 
         _events.emit("chat_received", req.message[:120], session_id=req.session_id or "", agent="chat_stream")
 
+        # Resolve the authenticated user once for the whole request
+        auth_ctx = getattr(request.state, "auth", None)
+        user_id = auth_ctx.user_id if auth_ctx is not None else "user_legacy"
+
         session_id = req.session_id
         if not session_id:
-            session = memory.sessions.create(title=req.message[:60], project_id=req.project_id, channel="web")
+            session = memory.sessions.create(
+                title=req.message[:60], project_id=req.project_id, channel="web",
+                user_id=user_id,
+            )
             session_id = session["id"]
         else:
             memory.sessions.touch(session_id)
 
         if req.message.lstrip().startswith("/"):
+            auth = getattr(request.state, "auth", None)
+            user_id = auth.user_id if auth is not None else "user_legacy"
             ctx = {
                 "llm": llm,
                 "memory": memory,
@@ -465,6 +474,7 @@ def create_api_app(nexus_app) -> FastAPI:
                 "cold_mode": True,
                 "react_loop": True,
                 "nexus_app": nexus_app,
+                "user_id": user_id,
             }
             result = await _slash.dispatch(req.message, session_id, ctx)
 
@@ -526,7 +536,9 @@ def create_api_app(nexus_app) -> FastAPI:
         recalled_memories: list[dict] = []
         if recall is not None and use_agent_loop:
             try:
-                recalled_memories = recall.recall(req.message, n=5, min_confidence=0.7)
+                recalled_memories = recall.recall(
+                    req.message, n=5, min_confidence=0.7, user_id=user_id,
+                )
             except Exception as exc:
                 logger.debug("Memory recall failed: %s", exc)
             if recalled_memories:
@@ -582,8 +594,8 @@ def create_api_app(nexus_app) -> FastAPI:
                         full_text += token
                         yield f"data: {json.dumps({'type': 'chunk', 'content': token})}\n\n"
 
-                memory.save_conversation("orchestrator", "user", req.message, session_id)
-                memory.save_conversation("orchestrator", "assistant", full_text, session_id)
+                memory.save_conversation("orchestrator", "user", req.message, session_id, user_id=user_id)
+                memory.save_conversation("orchestrator", "assistant", full_text, session_id, user_id=user_id)
 
                 # Phase 1: fire-and-forget memory extraction (bounded by timeout)
                 from core import slash as _slash
@@ -593,7 +605,9 @@ def create_api_app(nexus_app) -> FastAPI:
                     and full_text):
                     try:
                         proposed = await asyncio.wait_for(
-                            extractor.extract_from_turn(req.message, full_text, session_id=session_id),
+                            extractor.extract_from_turn(
+                                req.message, full_text, session_id=session_id, user_id=user_id,
+                            ),
                             timeout=5.0,
                         )
                         for mem in proposed:
@@ -625,10 +639,23 @@ def create_api_app(nexus_app) -> FastAPI:
             "X-Accel-Buffering": "no",
         })
 
-    # ── Memory endpoints (Phase 1) ──────────────────────────────────────
+    # ── Memory endpoints (Phase 1, Phase 2.3) ─────────────────────────
+
+    def _request_user_id(request: Request) -> str:
+        """Return the authenticated user_id, or 'user_legacy' if unauthenticated."""
+        auth = getattr(request.state, "auth", None)
+        return auth.user_id if auth is not None else "user_legacy"
+
+    def _owns_or_admin(memory: dict | None, user_id: str, role: str) -> bool:
+        """True if the user owns the memory, or is an admin."""
+        if memory is None:
+            return False
+        if role == "admin":
+            return True
+        return memory.get("user_id") == user_id
 
     @app.get("/api/memory/core")
-    async def memory_core():
+    async def memory_core(request: Request):
         brain = getattr(nexus_app, "second_brain", None)
         if brain is None:
             return {"blocks": {}, "enabled": False}
@@ -652,24 +679,58 @@ def create_api_app(nexus_app) -> FastAPI:
         return {"ok": True, "block": result}
 
     @app.get("/api/memory/list")
-    async def memory_list(status: str = "active", type: str | None = None, limit: int = 50):
+    async def memory_list(
+        request: Request, status: str = "active", type: str | None = None, limit: int = 50,
+        include_all: bool = False,
+    ):
         brain = getattr(nexus_app, "second_brain", None)
         if brain is None:
             return {"memories": [], "enabled": False}
-        return {"memories": brain.list_memories(status=status, type=type, limit=limit), "enabled": True}
+        user_id = _request_user_id(request)
+        auth = getattr(request.state, "auth", None)
+        role = auth.role if auth is not None else "admin"
+        # Only admins can ask for include_all
+        if include_all and role != "admin":
+            include_all = False
+        return {
+            "memories": brain.list_memories(
+                status=status, type=type, limit=limit,
+                user_id=user_id, include_all=include_all,
+            ),
+            "enabled": True,
+        }
 
     @app.get("/api/memory/pending")
-    async def memory_pending(limit: int = 50):
+    async def memory_pending(request: Request, limit: int = 50, include_all: bool = False):
         brain = getattr(nexus_app, "second_brain", None)
         if brain is None:
             return {"memories": [], "enabled": False}
-        return {"memories": brain.list_pending(limit=limit), "enabled": True}
+        user_id = _request_user_id(request)
+        auth = getattr(request.state, "auth", None)
+        role = auth.role if auth is not None else "admin"
+        if include_all and role != "admin":
+            include_all = False
+        return {
+            "memories": brain.list_pending(
+                limit=limit, user_id=user_id, include_all=include_all,
+            ),
+            "enabled": True,
+        }
 
     @app.post("/api/memory/{memory_id}/approve")
-    async def memory_approve(memory_id: str):
+    async def memory_approve(memory_id: str, request: Request):
         brain = getattr(nexus_app, "second_brain", None)
         if brain is None:
             raise HTTPException(503, "Phase 1 memory not enabled")
+        # Ownership check
+        existing = brain.get(memory_id)
+        if existing is None:
+            raise HTTPException(404, "Memory not found")
+        user_id = _request_user_id(request)
+        auth = getattr(request.state, "auth", None)
+        role = auth.role if auth is not None else "admin"
+        if not _owns_or_admin(existing, user_id, role):
+            raise HTTPException(403, "You don't own this memory")
         try:
             m = brain.approve_memory(memory_id)
         except KeyError:
@@ -679,10 +740,18 @@ def create_api_app(nexus_app) -> FastAPI:
         return {"ok": True, "memory": m}
 
     @app.post("/api/memory/{memory_id}/reject")
-    async def memory_reject(memory_id: str):
+    async def memory_reject(memory_id: str, request: Request):
         brain = getattr(nexus_app, "second_brain", None)
         if brain is None:
             raise HTTPException(503, "Phase 1 memory not enabled")
+        existing = brain.get(memory_id)
+        if existing is None:
+            raise HTTPException(404, "Memory not found")
+        user_id = _request_user_id(request)
+        auth = getattr(request.state, "auth", None)
+        role = auth.role if auth is not None else "admin"
+        if not _owns_or_admin(existing, user_id, role):
+            raise HTTPException(403, "You don't own this memory")
         try:
             m = brain.reject_memory(memory_id)
         except KeyError:
@@ -696,6 +765,14 @@ def create_api_app(nexus_app) -> FastAPI:
         brain = getattr(nexus_app, "second_brain", None)
         if brain is None:
             raise HTTPException(503, "Phase 1 memory not enabled")
+        existing = brain.get(memory_id)
+        if existing is None:
+            raise HTTPException(404, "Memory not found")
+        user_id = _request_user_id(request)
+        auth = getattr(request.state, "auth", None)
+        role = auth.role if auth is not None else "admin"
+        if not _owns_or_admin(existing, user_id, role):
+            raise HTTPException(403, "You don't own this memory")
         try:
             body = await request.json()
         except Exception:
@@ -708,10 +785,18 @@ def create_api_app(nexus_app) -> FastAPI:
         return {"ok": True, "memory": m}
 
     @app.delete("/api/memory/{memory_id}")
-    async def memory_delete(memory_id: str):
+    async def memory_delete(memory_id: str, request: Request):
         brain = getattr(nexus_app, "second_brain", None)
         if brain is None:
             raise HTTPException(503, "Phase 1 memory not enabled")
+        existing = brain.get(memory_id)
+        if existing is None:
+            raise HTTPException(404, "Memory not found")
+        user_id = _request_user_id(request)
+        auth = getattr(request.state, "auth", None)
+        role = auth.role if auth is not None else "admin"
+        if not _owns_or_admin(existing, user_id, role):
+            raise HTTPException(403, "You don't own this memory")
         ok = brain.delete_memory(memory_id)
         if not ok:
             raise HTTPException(404, "Memory not found")

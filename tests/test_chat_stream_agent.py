@@ -31,10 +31,14 @@ class FakeMemory:
             self._store: dict[str, dict] = {}
             self._counter = 0
 
-        def create(self, title: str = "", project_id: str | None = None, channel: str = "web") -> dict:
+        def create(self, title: str = "", project_id: str | None = None,
+                   channel: str = "web", user_id: str | None = None) -> dict:
             self._counter += 1
             sid = f"sess_{self._counter}"
-            self._store[sid] = {"id": sid, "title": title, "project_id": project_id, "channel": channel}
+            self._store[sid] = {
+                "id": sid, "title": title, "project_id": project_id, "channel": channel,
+                "user_id": user_id or "user_legacy",
+            }
             return self._store[sid]
 
         def touch(self, sid: str) -> None:
@@ -47,8 +51,12 @@ class FakeMemory:
     def get_context(self, agent: str, last_n: int = 10, session_id: str | None = None) -> list[dict[str, str]]:
         return []
 
-    def save_conversation(self, agent: str, role: str, content: str, session_id: str | None = None) -> None:
-        self._conversations.append({"agent": agent, "role": role, "content": content, "session_id": session_id})
+    def save_conversation(self, agent: str, role: str, content: str,
+                          session_id: str | None = None, *, user_id: str | None = None) -> None:
+        self._conversations.append({
+            "agent": agent, "role": role, "content": content,
+            "session_id": session_id, "user_id": user_id,
+        })
 
 
 class FakeGateway:

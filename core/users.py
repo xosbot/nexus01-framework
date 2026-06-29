@@ -29,7 +29,6 @@ import re
 import sqlite3
 import time
 import uuid
-from typing import Any, Iterator
 
 import bcrypt
 
