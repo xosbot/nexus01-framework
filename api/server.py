@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -315,6 +316,34 @@ def create_api_app(nexus_app) -> FastAPI:
 
     @app.post("/api/chat/approve")
     async def approve(req: ApprovalRequest):
+        # Phase 1: check for a pending chat_tools execution first
+        from core import chat_tools as _chat_tools
+        pending = _chat_tools.get_pending_execution(req.approval_id)
+        if pending is not None:
+            if not req.approved:
+                _chat_tools.pop_pending_execution(req.approval_id)
+                return {"text": "denied", "success": False, "approval_id": req.approval_id}
+            # Re-run with elevated permission
+            _chat_tools.pop_pending_execution(req.approval_id)
+            sandbox = getattr(nexus_app, "sandbox", None)
+            cold_mode = getattr(nexus_app, "cold_mode", None)
+            if sandbox is None:
+                from core.sandbox import DockerSandbox, SandboxConfig
+                sandbox = DockerSandbox(SandboxConfig(timeout_seconds=30))
+            if cold_mode is None:
+                from core.cold_mode import ColdMode
+                cold_mode = ColdMode(enabled=False)
+            result = await _chat_tools.exec(
+                cmd=pending["cmd"],
+                permission="EXECUTE",
+                session_id=pending.get("session_id", ""),
+                cold_mode=cold_mode,
+                sandbox=sandbox,
+            )
+            if isinstance(result, dict):
+                return {"text": json.dumps(result), "success": False, "approval_id": req.approval_id, "still_blocked": True}
+            return {"text": result, "success": True, "approval_id": req.approval_id}
+        # Fall through to legacy gateway approval
         inbound = InboundMessage(
             channel=ChannelKind.WEB,
             session_id=req.session_id,
@@ -330,12 +359,24 @@ def create_api_app(nexus_app) -> FastAPI:
         """Server-Sent Events streaming chat. Bypasses orchestrator for low-latency conversational responses.
 
         Wire format: each event is `data: <json>\\n\\n`.
-        Event types: `sources` (RAG citations), `chunk` (token), `command` (slash command result),
-                     `done` (final metadata), `error` (failure).
+        Event types:
+          - `sources` (RAG citations)
+          - `memory_recall` (long-term memories injected for this turn)
+          - `agent_iteration` (ReAct loop iteration)
+          - `tool_started` / `tool_finished` (tool invocation progress)
+          - `approval_requested` (cold-mode gated tool needs user OK)
+          - `chunk` (assistant text)
+          - `memory_proposed` (new facts extracted for review)
+          - `command` (slash command result)
+          - `done` (final metadata)
+          - `error` (failure)
+
+        When `nexus_app.chat_agent_loop` is set (PHASE1_ENABLED), the chat uses
+        AgentLoop.stream() with registered chat tools. Otherwise it falls back
+        to the legacy direct-LLM path.
         """
         from core import events as _events
         from core import slash as _slash
-        from core import permissions as _permissions
 
         _events.emit("chat_received", req.message[:120], session_id=req.session_id or "", agent="chat_stream")
 
@@ -354,6 +395,7 @@ def create_api_app(nexus_app) -> FastAPI:
                 "bus_backend": "redis" if (hasattr(nexus_app, "_bus") and getattr(nexus_app._bus, "_redis", None)) else "memory",
                 "cold_mode": True,
                 "react_loop": True,
+                "nexus_app": nexus_app,
             }
             result = await _slash.dispatch(req.message, session_id, ctx)
 
@@ -376,9 +418,17 @@ def create_api_app(nexus_app) -> FastAPI:
                 "X-Accel-Buffering": "no",
             })
 
+        # Phase 1: use AgentLoop.stream() if available, else legacy direct-LLM
+        chat_agent_loop = getattr(nexus_app, "chat_agent_loop", None)
+        recall = getattr(nexus_app, "recall", None)
+        second_brain = getattr(nexus_app, "second_brain", None)
+        extractor = getattr(nexus_app, "extractor", None)
+        use_agent_loop = chat_agent_loop is not None
+
         history = memory.get_context("orchestrator", session_id=session_id)
         messages = [{"role": m["role"], "content": m["content"]} for m in history[-20:]]
 
+        # RAG context (existing)
         sources: list[dict] = []
         rag = getattr(nexus_app, "rag", None)
         if rag and hasattr(rag, "search"):
@@ -403,6 +453,30 @@ def create_api_app(nexus_app) -> FastAPI:
             except Exception as exc:
                 logger.debug("RAG context injection failed: %s", exc)
 
+        # Phase 1: core blocks + memory recall injected into system prompt
+        recalled_memories: list[dict] = []
+        if recall is not None and use_agent_loop:
+            try:
+                recalled_memories = recall.recall(req.message, n=5, min_confidence=0.7)
+            except Exception as exc:
+                logger.debug("Memory recall failed: %s", exc)
+            if recalled_memories:
+                memory_block = recall.format_for_context(recalled_memories)
+                if memory_block:
+                    messages.insert(0, {"role": "system", "content": memory_block})
+            # Also inject core blocks (user/persona/etc) for personalization
+            if second_brain is not None:
+                try:
+                    core_blocks = second_brain.get_core_blocks()
+                    if core_blocks:
+                        core_text = "\n\n".join(
+                            f"## {label}\n{value}" for label, value in core_blocks.items() if value
+                        )
+                        if core_text:
+                            messages.insert(0, {"role": "system", "content": core_text})
+                except Exception as exc:
+                    logger.debug("Core block read failed: %s", exc)
+
         messages.append({"role": "user", "content": req.message})
 
         async def event_gen():
@@ -410,13 +484,57 @@ def create_api_app(nexus_app) -> FastAPI:
             try:
                 if sources:
                     yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
-                async for token in llm.stream(messages, session_id=session_id, agent="chat_stream"):
-                    if not token:
-                        continue
-                    full_text += token
-                    yield f"data: {json.dumps({'type': 'chunk', 'content': token})}\n\n"
+                if use_agent_loop and recalled_memories:
+                    yield f"data: {json.dumps({'type': 'memory_recall', 'memories': recalled_memories})}\n\n"
+
+                if use_agent_loop:
+                    # AgentLoop.stream yields progress events
+                    async for event in chat_agent_loop.stream(
+                        messages, session_id=session_id, agent="chat_stream",
+                    ):
+                        # Skip internal events not meant for SSE
+                        if event["type"] in ("tool_blocked",):
+                            continue  # already emitted as approval_requested
+                        if event["type"] == "chunk":
+                            full_text += event.get("content", "")
+                        yield f"data: {json.dumps(event)}\n\n"
+                        if event["type"] == "done":
+                            full_text = event.get("content", full_text)
+                else:
+                    # Legacy direct-LLM path
+                    async for token in llm.stream(messages, session_id=session_id, agent="chat_stream"):
+                        if not token:
+                            continue
+                        full_text += token
+                        yield f"data: {json.dumps({'type': 'chunk', 'content': token})}\n\n"
+
                 memory.save_conversation("orchestrator", "user", req.message, session_id)
                 memory.save_conversation("orchestrator", "assistant", full_text, session_id)
+
+                # Phase 1: fire-and-forget memory extraction (bounded by timeout)
+                if (extractor is not None
+                    and getattr(nexus_app, "memory_extraction_enabled", True)
+                    and full_text):
+                    try:
+                        proposed = await asyncio.wait_for(
+                            extractor.extract_from_turn(req.message, full_text, session_id=session_id),
+                            timeout=5.0,
+                        )
+                        for mem in proposed:
+                            payload = {
+                                "type": "memory_proposed",
+                                "memory_id": mem.get("id", ""),
+                                "memory_type": mem.get("type", ""),
+                                "content": mem.get("content", ""),
+                                "confidence": mem.get("confidence", 0),
+                                "status": mem.get("status", "pending"),
+                            }
+                            yield f"data: {json.dumps(payload)}\n\n"
+                    except asyncio.TimeoutError:
+                        logger.debug("Memory extraction timed out (skipped)")
+                    except Exception as exc:
+                        logger.debug("Memory extraction failed: %s", exc)
+
                 yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'content': full_text})}\n\n"
             except Exception as exc:
                 _events.emit("error", f"chat_stream failed: {exc}", session_id=session_id, agent="chat_stream", level="error")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,15 @@ class NexusApp:
     proactive: Any = None
     social_media: Any = None
     config_manager: ConfigManager | None = None
+    # Phase 1: long-term memory + chat tools
+    second_brain: Any = None
+    recall: Any = None
+    extractor: Any = None
+    chat_tools: Any = None
+    chat_agent_loop: Any = None
+    cold_mode: Any = None
+    sandbox: Any = None
+    memory_extraction_enabled: bool = True
 
     async def shutdown(self) -> None:
         for channel in self.channels:
@@ -290,6 +300,80 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
     nexus.copilot = ExecutionCopilot(nexus.memory, nexus.rag, agents_dict)
     nexus.integrations = IntegrationHub(nexus.memory, nexus.brain)
     nexus.proactive = ProactiveIntelligence(nexus.memory, nexus.brain)
+
+    # Phase 1: long-term memory + chat tools
+    # Enabled by PHASE1_ENABLED env var (default off to keep prod stable).
+    if os.getenv("PHASE1_ENABLED", "").lower() in ("1", "true", "yes"):
+        from functools import partial
+        from core.second_brain import SecondBrain
+        from core.memory_recall import MemoryRecall
+        from core.memory_extractor import MemoryExtractor
+        from core.chat_tools import (
+            exec as chat_exec, web_search, fetch_url,
+            rag_query as chat_rag_query, memory_store, list_dir, read_file,
+        )
+
+        # Second brain DB sits next to the main DB
+        nexus.second_brain = SecondBrain(
+            db_path=str(Path(cfg.database_path).parent / "memory.db")
+        )
+        nexus.recall = MemoryRecall(nexus.second_brain)
+        nexus.extractor = MemoryExtractor(nexus.llm, nexus.second_brain)
+        nexus.cold_mode = cold_mode
+        nexus.sandbox = sandbox
+
+        # Chat tool registry (separate from the orchestrator's bus tools).
+        # Use partial() to bind service deps (rag, brain, cold_mode, sandbox) so
+        # the LLM only sees the user-facing parameters in the tool schema.
+        chat_tools_reg = ToolRegistry()
+        chat_tools_reg.register(web_search, name="web_search",
+                                description="Search the web via DuckDuckGo",
+                                parameters={"type": "object",
+                                            "properties": {"query": {"type": "string"}, "n": {"type": "integer"}},
+                                            "required": ["query"]})
+        chat_tools_reg.register(fetch_url, name="fetch_url",
+                                description="Fetch a URL and extract text content",
+                                parameters={"type": "object",
+                                            "properties": {"url": {"type": "string"}, "max_chars": {"type": "integer"}},
+                                            "required": ["url"]})
+        chat_tools_reg.register(
+            partial(chat_exec, cold_mode=cold_mode, sandbox=sandbox),
+            name="exec",
+            description="Run a shell command in a Docker sandbox (requires user approval)",
+            parameters={"type": "object",
+                        "properties": {"cmd": {"type": "string"}, "permission": {"type": "string"}, "session_id": {"type": "string"}},
+                        "required": ["cmd"]},
+        )
+        chat_tools_reg.register(
+            partial(chat_rag_query, rag=nexus.rag),
+            name="rag_query",
+            description="Search the local knowledge base",
+            parameters={"type": "object",
+                        "properties": {"query": {"type": "string"}, "n": {"type": "integer"}},
+                        "required": ["query"]},
+        )
+        chat_tools_reg.register(
+            partial(memory_store, brain=nexus.second_brain),
+            name="memory_store",
+            description="Store a high-confidence long-term memory",
+            parameters={"type": "object",
+                        "properties": {"content": {"type": "string"}, "type": {"type": "string"}},
+                        "required": ["content"]},
+        )
+        chat_tools_reg.register(list_dir, name="list_dir",
+                                description="List directory entries (scoped to ./data and ./web)",
+                                parameters={"type": "object",
+                                            "properties": {"path": {"type": "string"}},
+                                            "required": ["path"]})
+        chat_tools_reg.register(read_file, name="read_file",
+                                description="Read a text file (scoped to ./data and ./web)",
+                                parameters={"type": "object",
+                                            "properties": {"path": {"type": "string"}, "max_chars": {"type": "integer"}},
+                                            "required": ["path"]})
+
+        nexus.chat_tools = chat_tools_reg
+        nexus.chat_agent_loop = AgentLoop(llm.router, chat_tools_reg, memory)
+        logger.info("Phase 1 enabled: second brain + chat tools + memory recall")
 
     from integrations.social.manager import SocialMediaManager
     from integrations.social.twitter_adapter import TwitterAdapter
