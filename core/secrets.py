@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 _SECRETS_PATH = Path(__file__).parent.parent / "config" / "secrets.yaml"
 
 # Providers that use API keys
-_API_KEY_PROVIDERS = {"groq", "gemini", "openai", "anthropic"}
+_API_KEY_PROVIDERS = {"groq", "gemini", "openai", "anthropic", "nim"}
 
 
 def _mask_key(key: str) -> str:

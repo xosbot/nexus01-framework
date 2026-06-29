@@ -66,6 +66,7 @@ class Config:
     groq_api_key: str = field(default_factory=lambda: os.getenv("GROQ_API_KEY", ""))
     openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     anthropic_api_key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
+    nim_api_key: str = field(default_factory=lambda: os.getenv("NIM_API_KEY", ""))
 
     # Phase 3 — Deploy & Control
     executor_sandbox_enabled: bool = field(default_factory=lambda: _env_bool("EXECUTOR_SANDBOX_ENABLED", "true"))

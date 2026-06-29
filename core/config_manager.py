@@ -20,6 +20,7 @@ _PROVIDER_NAME_MAP = {
     "openai": "openai_mini",
     "anthropic": "claude_sonnet",
     "ollama": "ollama_local",
+    "nim": "nim_llama70b",
 }
 
 _PROVIDER_TYPE_MAP = {v: k for k, v in _PROVIDER_NAME_MAP.items()}
