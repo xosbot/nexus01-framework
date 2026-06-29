@@ -365,6 +365,30 @@ async function sendMessage() {
 
         if (evt.type === 'sources') {
           sources = evt.sources || [];
+        } else if (evt.type === 'memory_recall') {
+          if (!currentBubble) {
+            removeTyping(typing);
+            currentBubble = createAssistantBubble();
+          }
+          appendMemoryRecall(currentBubble, evt.memories || []);
+        } else if (evt.type === 'agent_iteration') {
+          if (!currentBubble) {
+            removeTyping(typing);
+            currentBubble = createAssistantBubble();
+          }
+          appendAgentStep(currentBubble, evt);
+        } else if (evt.type === 'tool_started') {
+          if (!currentBubble) {
+            removeTyping(typing);
+            currentBubble = createAssistantBubble();
+          }
+          appendToolCall(currentBubble, evt);
+        } else if (evt.type === 'tool_finished') {
+          updateToolCall(currentBubble, evt);
+        } else if (evt.type === 'approval_requested') {
+          appendApprovalRequest(currentBubble, evt);
+        } else if (evt.type === 'memory_proposed') {
+          appendMemoryProposed(currentBubble, evt);
         } else if (evt.type === 'chunk') {
           if (!currentBubble) {
             removeTyping(typing);
@@ -432,6 +456,166 @@ function createAssistantBubble() {
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
   return div;
+}
+
+// ── Inline progress UI for agent steps, tool calls, memory events ────────
+
+function _ensureProgressArea(bubble) {
+  if (!bubble) return null;
+  let area = bubble.querySelector('.progress-area');
+  if (!area) {
+    area = document.createElement('div');
+    area.className = 'progress-area';
+    const content = bubble.querySelector('.msg-content');
+    if (content) bubble.insertBefore(area, content);
+    else bubble.appendChild(area);
+  }
+  return area;
+}
+
+function appendMemoryRecall(bubble, memories) {
+  const area = _ensureProgressArea(bubble);
+  if (!area) return;
+  if (!memories.length) return;
+  const chip = document.createElement('div');
+  chip.className = 'memory-recall-chip';
+  chip.innerHTML = `<span class="chip-icon">🧠</span> <span>${memories.length} memor${memories.length === 1 ? 'y' : 'ies'} used</span>`;
+  const detail = document.createElement('div');
+  detail.className = 'memory-recall-detail';
+  detail.style.display = 'none';
+  detail.innerHTML = memories.map(m =>
+    `<div class="memory-recall-item"><span class="memory-type">${escapeHtml(m.type || 'memory')}</span> ${escapeHtml(m.content || '')}</div>`
+  ).join('');
+  chip.addEventListener('click', () => {
+    detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+  });
+  area.appendChild(chip);
+  area.appendChild(detail);
+  const container = $('#chat-msgs');
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+function appendAgentStep(bubble, evt) {
+  const area = _ensureProgressArea(bubble);
+  if (!area) return;
+  const step = document.createElement('div');
+  step.className = 'agent-step';
+  step.innerHTML = `<span class="step-icon">🧠</span> <span>Reasoning iteration ${evt.n}/${evt.max || '?'}</span>`;
+  area.appendChild(step);
+  const container = $('#chat-msgs');
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+function appendToolCall(bubble, evt) {
+  const area = _ensureProgressArea(bubble);
+  if (!area) return;
+  const card = document.createElement('div');
+  card.className = 'tool-call pending';
+  card.dataset.toolId = evt.id;
+  const argsPreview = JSON.stringify(evt.args || {}).slice(0, 120);
+  card.innerHTML = `
+    <div class="tool-call-header">
+      <span class="tool-icon">⚙️</span>
+      <span class="tool-name">${escapeHtml(evt.name || 'tool')}</span>
+      <span class="tool-status">⏳</span>
+    </div>
+    <div class="tool-call-args">${escapeHtml(argsPreview)}</div>
+  `;
+  area.appendChild(card);
+  const container = $('#chat-msgs');
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+function updateToolCall(bubble, evt) {
+  const area = _ensureProgressArea(bubble);
+  if (!area) return;
+  const card = area.querySelector(`.tool-call[data-tool-id="${evt.id}"]`);
+  if (!card) return;
+  card.classList.remove('pending');
+  card.classList.add(evt.ok ? 'done' : 'error');
+  const status = card.querySelector('.tool-status');
+  if (status) status.textContent = evt.ok ? `✓ ${evt.duration_ms || 0}ms` : '✗';
+  const result = document.createElement('div');
+  result.className = 'tool-call-result';
+  const content = (evt.content || '').slice(0, 400);
+  result.textContent = content;
+  card.appendChild(result);
+  const container = $('#chat-msgs');
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+function appendApprovalRequest(bubble, evt) {
+  const area = _ensureProgressArea(bubble);
+  if (!area) return;
+  const bar = document.createElement('div');
+  bar.className = 'approval-bar';
+  bar.innerHTML = `
+    <span class="approval-icon">🔐</span>
+    <span class="approval-text">${escapeHtml(evt.description || 'Action requires approval')}</span>
+    <button class="approval-yes" data-approval-id="${escapeHtml(evt.approval_id || '')}">Approve</button>
+    <button class="approval-no" data-approval-id="${escapeHtml(evt.approval_id || '')}">Deny</button>
+  `;
+  bar.querySelector('.approval-yes').addEventListener('click', () => respondApproval(evt.approval_id, true, bar));
+  bar.querySelector('.approval-no').addEventListener('click', () => respondApproval(evt.approval_id, false, bar));
+  area.appendChild(bar);
+  const container = $('#chat-msgs');
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+async function respondApproval(approvalId, approved, bar) {
+  if (!approvalId) return;
+  bar.querySelectorAll('button').forEach(b => b.disabled = true);
+  try {
+    const res = await fetch('/api/chat/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approval_id: approvalId, approved, session_id: state.currentSession || 'web' }),
+    });
+    const data = await res.json();
+    if (approved && data.success) {
+      bar.innerHTML = `<span class="approval-icon">✅</span> <span class="approval-text">Approved: ${escapeHtml(String(data.text || '').slice(0, 200))}</span>`;
+    } else if (!approved) {
+      bar.innerHTML = `<span class="approval-icon">⛔</span> <span class="approval-text">Denied</span>`;
+    } else {
+      bar.innerHTML = `<span class="approval-icon">⚠️</span> <span class="approval-text">Failed: ${escapeHtml(String(data.text || '').slice(0, 200))}</span>`;
+    }
+  } catch (e) {
+    bar.innerHTML = `<span class="approval-icon">⚠️</span> <span class="approval-text">Network error</span>`;
+  }
+}
+
+function appendMemoryProposed(bubble, evt) {
+  const area = _ensureProgressArea(bubble);
+  if (!area) return;
+  const chip = document.createElement('div');
+  chip.className = 'memory-proposed-chip';
+  chip.innerHTML = `
+    <span class="chip-icon">💡</span>
+    <span class="chip-content">I learned: ${escapeHtml(evt.content || '')}</span>
+    <span class="chip-type">${escapeHtml(evt.memory_type || '')}</span>
+    <button class="chip-accept" data-memory-id="${escapeHtml(evt.memory_id || '')}">✓</button>
+    <button class="chip-reject" data-memory-id="${escapeHtml(evt.memory_id || '')}">✗</button>
+  `;
+  chip.querySelector('.chip-accept').addEventListener('click', () => respondMemory(evt.memory_id, 'approve', chip));
+  chip.querySelector('.chip-reject').addEventListener('click', () => respondMemory(evt.memory_id, 'reject', chip));
+  area.appendChild(chip);
+  const container = $('#chat-msgs');
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+async function respondMemory(memoryId, action, chip) {
+  if (!memoryId) return;
+  chip.querySelectorAll('button').forEach(b => b.disabled = true);
+  try {
+    const res = await fetch(`/api/memory/${memoryId}/${action}`, { method: 'POST' });
+    if (res.ok) {
+      chip.classList.add(action === 'approve' ? 'accepted' : 'rejected');
+      chip.querySelector('.chip-content').textContent =
+        (action === 'approve' ? '✓ Accepted: ' : '✗ Rejected: ') + (chip.querySelector('.chip-content').textContent.replace(/^I learned: /, ''));
+    }
+  } catch (e) {
+    chip.querySelectorAll('button').forEach(b => b.disabled = false);
+  }
 }
 
 function updateAssistantBubble(bubble, full, sources) {

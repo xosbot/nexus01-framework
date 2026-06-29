@@ -1353,3 +1353,107 @@ input, textarea, select { font-family: inherit; }
   .welcome-stats { grid-template-columns: 1fr 1fr; }
   .topbar-meta { display: none; }
 }
+
+/* ── Phase 1: progress area in chat messages ────────────────────── */
+
+.progress-area {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.memory-recall-chip,
+.memory-proposed-chip,
+.agent-step,
+.tool-call,
+.approval-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+  color: var(--text-muted, #888);
+  font-size: 12px;
+  line-height: 1.4;
+  flex-wrap: wrap;
+}
+
+.memory-recall-chip { cursor: pointer; }
+.memory-recall-chip:hover { background: var(--surface-3, rgba(255,255,255,0.08)); }
+
+.memory-recall-detail {
+  margin: 4px 0 4px 24px;
+  padding-left: 12px;
+  border-left: 2px solid var(--accent, #6cf);
+  font-size: 11px;
+}
+.memory-recall-item { margin-bottom: 4px; }
+.memory-type {
+  display: inline-block;
+  padding: 1px 6px;
+  background: var(--accent, #6cf);
+  color: #000;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.tool-call { flex-direction: column; align-items: stretch; }
+.tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.tool-call-args {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--text-faint, #666);
+  margin-top: 2px;
+  word-break: break-all;
+}
+.tool-call-result {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: var(--surface-1, rgba(0,0,0,0.2));
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.tool-call.pending .tool-status { color: var(--accent, #6cf); animation: pulse 1.2s ease-in-out infinite; }
+.tool-call.done .tool-status { color: #4ade80; }
+.tool-call.error .tool-status { color: #f87171; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.approval-bar { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+.approval-bar button {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: auto;
+}
+.approval-yes { background: #22c55e; color: #fff; }
+.approval-no { background: #ef4444; color: #fff; }
+.approval-yes:disabled, .approval-no:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.memory-proposed-chip button {
+  padding: 2px 6px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.chip-accept { background: #22c55e; color: #fff; }
+.chip-reject { background: #ef4444; color: #fff; }
+.memory-proposed-chip.accepted { opacity: 0.5; }
+.memory-proposed-chip.rejected { opacity: 0.4; text-decoration: line-through; }

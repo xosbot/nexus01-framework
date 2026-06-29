@@ -546,6 +546,122 @@ def create_api_app(nexus_app) -> FastAPI:
             "X-Accel-Buffering": "no",
         })
 
+    # ── Memory endpoints (Phase 1) ──────────────────────────────────────
+
+    @app.get("/api/memory/core")
+    async def memory_core():
+        brain = getattr(nexus_app, "second_brain", None)
+        if brain is None:
+            return {"blocks": {}, "enabled": False}
+        return {"blocks": brain.get_core_blocks(), "enabled": True}
+
+    @app.put("/api/memory/core/{label}")
+    async def memory_core_update(label: str, request: Request):
+        brain = getattr(nexus_app, "second_brain", None)
+        if brain is None:
+            raise HTTPException(503, "Phase 1 memory not enabled")
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(400, "Invalid JSON")
+        value = str(body.get("value", ""))
+        actor = str(body.get("actor", "user"))
+        try:
+            result = brain.set_core_block(label, value, actor=actor)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        return {"ok": True, "block": result}
+
+    @app.get("/api/memory/list")
+    async def memory_list(status: str = "active", type: str | None = None, limit: int = 50):
+        brain = getattr(nexus_app, "second_brain", None)
+        if brain is None:
+            return {"memories": [], "enabled": False}
+        return {"memories": brain.list_memories(status=status, type=type, limit=limit), "enabled": True}
+
+    @app.get("/api/memory/pending")
+    async def memory_pending(limit: int = 50):
+        brain = getattr(nexus_app, "second_brain", None)
+        if brain is None:
+            return {"memories": [], "enabled": False}
+        return {"memories": brain.list_pending(limit=limit), "enabled": True}
+
+    @app.post("/api/memory/{memory_id}/approve")
+    async def memory_approve(memory_id: str):
+        brain = getattr(nexus_app, "second_brain", None)
+        if brain is None:
+            raise HTTPException(503, "Phase 1 memory not enabled")
+        try:
+            m = brain.approve_memory(memory_id)
+        except KeyError:
+            raise HTTPException(404, "Memory not found")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        return {"ok": True, "memory": m}
+
+    @app.post("/api/memory/{memory_id}/reject")
+    async def memory_reject(memory_id: str):
+        brain = getattr(nexus_app, "second_brain", None)
+        if brain is None:
+            raise HTTPException(503, "Phase 1 memory not enabled")
+        try:
+            m = brain.reject_memory(memory_id)
+        except KeyError:
+            raise HTTPException(404, "Memory not found")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        return {"ok": True, "memory": m}
+
+    @app.post("/api/memory/{memory_id}/pin")
+    async def memory_pin(memory_id: str, request: Request):
+        brain = getattr(nexus_app, "second_brain", None)
+        if brain is None:
+            raise HTTPException(503, "Phase 1 memory not enabled")
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        pinned = bool(body.get("pinned", True))
+        try:
+            m = brain.pin_memory(memory_id, pinned=pinned)
+        except KeyError:
+            raise HTTPException(404, "Memory not found")
+        return {"ok": True, "memory": m}
+
+    @app.delete("/api/memory/{memory_id}")
+    async def memory_delete(memory_id: str):
+        brain = getattr(nexus_app, "second_brain", None)
+        if brain is None:
+            raise HTTPException(503, "Phase 1 memory not enabled")
+        ok = brain.delete_memory(memory_id)
+        if not ok:
+            raise HTTPException(404, "Memory not found")
+        return {"ok": True}
+
+    @app.get("/api/memory/audit")
+    async def memory_audit(limit: int = 100, memory_id: str | None = None):
+        brain = getattr(nexus_app, "second_brain", None)
+        if brain is None:
+            return {"entries": [], "enabled": False}
+        return {"entries": brain.audit_log(limit=limit, memory_id=memory_id), "enabled": True}
+
+    @app.get("/api/memory/stats")
+    async def memory_stats():
+        brain = getattr(nexus_app, "second_brain", None)
+        if brain is None:
+            return {"enabled": False}
+        return {"enabled": True, **brain.stats()}
+
+    @app.get("/api/memory/{memory_id}")
+    async def memory_get(memory_id: str):
+        brain = getattr(nexus_app, "second_brain", None)
+        if brain is None:
+            raise HTTPException(503, "Phase 1 memory not enabled")
+        m = brain.get(memory_id)
+        if not m:
+            raise HTTPException(404, "Memory not found")
+        return m
+
     @app.websocket("/ws")
     async def ws_chat(websocket: WebSocket):
         await websocket.accept()
