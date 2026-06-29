@@ -1,6 +1,6 @@
 # NEXUS-01 — Build Plan
 
-**Status:** Phase 0 (UI + soul + events + permissions + slash commands) shipped on https://navos.space  
+**Status:** Phase 1 (agentic chat + memory + tools) complete on https://navos.space  
 **Audience:** NEXUS-01 maintainers (xosbot + team)  
 **Last updated:** 2026-06-29
 
@@ -846,4 +846,4 @@ This is a plan for an autonomous run. I will commit and push after each phase. I
 
 **Last updated:** 2026-06-29
 **Owner:** NEXUS-01 maintainers
-**Status:** Phase 0 shipped; Phase 1 in progress.
+**Status:** Phase 0 + Phase 1 shipped. Phase 2 next.
