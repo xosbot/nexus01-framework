@@ -512,8 +512,10 @@ def create_api_app(nexus_app) -> FastAPI:
                 memory.save_conversation("orchestrator", "assistant", full_text, session_id)
 
                 # Phase 1: fire-and-forget memory extraction (bounded by timeout)
+                from core import slash as _slash
                 if (extractor is not None
                     and getattr(nexus_app, "memory_extraction_enabled", True)
+                    and not _slash.is_paused(session_id)
                     and full_text):
                     try:
                         proposed = await asyncio.wait_for(
@@ -881,8 +883,8 @@ def create_api_app(nexus_app) -> FastAPI:
         response = await gateway.handle(inbound)
         return {"text": response.text, "success": response.success}
 
-    @app.get("/api/memory/stats")
-    async def memory_stats():
+    @app.get("/api/memory/legacy_stats")
+    async def memory_legacy_stats():
         return memory.stats()
 
     @app.get("/api/memory/knowledge")
