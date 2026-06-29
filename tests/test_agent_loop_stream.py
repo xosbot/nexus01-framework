@@ -229,3 +229,61 @@ async def test_stream_injects_system_message_if_missing(router: MagicMock, tools
     call_args = router.complete_messages.await_args
     msgs = call_args.kwargs.get("messages") or call_args.args[0]
     assert msgs[0]["role"] == "system"
+
+
+# ── Client disconnect / cancellation ───────────────────────────────────────
+
+
+async def test_stream_client_disconnect_cancels_cleanly(router: MagicMock, tools: ToolRegistry) -> None:
+    """If the SSE consumer drops mid-stream, the agent loop must cancel cleanly.
+
+    Simulates an HTTP client disconnect by breaking out of the async-for loop
+    after the first `agent_iteration` event. The next `__anext__` triggers the
+    LLM call; cancelling the task there must propagate CancelledError, not hang
+    the test or leak the inner future.
+    """
+    import asyncio
+
+    llm_started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_llm_call(*args, **kwargs):
+        llm_started.set()
+        await release.wait()  # block — we cancel before this resolves
+        return _response("never delivered")
+
+    router.complete_with_tools = AsyncMock(side_effect=slow_llm_call)
+    router.complete_messages = AsyncMock(side_effect=slow_llm_call)
+
+    loop = AgentLoop(router, tools, FakeMemory())  # type: ignore[arg-type]
+
+    iter_started = asyncio.Event()
+    first_event_received = asyncio.Event()
+
+    async def consume():
+        # Pull the first event (agent_iteration), then the second pull
+        # triggers the LLM call. We pull exactly one event then return —
+        # the consumer drops the connection mid-tool-call.
+        gen = loop.stream([{"role": "user", "content": "go"}])
+        try:
+            iter_started.set()
+            await gen.__anext__()  # agent_iteration
+            first_event_received.set()
+            # The next __anext__ enters the LLM call. We don't pull it —
+            # we just let the task be cancelled while suspended on the call.
+            await gen.__anext__()
+        finally:
+            await gen.aclose()
+
+    task = asyncio.create_task(consume())
+    await iter_started.wait()
+    await first_event_received.wait()
+    # Now the consumer is blocked inside the LLM call (slow_llm_call).
+    await llm_started.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    # Unblock the slow mock so the event loop has no pending awaits.
+    release.set()
