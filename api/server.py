@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from api.auth import AuthMiddleware, ws_auth
+from api.auth_routes import build_auth_router
 from gateway.types import ChannelKind, InboundMessage
 
 logger = logging.getLogger(__name__)
@@ -72,10 +73,16 @@ def create_api_app(nexus_app) -> FastAPI:
         allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["Authorization", "X-API-Key", "Content-Type"],
     )
-    app.add_middleware(AuthMiddleware)
     gateway = nexus_app.gateway
     memory = nexus_app.memory
     llm = nexus_app.llm
+    # AuthMiddleware gets memory so it can resolve per-user nxk_ API keys.
+    # No memory → no per-user keys; legacy env keys still work.
+    app.add_middleware(AuthMiddleware, memory=memory)
+
+    # ── Auth routes (login / register / me / keys) ─────────────────────
+    if getattr(memory, "users", None) is not None:
+        app.include_router(build_auth_router(memory))
 
     brain = getattr(nexus_app, 'brain', None)
     copilot = getattr(nexus_app, 'copilot', None)

@@ -59,6 +59,12 @@ def _build_mock_nexus() -> SimpleNamespace:
     # Gateway stub
     gateway = MagicMock(name="gateway")
 
+    # By default the mock has no user accounts / API keys — this is a
+    # "legacy single-user" deployment for testing the public API surface.
+    # Tests that need auth endpoints (test_auth_routes.py) build a real Memory.
+    memory.users = None
+    memory.api_keys = None
+
     # Channels: empty list is fine for these tests
     nexus = SimpleNamespace(
         gateway=gateway,
