@@ -126,11 +126,29 @@ CREATE INDEX IF NOT EXISTS idx_audit_ts ON memory_audit(ts DESC);
 # ── Helpers ───────────────────────────────────────────────────────────────
 
 def _fts_escape(query: str) -> str:
-    """Escape a query for FTS5 MATCH. Wraps in double-quotes and escapes inner quotes."""
+    """Sanitize a query for FTS5 MATCH.
+
+    FTS5 parses raw query text as a search expression (tokenized). Special
+    chars like `"`, `(`, `)`, `*`, `:` have meaning. We escape them by
+    quoting each word individually, which gives us tokenized AND matching
+    without phrase-exact requirements.
+
+    This means "what python version" becomes `"what" "python" "version"`,
+    which matches any document containing all three tokens (FTS5 default
+    is implicit AND for space-separated quoted terms).
+    """
     if not query:
         return '""'
-    escaped = query.replace('"', '""')
-    return f'"{escaped}"'
+    tokens = query.split()
+    if not tokens:
+        return '""'
+    quoted = []
+    for t in tokens:
+        # Strip FTS5 special chars from each token; collapse double-quotes
+        cleaned = t.replace('"', '').replace("(", "").replace(")", "").replace(":", "").replace("*", "")
+        if cleaned:
+            quoted.append(f'"{cleaned}"')
+    return " ".join(quoted) if quoted else '""'
 
 
 def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
