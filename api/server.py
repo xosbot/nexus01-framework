@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -323,6 +324,109 @@ def create_api_app(nexus_app) -> FastAPI:
         )
         response = await gateway.handle(inbound)
         return {"text": response.text, "success": response.success}
+
+    @app.post("/api/chat/stream")
+    async def chat_stream(req: ChatRequest):
+        """Server-Sent Events streaming chat. Bypasses orchestrator for low-latency conversational responses.
+
+        Wire format: each event is `data: <json>\\n\\n`.
+        Event types: `sources` (RAG citations), `chunk` (token), `command` (slash command result),
+                     `done` (final metadata), `error` (failure).
+        """
+        from core import events as _events
+        from core import slash as _slash
+        from core import permissions as _permissions
+
+        _events.emit("chat_received", req.message[:120], session_id=req.session_id or "", agent="chat_stream")
+
+        session_id = req.session_id
+        if not session_id:
+            session = memory.sessions.create(title=req.message[:60], project_id=req.project_id, channel="web")
+            session_id = session["id"]
+        else:
+            memory.sessions.touch(session_id)
+
+        if req.message.lstrip().startswith("/"):
+            ctx = {
+                "llm": llm,
+                "memory": memory,
+                "agents": ["orchestrator", "osint", "analyst", "executor"],
+                "bus_backend": "redis" if (hasattr(nexus_app, "_bus") and getattr(nexus_app._bus, "_redis", None)) else "memory",
+                "cold_mode": True,
+                "react_loop": True,
+            }
+            result = await _slash.dispatch(req.message, session_id, ctx)
+
+            async def command_gen():
+                payload = {
+                    "type": "command",
+                    "ok": result.ok,
+                    "title": result.title,
+                    "text": result.text,
+                    "side_effect": result.side_effect,
+                    "data": result.data or {},
+                }
+                yield f"data: {json.dumps(payload)}\n\n"
+                memory.save_conversation("orchestrator", "user", req.message, session_id)
+                memory.save_conversation("orchestrator", "assistant", result.text, session_id)
+                yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'content': result.text})}\n\n"
+
+            return StreamingResponse(command_gen(), media_type="text/event-stream", headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            })
+
+        history = memory.get_context("orchestrator", session_id=session_id)
+        messages = [{"role": m["role"], "content": m["content"]} for m in history[-20:]]
+
+        sources: list[dict] = []
+        rag = getattr(nexus_app, "rag", None)
+        if rag and hasattr(rag, "search"):
+            try:
+                hits = rag.search(req.message, n=3) or []
+                for h in hits[:3]:
+                    sources.append({
+                        "content": (h.get("content", "") or "")[:400],
+                        "source": (h.get("metadata") or {}).get("source", ""),
+                        "url": (h.get("metadata") or {}).get("url", ""),
+                        "title": (h.get("metadata") or {}).get("title", ""),
+                        "distance": h.get("distance"),
+                    })
+                if sources:
+                    context_block = "\n\n".join(
+                        f"[{i+1}] {s['content']}" for i, s in enumerate(sources)
+                    )
+                    messages.insert(0, {
+                        "role": "system",
+                        "content": f"Use the following knowledge base excerpts to ground your answer when relevant. Cite as [1], [2], [3]:\n\n{context_block}",
+                    })
+            except Exception as exc:
+                logger.debug("RAG context injection failed: %s", exc)
+
+        messages.append({"role": "user", "content": req.message})
+
+        async def event_gen():
+            full_text = ""
+            try:
+                if sources:
+                    yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
+                async for token in llm.stream(messages, session_id=session_id, agent="chat_stream"):
+                    if not token:
+                        continue
+                    full_text += token
+                    yield f"data: {json.dumps({'type': 'chunk', 'content': token})}\n\n"
+                memory.save_conversation("orchestrator", "user", req.message, session_id)
+                memory.save_conversation("orchestrator", "assistant", full_text, session_id)
+                yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'content': full_text})}\n\n"
+            except Exception as exc:
+                _events.emit("error", f"chat_stream failed: {exc}", session_id=session_id, agent="chat_stream", level="error")
+                logger.exception("Streaming chat failed")
+                yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
+
+        return StreamingResponse(event_gen(), media_type="text/event-stream", headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        })
 
     @app.websocket("/ws")
     async def ws_chat(websocket: WebSocket):
@@ -925,5 +1029,76 @@ def create_api_app(nexus_app) -> FastAPI:
             raise HTTPException(503, "Config manager not initialized")
         config_mgr.reload()
         return {"ok": True, "message": "Config reloaded"}
+
+    # ── Soul (personality) ────────────────────────────────────────────
+
+    @app.get("/api/soul")
+    async def get_soul():
+        from core import soul as _soul_mod
+        s = _soul_mod.get()
+        return {
+            "sections": s.sections,
+            "stats": _soul_mod.section_stats(),
+        }
+
+    @app.get("/api/soul/{section}")
+    async def get_soul_section(section: str):
+        from core import soul as _soul_mod
+        if section not in ("soul", "personality", "taste", "heartbeat"):
+            raise HTTPException(404, "Unknown section")
+        return {"section": section, "body": _soul_mod.get().section(section)}
+
+    @app.put("/api/soul/{section}")
+    async def save_soul_section(section: str, request: Request):
+        from core import soul as _soul_mod
+        if section not in ("soul", "personality", "taste", "heartbeat"):
+            raise HTTPException(404, "Unknown section")
+        data = await request.json()
+        body = data.get("body", "")
+        if not body.strip():
+            raise HTTPException(400, "body cannot be empty")
+        _soul_mod.save_section(section, body)
+        return {"ok": True, "section": section}
+
+    @app.post("/api/soul/reload")
+    async def reload_soul():
+        from core import soul as _soul_mod
+        s = _soul_mod.reload()
+        return {"ok": True, "loaded": list(s.sections.keys())}
+
+    # ── Event log ──────────────────────────────────────────────────────
+
+    @app.get("/api/events")
+    async def get_events(limit: int = 100, since: float = 0.0, kind: str | None = None,
+                         session_id: str | None = None):
+        from core import events as _events_mod
+        rows = _events_mod.query(limit=min(limit, 500), since=since, kind=kind, session_id=session_id)
+        return {"events": rows, "count": len(rows)}
+
+    @app.get("/api/events/stats")
+    async def events_stats():
+        from core import events as _events_mod
+        return _events_mod.stats()
+
+    # ── Permission modes (per session) ───────────────────────────────
+
+    @app.get("/api/permissions/{session_id}")
+    async def get_perm(session_id: str):
+        from core import permissions as _perm_mod
+        return _perm_mod.get(session_id).to_dict()
+
+    @app.put("/api/permissions/{session_id}")
+    async def set_perm(session_id: str, request: Request):
+        from core import permissions as _perm_mod
+        data = await request.json()
+        mode = data.get("mode", "ask")
+        if mode not in ("ask", "allow"):
+            raise HTTPException(400, "mode must be 'ask' or 'allow'")
+        return _perm_mod.set_mode(session_id, mode).to_dict()
+
+    @app.get("/api/permissions")
+    async def list_perms():
+        from core import permissions as _perm_mod
+        return {"permissions": _perm_mod.list_all()}
 
     return app
