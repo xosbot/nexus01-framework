@@ -85,14 +85,12 @@ CREATE TABLE IF NOT EXISTS memories (
     pinned INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL,
     last_referenced REAL,
-    user_id TEXT NOT NULL DEFAULT 'user_legacy',
     access_count INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status, confidence DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(source_session_id);
 CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type, status);
-CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id, status, created_at DESC);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
     content, type,
@@ -196,13 +194,19 @@ class SecondBrain:
             cols = {r[1] for r in c.execute("PRAGMA table_info(memories)").fetchall()}
             if "pinned" not in cols:
                 c.execute("ALTER TABLE memories ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
-            # Phase 2.3: user_id column on memories (idempotent)
+            # Phase 2.3: user_id column on memories (idempotent migration).
+            # We don't put user_id in CREATE TABLE above because IF NOT EXISTS
+            # is a no-op on existing tables — that would skip the column add
+            # and the CREATE INDEX below would fail with "no such column".
             if "user_id" not in cols:
                 c.execute(
                     "ALTER TABLE memories ADD COLUMN user_id TEXT NOT NULL DEFAULT 'user_legacy'"
                 )
-                c.execute("CREATE INDEX IF NOT EXISTS idx_memories_user "
-                          "ON memories(user_id, status, created_at DESC)")
+            # Always (re-)create the per-user index; safe because of IF NOT EXISTS
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memories_user "
+                "ON memories(user_id, status, created_at DESC)"
+            )
 
     # ── Core blocks ─────────────────────────────────────────────────────
 
