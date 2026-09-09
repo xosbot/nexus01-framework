@@ -78,14 +78,15 @@ class NexusGateway:
                         reason="gateway exec approval",
                         correlation_id=inbound.session_id,
                     )
-                    # authority.request auto-approves reads but exec stays pending
-                    if res["request"]["status"] == "pending":
+                    # authority.request auto-approves reads but exec stays pending (handle both cases)
+                    status = str(res["request"]["status"]).lower()
+                    if status == "pending":
                         authority_request_id = res["request"]["id"]
-                    elif res["request"]["status"] == "approved":
+                    elif status == "approved":
                         # policy auto-allowed (e.g., read) — bypass gateway approval
                         return await self._dispatch(inbound)
                     # deny case: block immediately
-                    if res["request"]["status"] == "denied":
+                    if status == "denied":
                         return GatewayResponse("⛔ Blocked by policy: " + res["request"].get("policy_reason", ""))
                 except Exception:
                     # fall through to legacy approval path

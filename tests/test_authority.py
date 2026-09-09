@@ -1,131 +1,197 @@
-"""XOS Control Runtime — focused authority tests (8/8).
-
-Covers: request → policy → approve → grant lifecycle
-        grant expiry, single-use, scope, evidence, confirm mode
-"""
-
 from __future__ import annotations
-
-import time
 
 import pytest
 
-from core.authority import AuthorityService
-from core.policy import Policy
+from core.authority import (
+    AuthorityService,
+    ControlMode,
+    GrantConsumed,
+    GrantExpired,
+    GrantScopeMismatch,
+    PolicyDecision,
+    RequestNotPending,
+    RequestStatus,
+    RiskClass,
+)
 
 
 @pytest.fixture
-def svc(tmp_path):
-    db = tmp_path / "authority.db"
-    return AuthorityService(db_path=db, grant_ttl_seconds=600)
+def authority():
+    service = AuthorityService(":memory:")
+    try:
+        yield service
+    finally:
+        service.close()
 
 
-@pytest.fixture
-def svc_short_ttl(tmp_path):
-    db = tmp_path / "authority_short.db"
-    return AuthorityService(db_path=db, grant_ttl_seconds=1)
-
-
-def test_request_pending_for_execute(svc):
-    res = svc.request(actor_id="agent:osint", action="run_command", resource="shell:ls")
-    assert res["request"]["status"] == "pending"
-    assert res["grant"] is None
-    assert res["policy"]["require_approval"] is True
-
-
-def test_approve_issues_scoped_grant(svc):
-    res = svc.request(actor_id="human:alice", action="run_command", resource="shell:deploy", session_id="s1")
-    req_id = res["request"]["id"]
-    out = svc.approve(req_id, approved_by="human:alice")
-    grant = out["grant"]
-    assert grant["action"] == "run_command"
-    assert grant["resource"] == "shell:deploy"
-    assert grant["single_use"] is True
-    assert grant["used"] is False
-    # verify without consuming still valid
-    ok, _ = svc.verify_grant(grant["id"], "run_command", "shell:deploy")
-    assert ok
-
-
-def test_deny_blocks_grant(svc):
-    res = svc.request(actor_id="agent:exec", action="delete", resource="db:users")
-    req_id = res["request"]["id"]
-    out = svc.deny(req_id, denied_by="human:bob", reason="too risky")
-    assert out["request"]["status"] == "denied"
-    assert out["grant"] is None
-    # approve after deny should fail
-    with pytest.raises(ValueError):
-        svc.approve(req_id)
-
-
-def test_grant_expiry(svc_short_ttl):
-    res = svc_short_ttl.request(actor_id="agent:exec", action="run_command", resource="shell:tmp")
-    grant = svc_short_ttl.approve(res["request"]["id"])["grant"]
-    ok, _ = svc_short_ttl.verify_grant(grant["id"], "run_command", "shell:tmp")
-    assert ok
-    time.sleep(1.2)
-    ok2, reason = svc_short_ttl.verify_grant(grant["id"], "run_command", "shell:tmp")
-    assert not ok2
-    assert "expired" in reason
-
-
-def test_single_use_grant(svc):
-    res = svc.request(actor_id="agent:exec", action="write_file", resource="/tmp/demo.txt")
-    grant = svc.approve(res["request"]["id"])["grant"]
-    ok, _ = svc.consume_grant(grant["id"], "write_file", "/tmp/demo.txt")
-    assert ok
-    ok2, reason = svc.consume_grant(grant["id"], "write_file", "/tmp/demo.txt")
-    assert not ok2
-    assert "already used" in reason
-    ok3, reason3 = svc.verify_grant(grant["id"], "write_file", "/tmp/demo.txt")
-    assert not ok3
-    assert "already used" in reason3
-
-
-def test_scope_must_match(svc):
-    res = svc.request(actor_id="agent:exec", action="run_command", resource="shell:allowed")
-    grant = svc.approve(res["request"]["id"])["grant"]
-    ok, reason = svc.verify_grant(grant["id"], "run_command", "shell:other")
-    assert not ok
-    assert "scope mismatch" in reason
-    ok2, reason2 = svc.verify_grant(grant["id"], "write_file", "shell:allowed")
-    assert not ok2
-    assert "scope mismatch" in reason2
-    # correct scope still consumes
-    ok3, _ = svc.consume_grant(grant["id"], "run_command", "shell:allowed")
-    assert ok3
-
-
-def test_evidence_recorded(svc):
-    res = svc.request(actor_id="agent:exec", action="run_command", resource="shell:evidence")
-    grant = svc.approve(res["request"]["id"])["grant"]
-    svc.consume_grant(grant["id"], "run_command", "shell:evidence")
-    ev = svc.record_evidence(
-        request_id=res["request"]["id"],
-        grant_id=grant["id"],
-        actor_id="agent:exec",
-        action="run_command",
-        resource="shell:evidence",
-        input_data={"cmd": "echo hi"},
-        outcome="ok",
-        success=True,
-        duration_ms=42,
+def _request(authority: AuthorityService, *, mode: ControlMode = ControlMode.CONFIRM):
+    return authority.create_request(
+        actor="agent.coder.01",
+        principal="navigator",
+        action="github.create_branch",
+        resource="xosbot/nexus01-framework",
+        environment="production",
+        risk_class=RiskClass.MEDIUM,
+        requested_scope={"branch": "proof/xos-control-001"},
+        correlation_id="corr-proof-001",
+        mode=mode,
     )
-    assert ev["request_id"] == res["request"]["id"]
-    assert ev["grant_id"] == grant["id"]
-    listed = svc.list_evidence(request_id=res["request"]["id"])
-    assert len(listed) == 1
-    assert listed[0]["id"] == ev["id"]
 
 
-def test_confirm_mode_requires_approval_even_for_read(tmp_path):
-    policy = Policy(confirm_mode=True)
-    svc_confirm = AuthorityService(db_path=tmp_path / "confirm.db", policy=policy)
-    res = svc_confirm.request(actor_id="agent:reader", action="read_file", resource="/tmp/foo")
-    assert res["request"]["status"] == "pending"
-    assert res["policy"]["require_approval"] is True
-    # normal mode auto-allows read
-    svc_normal = AuthorityService(db_path=tmp_path / "normal.db", policy=Policy(confirm_mode=False))
-    res2 = svc_normal.request(actor_id="agent:reader", action="read_file", resource="/tmp/foo")
-    assert res2["request"]["status"] == "approved"
-    assert res2["grant"] is not None
+def test_confirm_mode_requires_human_and_issues_single_use_grant(authority: AuthorityService):
+    request = _request(authority)
+
+    assert request.status is RequestStatus.PENDING
+    assert request.policy_decision is PolicyDecision.REQUIRE_HUMAN
+
+    grant = authority.approve(request.id, approved_by="navigator", ttl_seconds=300)
+    approved = authority.get_request(request.id)
+
+    assert approved.status is RequestStatus.APPROVED
+    assert approved.decided_by == "navigator"
+    assert grant.request_id == request.id
+    assert grant.action == request.action
+    assert grant.resource == request.resource
+    assert grant.single_use is True
+
+    consumed = authority.consume_grant(
+        grant.id,
+        action="github.create_branch",
+        resource="xosbot/nexus01-framework",
+    )
+    assert consumed.consumed_at is not None
+
+    with pytest.raises(GrantConsumed):
+        authority.consume_grant(
+            grant.id,
+            action="github.create_branch",
+            resource="xosbot/nexus01-framework",
+        )
+
+    assert [e.event_type for e in authority.list_evidence(request_id=request.id)] == [
+        "request.created",
+        "request.approved",
+        "grant.issued",
+        "grant.consumed",
+    ]
+
+
+@pytest.mark.parametrize("mode", [ControlMode.OBSERVE, ControlMode.PROPOSE])
+def test_non_execution_modes_fail_closed(authority: AuthorityService, mode: ControlMode):
+    request = _request(authority, mode=mode)
+
+    assert request.status is RequestStatus.DENIED
+    assert request.policy_decision is PolicyDecision.DENY
+    assert request.decided_by == "xos.policy"
+
+    with pytest.raises(RequestNotPending):
+        authority.approve(request.id, approved_by="navigator")
+
+    assert [e.event_type for e in authority.list_evidence(request_id=request.id)] == [
+        "request.created",
+        "request.denied",
+    ]
+
+
+def test_explicit_denial_cannot_be_reversed(authority: AuthorityService):
+    request = _request(authority)
+    denied = authority.deny(request.id, denied_by="navigator", reason="Not this branch")
+
+    assert denied.status is RequestStatus.DENIED
+    assert denied.decided_by == "navigator"
+
+    with pytest.raises(RequestNotPending):
+        authority.approve(request.id, approved_by="navigator")
+
+
+def test_scope_mismatch_fails_without_consuming_grant(authority: AuthorityService):
+    request = _request(authority)
+    grant = authority.approve(request.id, approved_by="navigator")
+
+    with pytest.raises(GrantScopeMismatch):
+        authority.consume_grant(
+            grant.id,
+            action="github.delete_repository",
+            resource="xosbot/nexus01-framework",
+        )
+
+    still_valid = authority.consume_grant(
+        grant.id,
+        action="github.create_branch",
+        resource="xosbot/nexus01-framework",
+    )
+    assert still_valid.consumed_at is not None
+
+
+def test_expired_grant_fails_closed(authority: AuthorityService):
+    request = _request(authority)
+    grant = authority.approve(request.id, approved_by="navigator", ttl_seconds=0)
+
+    with pytest.raises(GrantExpired):
+        authority.consume_grant(
+            grant.id,
+            action="github.create_branch",
+            resource="xosbot/nexus01-framework",
+        )
+
+
+@pytest.mark.asyncio
+async def test_authorized_execution_records_success(authority: AuthorityService):
+    request = _request(authority)
+    grant = authority.approve(request.id, approved_by="navigator")
+
+    async def create_branch() -> dict[str, str]:
+        return {"branch": "proof/xos-control-001"}
+
+    result = await authority.execute_with_grant(
+        grant.id,
+        action="github.create_branch",
+        resource="xosbot/nexus01-framework",
+        executor=create_branch,
+        actor="nexus.github-adapter",
+    )
+
+    assert result == {"branch": "proof/xos-control-001"}
+    assert [e.event_type for e in authority.list_evidence(request_id=request.id)] == [
+        "request.created",
+        "request.approved",
+        "grant.issued",
+        "grant.consumed",
+        "execution.started",
+        "execution.succeeded",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_authorized_execution_records_failure_and_reraises(authority: AuthorityService):
+    request = authority.create_request(
+        actor="agent.coder.02",
+        principal="navigator",
+        action="github.create_branch",
+        resource="xosbot/nexus01-framework",
+        mode=ControlMode.CONFIRM,
+    )
+    grant = authority.approve(request.id, approved_by="navigator")
+
+    async def fail() -> None:
+        raise RuntimeError("simulated adapter failure")
+
+    with pytest.raises(RuntimeError, match="simulated adapter failure"):
+        await authority.execute_with_grant(
+            grant.id,
+            action="github.create_branch",
+            resource="xosbot/nexus01-framework",
+            executor=fail,
+            actor="nexus.github-adapter",
+        )
+
+    events = authority.list_evidence(request_id=request.id)
+    assert [e.event_type for e in events] == [
+        "request.created",
+        "request.approved",
+        "grant.issued",
+        "grant.consumed",
+        "execution.started",
+        "execution.failed",
+    ]
+    assert events[-1].data["error_type"] == "RuntimeError"

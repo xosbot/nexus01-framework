@@ -83,11 +83,19 @@ class ExecutorAgent(BaseAgent):
             reasons = self.cold_mode.get_failure_reasons(context)
             return {"status": "blocked", "reasons": reasons, "action": action}
 
-        # ColdMode passed — now consume the grant atomically
+        # ColdMode passed — now consume the grant atomically (hardened: raises on failure)
         if pending_verified:
-            ok_c, reason_c = self.authority.consume_grant(grant_id, action, pending_grant_resource)
-            if not ok_c:
-                return {"status": "blocked", "reasons": [f"XOS grant consume failed: {reason_c}"], "action": action}
+            try:
+                # hardened API raises; legacy shim returns bool tuple - handle both
+                result = self.authority.consume_grant(grant_id, action, pending_grant_resource)
+                # if legacy bool tuple, result would be tuple
+                if isinstance(result, tuple):
+                    ok_c, reason_c = result
+                    if not ok_c:
+                        return {"status": "blocked", "reasons": [f"XOS grant consume failed: {reason_c}"], "action": action}
+            except Exception as exc:
+                # map known grant exceptions to blocked
+                return {"status": "blocked", "reasons": [f"XOS grant consume failed: {exc}"], "action": action}
 
         self.memory.save_conversation(self.name, "user", f"Execute: {action}")
 
