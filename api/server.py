@@ -64,6 +64,23 @@ class IngestRequest(BaseModel):
     project_id: str | None = None
 
 
+class AuthorityRequestBody(BaseModel):
+    actor_type: str = "agent"
+    actor_id: str
+    session_id: str = ""
+    action: str
+    resource: str = ""
+    params: dict = {}
+    reason: str = ""
+    correlation_id: str = ""
+
+
+class AuthorityDecisionBody(BaseModel):
+    approved_by: str = "human"
+    ttl_seconds: int | None = None
+    reason: str = ""
+
+
 def create_api_app(nexus_app) -> FastAPI:
     app = FastAPI(title="IVA — NEXUS-01 OS", version="2.0.0")
     app.add_middleware(
@@ -1578,5 +1595,114 @@ def create_api_app(nexus_app) -> FastAPI:
     async def list_perms():
         from core import permissions as _perm_mod
         return {"permissions": _perm_mod.list_all()}
+
+    # ── XOS Control Runtime — authority / grants / evidence ──────────────
+
+    def _require_authority():
+        auth = getattr(nexus_app, "authority", None)
+        if auth is None:
+            raise HTTPException(503, "XOS authority not enabled")
+        return auth
+
+    @app.post("/api/authority/request")
+    async def authority_request(body: AuthorityRequestBody):
+        authority = _require_authority()
+        try:
+            result = authority.request(
+                actor_type=body.actor_type,
+                actor_id=body.actor_id,
+                session_id=body.session_id,
+                action=body.action,
+                resource=body.resource,
+                params=body.params,
+                reason=body.reason,
+                correlation_id=body.correlation_id,
+            )
+            return result
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+
+    @app.get("/api/authority/requests")
+    async def authority_list_requests(status: str | None = None, limit: int = 50):
+        authority = _require_authority()
+        return {"requests": authority.list_requests(status=status, limit=min(limit, 200))}
+
+    @app.get("/api/authority/requests/{request_id}")
+    async def authority_get_request(request_id: str):
+        authority = _require_authority()
+        req = authority.get_request(request_id)
+        if not req:
+            raise HTTPException(404, "Request not found")
+        return req
+
+    @app.post("/api/authority/requests/{request_id}/approve")
+    async def authority_approve(request_id: str, request: Request):
+        authority = _require_authority()
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        approved_by = data.get("approved_by") or data.get("created_by") or "human"
+        ttl = data.get("ttl_seconds")
+        try:
+            return authority.approve(request_id, approved_by=approved_by, ttl_seconds=ttl)
+        except KeyError:
+            raise HTTPException(404, "Request not found")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+
+    @app.post("/api/authority/requests/{request_id}/deny")
+    async def authority_deny(request_id: str, request: Request):
+        authority = _require_authority()
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        denied_by = data.get("approved_by") or data.get("denied_by") or "human"
+        reason = data.get("reason", "")
+        try:
+            return authority.deny(request_id, denied_by=denied_by, reason=reason)
+        except KeyError:
+            raise HTTPException(404, "Request not found")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+
+    @app.get("/api/authority/grants/{grant_id}")
+    async def authority_get_grant(grant_id: str):
+        authority = _require_authority()
+        g = authority.get_grant(grant_id)
+        if not g:
+            raise HTTPException(404, "Grant not found")
+        return g
+
+    @app.post("/api/authority/grants/{grant_id}/verify")
+    async def authority_verify_grant(grant_id: str, request: Request):
+        authority = _require_authority()
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        action = data.get("action", "")
+        resource = data.get("resource", "")
+        if not action:
+            raise HTTPException(400, "action is required")
+        ok, reason = authority.verify_grant(grant_id, action, resource)
+        return {"valid": ok, "reason": reason, "grant_id": grant_id}
+
+    @app.get("/api/authority/evidence")
+    async def authority_list_evidence(request_id: str | None = None, grant_id: str | None = None, limit: int = 50):
+        authority = _require_authority()
+        return {"evidence": authority.list_evidence(request_id=request_id, grant_id=grant_id, limit=min(limit, 200))}
+
+    @app.get("/api/authority/stats")
+    async def authority_stats():
+        authority = _require_authority()
+        return authority.stats()
+
+    # legacy alias — pending list
+    @app.get("/api/authority/pending")
+    async def authority_pending(limit: int = 50):
+        authority = _require_authority()
+        return {"pending": authority.list_pending(limit=min(limit, 200))}
 
     return app

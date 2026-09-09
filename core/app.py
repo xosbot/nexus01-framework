@@ -64,6 +64,8 @@ class NexusApp:
     memory_extraction_enabled: bool = True
     # Phase 2.6
     cost_dashboard: Any = None
+    # XOS Control Runtime
+    authority: Any = None
 
     async def shutdown(self) -> None:
         for channel in self.channels:
@@ -140,6 +142,16 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
     memory = Memory(cfg.database_path, cfg.chroma_path)
     cold_mode = ColdMode(cfg.cold_mode_enabled)
 
+    # XOS Control Runtime — authority service
+    from core.policy import Policy
+    from core.authority import AuthorityService
+    xos_policy = Policy(confirm_mode=cfg.xos_confirm_mode)
+    authority = AuthorityService(
+        db_path=cfg.xos_authority_db,
+        grant_ttl_seconds=cfg.xos_grant_ttl_seconds,
+        policy=xos_policy,
+    )
+
     # Config manager for runtime settings
     secrets = SecretsStore()
     settings_store = SettingsStore(memory._conn)
@@ -188,7 +200,7 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
             logger.info("Docker sandbox enabled for executor agent")
 
     osint = OSINTAgent(llm, memory, rag)
-    executor = ExecutorAgent(llm, memory, cold_mode, rag, sandbox=sandbox)
+    executor = ExecutorAgent(llm, memory, cold_mode, rag, sandbox=sandbox, authority=authority)
     analyst = AnalystAgent(llm, memory, rag)
     orchestrator = OrchestratorAgent(llm, memory, rag, agent_loop)
 
@@ -209,6 +221,7 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
         bus=msg_bus,
         allowed_users=allowed_users,
         require_approval_for_exec=cfg.require_approval_for_exec,
+        authority=authority,
     )
 
     channels = []
@@ -288,6 +301,7 @@ async def create_app(cfg: Config | None = None) -> NexusApp:
         _api_server=None,
         config_manager=config_manager,
         cost_dashboard=cost_dashboard,
+        authority=authority,
     )
 
     from core.brain import IVABrain

@@ -24,12 +24,14 @@ class NexusGateway:
         allowed_users: dict[str, list[str]] | None = None,
         require_approval_for_exec: bool = True,
         require_approval_for_replies: bool = True,
+        authority=None,
     ):
         self.bus = bus
         self.approvals = ApprovalManager()
         self.allowed_users = allowed_users or {}
         self.require_approval_for_exec = require_approval_for_exec
         self.require_approval_for_replies = require_approval_for_replies
+        self.authority = authority
         self._channels: dict[str, object] = {}
 
     def register_channel(self, adapter) -> None:
@@ -61,11 +63,39 @@ class NexusGateway:
                 return await self._handle_approval_decision(inbound)
 
         if self.require_approval_for_exec and self._needs_approval(inbound.text):
+            # XOS authority request — durable + scoped grant path
+            authority_request_id = None
+            if self.authority is not None:
+                try:
+                    cmd_text = inbound.text.split(maxsplit=1)[1] if EXEC_PATTERN.match(inbound.text) else inbound.text
+                    res = self.authority.request(
+                        actor_type="human",
+                        actor_id=inbound.user_id or f"{channel}:{inbound.session_id}",
+                        session_id=inbound.session_id,
+                        action="run_command",
+                        resource=f"shell:{cmd_text[:120]}",
+                        params={"text": inbound.text},
+                        reason="gateway exec approval",
+                        correlation_id=inbound.session_id,
+                    )
+                    # authority.request auto-approves reads but exec stays pending
+                    if res["request"]["status"] == "pending":
+                        authority_request_id = res["request"]["id"]
+                    elif res["request"]["status"] == "approved":
+                        # policy auto-allowed (e.g., read) — bypass gateway approval
+                        return await self._dispatch(inbound)
+                    # deny case: block immediately
+                    if res["request"]["status"] == "denied":
+                        return GatewayResponse("⛔ Blocked by policy: " + res["request"].get("policy_reason", ""))
+                except Exception:
+                    # fall through to legacy approval path
+                    authority_request_id = None
+
             approval = self.approvals.create(
                 channel=channel,
                 session_id=inbound.session_id,
                 text=inbound.text,
-                payload={"metadata": inbound.metadata},
+                payload={"metadata": inbound.metadata, "authority_request_id": authority_request_id},
             )
             cmd = inbound.text.split(maxsplit=1)[1] if EXEC_PATTERN.match(inbound.text) else inbound.text
             return GatewayResponse(
@@ -123,6 +153,25 @@ class NexusGateway:
         if not pending:
             return GatewayResponse("No pending approval found (it may have expired).")
 
+        # XOS authority sync — approve/deny durable request if linked
+        authority_request_id = pending.payload.get("authority_request_id")
+        grant_id = None
+        if self.authority is not None and authority_request_id:
+            try:
+                if approved:
+                    try:
+                        res = self.authority.approve(authority_request_id, approved_by=inbound.user_id or channel)
+                        grant_id = (res.get("grant") or {}).get("id")
+                    except Exception:
+                        pass  # may already be handled
+                else:
+                    try:
+                        self.authority.deny(authority_request_id, denied_by=inbound.user_id or channel, reason="gateway cancel")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
         self.approvals.clear(pending.id)
         if not approved:
             return GatewayResponse("❌ Cancelled. No action taken.")
@@ -137,7 +186,13 @@ class NexusGateway:
             return GatewayResponse(f"⚠️ Channel {target_channel} not available.")
 
         inbound.text = pending.text
-        inbound.metadata = {**pending.payload.get("metadata", {}), **inbound.metadata, "approved": True}
+        extra = {}
+        if authority_request_id:
+            extra["authority_request_id"] = authority_request_id
+        if grant_id:
+            extra["grant_id"] = grant_id
+            extra["authority_grant_id"] = grant_id
+        inbound.metadata = {**pending.payload.get("metadata", {}), **inbound.metadata, "approved": True, **extra}
         response = await self._dispatch(inbound, force_exec=True)
         response.text = f"✅ Approved.\n\n{response.text}"
         return response

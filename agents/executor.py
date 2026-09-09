@@ -21,10 +21,11 @@ WORKSPACE = Path(__file__).parent.parent / "workspace"
 class ExecutorAgent(BaseAgent):
     PERMISSIONS = {"READ": 0, "WRITE": 1, "EXECUTE": 2, "ADMIN": 3}
 
-    def __init__(self, llm, memory, cold_mode: ColdMode, rag=None, sandbox=None):
+    def __init__(self, llm, memory, cold_mode: ColdMode, rag=None, sandbox=None, authority=None):
         super().__init__("executor", llm, memory, rag)
         self.cold_mode = cold_mode
         self._sandbox = sandbox
+        self.authority = authority
         self.tools = {
             "run_command": self._run_command,
             "read_file": self._read_file,
@@ -33,15 +34,48 @@ class ExecutorAgent(BaseAgent):
         WORKSPACE.mkdir(parents=True, exist_ok=True)
 
     async def on_message(self, message: Message) -> dict:
+        import time
         action = message.payload.get("action", "")
         params = message.payload.get("params", {})
         permission_level = message.payload.get("permission", "READ")
+        grant_id = message.payload.get("grant_id") or message.payload.get("authority_grant_id") or ""
+        request_id = message.payload.get("request_id") or message.payload.get("authority_request_id") or ""
+        # XOS execution boundary — scoped grant check for consequential actions
+        consequential = action in {"run_command", "write_file", "delete", "exec"}
+        pending_verified = False
+        pending_grant_resource = ""
+        if self.authority is not None and consequential:
+            approved = message.payload.get("approved") is True
+            if permission_level in {"EXECUTE", "ADMIN"} or approved:
+                if not grant_id:
+                    if not approved:
+                        return {"status": "blocked", "reasons": ["XOS grant required: no grant_id"], "action": action}
+                    # approved via legacy gateway path without grant — allow ColdMode to decide
+                else:
+                    resource = params.get("path") or params.get("cmd") or params.get("resource") or ""
+                    candidates = [resource, f"shell:{resource}"] if resource else [""]
+                    verified = False
+                    last_reason = ""
+                    matched_resource = ""
+                    for cand in candidates:
+                        ok, reason = self.authority.verify_grant(grant_id, action, cand)
+                        if ok:
+                            verified = True
+                            matched_resource = cand
+                            break
+                        last_reason = reason
+                    if not verified:
+                        return {"status": "blocked", "reasons": [f"XOS grant invalid: {last_reason}"], "action": action}
+                    # verified but not yet consumed — defer consume until ColdMode passes
+                    pending_verified = True
+                    pending_grant_resource = matched_resource
 
+        fallback_script = params.get("fallback") or params.get("fallback_script") or message.payload.get("fallback_script") or message.payload.get("fallback")
         context = ColdMode.build_context(
             action=action,
             permission=permission_level,
             confidence=message.payload.get("confidence"),
-            fallback_script=params.get("fallback"),
+            fallback_script=fallback_script,
             numeric_values=message.payload.get("numeric_values", []),
         )
 
@@ -49,11 +83,41 @@ class ExecutorAgent(BaseAgent):
             reasons = self.cold_mode.get_failure_reasons(context)
             return {"status": "blocked", "reasons": reasons, "action": action}
 
+        # ColdMode passed — now consume the grant atomically
+        if pending_verified:
+            ok_c, reason_c = self.authority.consume_grant(grant_id, action, pending_grant_resource)
+            if not ok_c:
+                return {"status": "blocked", "reasons": [f"XOS grant consume failed: {reason_c}"], "action": action}
+
         self.memory.save_conversation(self.name, "user", f"Execute: {action}")
 
-        result = await self.act(action, **params) if action in self.tools else {"error": f"Unknown action: {action}"}
+        start = time.monotonic()
+        # strip XOS/ColdMode control keys before tool dispatch
+        clean_params = {k: v for k, v in params.items() if k not in {"fallback", "fallback_script", "resource"}}
+        result = await self.act(action, **clean_params) if action in self.tools else {"error": f"Unknown action: {action}"}
+        duration_ms = int((time.monotonic() - start) * 1000)
 
         self.memory.save_conversation(self.name, "assistant", str(result))
+
+        # Durable evidence — best effort, never fail the action
+        if self.authority is not None and consequential:
+            try:
+                success = not (isinstance(result, dict) and result.get("error"))
+                outcome = str(result)[:2000] if success else str(result.get("error", ""))[:2000]
+                self.authority.record_evidence(
+                    request_id=request_id or grant_id or "direct",
+                    grant_id=grant_id,
+                    actor_id=message.payload.get("user_id") or message.payload.get("session_id") or "executor",
+                    action=action,
+                    resource=params.get("path") or params.get("cmd") or "",
+                    input_data=params,
+                    outcome=outcome,
+                    success=success,
+                    duration_ms=duration_ms,
+                )
+            except Exception:
+                pass
+
         return result
 
     async def _run_command(self, cmd: str, timeout: int = 30) -> dict:

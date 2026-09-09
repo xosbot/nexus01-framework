@@ -73,6 +73,11 @@ class Config:
     structured_log_json: bool = field(default_factory=lambda: _env_bool("STRUCTURED_LOG_JSON", "false"))
     allow_public_bots: bool = field(default_factory=lambda: _env_bool("ALLOW_PUBLIC_BOTS", "false"))
 
+    # XOS Control Runtime
+    xos_authority_db: str = field(default_factory=lambda: os.getenv("XOS_AUTHORITY_DB", "./data/authority.db"))
+    xos_grant_ttl_seconds: int = field(default_factory=lambda: int(os.getenv("XOS_GRANT_TTL_SECONDS", "600")))
+    xos_confirm_mode: bool = field(default_factory=lambda: _env_bool("XOS_CONFIRM_MODE", "false"))
+
     # Social Media (official API only)
     twitter_api_key: str = field(default_factory=lambda: os.getenv("TWITTER_API_KEY", ""))
     twitter_api_secret: str = field(default_factory=lambda: os.getenv("TWITTER_API_SECRET", ""))
