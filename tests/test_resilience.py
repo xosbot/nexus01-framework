@@ -27,10 +27,13 @@ class TestCircuitBreaker:
         monkeypatch.setattr(time, "monotonic", lambda: cb._last_failure_time + 0.1)
         assert cb.state == CircuitState.HALF_OPEN
 
-    def test_closes_after_success_in_half_open(self):
+    def test_closes_after_success_in_half_open(self, monkeypatch):
+        import time
+
         cb = CircuitBreaker(failure_threshold=1, recovery_timeout=999)
         cb.record_failure()
-        cb._last_failure_time = 0
+        # make time appear to have advanced past recovery_timeout
+        monkeypatch.setattr(time, "monotonic", lambda: cb._last_failure_time + 1000)
         assert cb.state == CircuitState.HALF_OPEN
         cb.record_success()
         cb.record_success()

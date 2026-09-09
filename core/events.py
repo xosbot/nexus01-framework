@@ -45,6 +45,9 @@ _KNOWN_KINDS = frozenset({
     "tool_invoked", "tool_finished", "approval_requested",
     "approval_resolved", "agent_routed", "session_started",
     "session_ended", "error", "system", "slash_command",
+    # XOS Control Runtime
+    "authority_requested", "authority_approved", "authority_denied",
+    "grant_issued", "grant_consumed", "execution_evidence",
 })
 
 

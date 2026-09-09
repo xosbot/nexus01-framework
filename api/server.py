@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -62,6 +62,23 @@ class IngestRequest(BaseModel):
     url: str | None = None
     source: str = "manual"
     project_id: str | None = None
+
+
+class AuthorityRequestBody(BaseModel):
+    actor_type: str = "agent"
+    actor_id: str
+    session_id: str = ""
+    action: str
+    resource: str = ""
+    params: dict = {}
+    reason: str = ""
+    correlation_id: str = ""
+
+
+class AuthorityDecisionBody(BaseModel):
+    approved_by: str = "human"
+    ttl_seconds: int | None = None
+    reason: str = ""
 
 
 def create_api_app(nexus_app) -> FastAPI:
@@ -418,7 +435,7 @@ def create_api_app(nexus_app) -> FastAPI:
             except HTTPException:
                 raise
             except Exception as e:
-                raise HTTPException(400, f"URL ingest failed: {str(e)}")
+                raise HTTPException(400, f"URL ingest failed: {e!s}")
         elif req.path:
             p = Path(req.path)
             if p.is_dir():
@@ -1578,5 +1595,162 @@ def create_api_app(nexus_app) -> FastAPI:
     async def list_perms():
         from core import permissions as _perm_mod
         return {"permissions": _perm_mod.list_all()}
+
+    # ── XOS Control Runtime — authority / grants / evidence ──────────────
+
+    def _require_authority():
+        auth = getattr(nexus_app, "authority", None)
+        if auth is None:
+            raise HTTPException(503, "XOS authority not enabled")
+        return auth
+
+    def _require_operator(request: Request):
+        ctx = getattr(request.state, "auth", None)
+        if ctx is None:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        if not ctx.is_admin():
+            raise HTTPException(status_code=403, detail="Operator privileges required")
+        return ctx
+
+    @app.post("/api/authority/request")
+    async def authority_request(body: AuthorityRequestBody):
+        authority = _require_authority()
+        try:
+            result = authority.request(
+                actor_type=body.actor_type,
+                actor_id=body.actor_id,
+                session_id=body.session_id,
+                action=body.action,
+                resource=body.resource,
+                params=body.params,
+                reason=body.reason,
+                correlation_id=body.correlation_id,
+            )
+            return result
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+
+    @app.get("/api/authority/requests")
+    async def authority_list_requests(status: str | None = None, limit: int = 50):
+        authority = _require_authority()
+        return {"requests": authority.list_requests(status=status, limit=min(limit, 200))}
+
+    @app.get("/api/authority/requests/{request_id}")
+    async def authority_get_request(request_id: str):
+        authority = _require_authority()
+        try:
+            req = authority.get_request(request_id)
+        except Exception:
+            raise HTTPException(404, "Request not found")
+        # normalize to dict
+        return req.to_dict() if hasattr(req, "to_dict") else req
+
+    @app.post("/api/authority/requests/{request_id}/approve")
+    async def authority_approve(request_id: str, request: Request):
+        authority = _require_authority()
+        operator = _require_operator(request)
+        # Do NOT trust approved_by from body — derive from authenticated operator
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        # log if client tried to forge identity
+        if data.get("approved_by") and data.get("approved_by") != operator.user_id:
+            logger.warning("approve: forged approved_by=%s ignored, using authenticated %s", data.get("approved_by"), operator.user_id)
+        ttl = data.get("ttl_seconds")
+        approved_by = operator.user_id
+        try:
+            result = authority.approve(request_id, approved_by=approved_by, ttl_seconds=ttl) if ttl is not None else authority.approve(request_id, approved_by=approved_by)
+            if hasattr(result, "to_dict"):
+                try:
+                    req = authority.get_request(request_id)
+                    return {"request": req.to_dict() if hasattr(req, "to_dict") else req, "grant": result.to_dict()}
+                except Exception:
+                    return result.to_dict()
+            return result
+        except KeyError:
+            raise HTTPException(404, "Request not found")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        except Exception as exc:
+            msg = str(exc)
+            if "not found" in msg.lower():
+                raise HTTPException(404, msg)
+            raise HTTPException(400, msg)
+
+    @app.post("/api/authority/requests/{request_id}/deny")
+    async def authority_deny(request_id: str, request: Request):
+        authority = _require_authority()
+        operator = _require_operator(request)
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        if data.get("denied_by") and data.get("denied_by") != operator.user_id:
+            logger.warning("deny: forged denied_by=%s ignored, using authenticated %s", data.get("denied_by"), operator.user_id)
+        if data.get("approved_by") and data.get("approved_by") != operator.user_id:
+            logger.warning("deny: forged approved_by=%s ignored, using authenticated %s", data.get("approved_by"), operator.user_id)
+        denied_by = operator.user_id
+        reason = data.get("reason", "")
+        try:
+            result = authority.deny(request_id, denied_by=denied_by, reason=reason)
+            return result.to_dict() if hasattr(result, "to_dict") else result
+        except KeyError:
+            raise HTTPException(404, "Request not found")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        except Exception as exc:
+            msg = str(exc)
+            if "not found" in msg.lower():
+                raise HTTPException(404, msg)
+            raise HTTPException(400, msg)
+
+    @app.get("/api/authority/grants/{grant_id}")
+    async def authority_get_grant(grant_id: str):
+        authority = _require_authority()
+        try:
+            g = authority.get_grant(grant_id)
+        except Exception:
+            raise HTTPException(404, "Grant not found")
+        return g.to_dict() if hasattr(g, "to_dict") else g
+
+    @app.post("/api/authority/grants/{grant_id}/verify")
+    async def authority_verify_grant(grant_id: str, request: Request):
+        authority = _require_authority()
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        action = data.get("action", "")
+        resource = data.get("resource", "")
+        if not action:
+            raise HTTPException(400, "action is required")
+        ok, reason = authority.verify_grant(grant_id, action, resource)
+        return {"valid": ok, "reason": reason, "grant_id": grant_id}
+
+    @app.get("/api/authority/evidence")
+    async def authority_list_evidence(request_id: str | None = None, grant_id: str | None = None, limit: int = 50):
+        authority = _require_authority()
+        # hardened list_evidence only supports request_id; filter grant_id in memory if needed
+        try:
+            evs = authority.list_evidence(request_id=request_id)
+        except TypeError:
+            evs = authority.list_evidence(request_id=request_id, grant_id=grant_id, limit=min(limit, 200))
+        # evs are EvidenceEvent objects; convert to dict
+        evs_dict = [e.to_dict() if hasattr(e, "to_dict") else e for e in evs]
+        if grant_id:
+            evs_dict = [e for e in evs_dict if e.get("grant_id") == grant_id]
+        return {"evidence": evs_dict[: min(limit, 200)]}
+
+    @app.get("/api/authority/stats")
+    async def authority_stats():
+        authority = _require_authority()
+        return authority.stats()
+
+    # legacy alias — pending list
+    @app.get("/api/authority/pending")
+    async def authority_pending(limit: int = 50):
+        authority = _require_authority()
+        return {"pending": authority.list_pending(limit=min(limit, 200))}
 
     return app
