@@ -73,8 +73,8 @@ class Config:
     structured_log_json: bool = field(default_factory=lambda: _env_bool("STRUCTURED_LOG_JSON", "false"))
     allow_public_bots: bool = field(default_factory=lambda: _env_bool("ALLOW_PUBLIC_BOTS", "false"))
 
-    # XOS Control Runtime
-    xos_authority_db: str = field(default_factory=lambda: os.getenv("XOS_AUTHORITY_DB", "./data/authority.db"))
+    # XOS Control Runtime — hardened default is xos_control.db (WAL, FK, evidence ledger)
+    xos_authority_db: str = field(default_factory=lambda: os.getenv("XOS_AUTHORITY_DB", "./data/xos_control.db"))
     xos_grant_ttl_seconds: int = field(default_factory=lambda: int(os.getenv("XOS_GRANT_TTL_SECONDS", "600")))
     xos_confirm_mode: bool = field(default_factory=lambda: _env_bool("XOS_CONFIRM_MODE", "false"))
 

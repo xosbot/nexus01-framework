@@ -1630,10 +1630,12 @@ def create_api_app(nexus_app) -> FastAPI:
     @app.get("/api/authority/requests/{request_id}")
     async def authority_get_request(request_id: str):
         authority = _require_authority()
-        req = authority.get_request(request_id)
-        if not req:
+        try:
+            req = authority.get_request(request_id)
+        except Exception:
             raise HTTPException(404, "Request not found")
-        return req
+        # normalize to dict
+        return req.to_dict() if hasattr(req, "to_dict") else req
 
     @app.post("/api/authority/requests/{request_id}/approve")
     async def authority_approve(request_id: str, request: Request):
@@ -1645,11 +1647,26 @@ def create_api_app(nexus_app) -> FastAPI:
         approved_by = data.get("approved_by") or data.get("created_by") or "human"
         ttl = data.get("ttl_seconds")
         try:
-            return authority.approve(request_id, approved_by=approved_by, ttl_seconds=ttl)
+            # hardened returns CapabilityGrant, legacy shim returns dict
+            result = authority.approve(request_id, approved_by=approved_by, ttl_seconds=ttl) if ttl is not None else authority.approve(request_id, approved_by=approved_by)
+            if hasattr(result, "to_dict"):
+                # hardened: return grant dict + request for compat
+                try:
+                    req = authority.get_request(request_id)
+                    return {"request": req.to_dict() if hasattr(req, "to_dict") else req, "grant": result.to_dict()}
+                except Exception:
+                    return result.to_dict()
+            return result
         except KeyError:
             raise HTTPException(404, "Request not found")
         except ValueError as exc:
             raise HTTPException(400, str(exc))
+        except Exception as exc:
+            # map hardened exceptions
+            msg = str(exc)
+            if "not found" in msg.lower():
+                raise HTTPException(404, msg)
+            raise HTTPException(400, msg)
 
     @app.post("/api/authority/requests/{request_id}/deny")
     async def authority_deny(request_id: str, request: Request):
@@ -1661,19 +1678,26 @@ def create_api_app(nexus_app) -> FastAPI:
         denied_by = data.get("approved_by") or data.get("denied_by") or "human"
         reason = data.get("reason", "")
         try:
-            return authority.deny(request_id, denied_by=denied_by, reason=reason)
+            result = authority.deny(request_id, denied_by=denied_by, reason=reason)
+            return result.to_dict() if hasattr(result, "to_dict") else result
         except KeyError:
             raise HTTPException(404, "Request not found")
         except ValueError as exc:
             raise HTTPException(400, str(exc))
+        except Exception as exc:
+            msg = str(exc)
+            if "not found" in msg.lower():
+                raise HTTPException(404, msg)
+            raise HTTPException(400, msg)
 
     @app.get("/api/authority/grants/{grant_id}")
     async def authority_get_grant(grant_id: str):
         authority = _require_authority()
-        g = authority.get_grant(grant_id)
-        if not g:
+        try:
+            g = authority.get_grant(grant_id)
+        except Exception:
             raise HTTPException(404, "Grant not found")
-        return g
+        return g.to_dict() if hasattr(g, "to_dict") else g
 
     @app.post("/api/authority/grants/{grant_id}/verify")
     async def authority_verify_grant(grant_id: str, request: Request):
@@ -1692,7 +1716,16 @@ def create_api_app(nexus_app) -> FastAPI:
     @app.get("/api/authority/evidence")
     async def authority_list_evidence(request_id: str | None = None, grant_id: str | None = None, limit: int = 50):
         authority = _require_authority()
-        return {"evidence": authority.list_evidence(request_id=request_id, grant_id=grant_id, limit=min(limit, 200))}
+        # hardened list_evidence only supports request_id; filter grant_id in memory if needed
+        try:
+            evs = authority.list_evidence(request_id=request_id)
+        except TypeError:
+            evs = authority.list_evidence(request_id=request_id, grant_id=grant_id, limit=min(limit, 200))
+        # evs are EvidenceEvent objects; convert to dict
+        evs_dict = [e.to_dict() if hasattr(e, "to_dict") else e for e in evs]
+        if grant_id:
+            evs_dict = [e for e in evs_dict if e.get("grant_id") == grant_id]
+        return {"evidence": evs_dict[: min(limit, 200)]}
 
     @app.get("/api/authority/stats")
     async def authority_stats():

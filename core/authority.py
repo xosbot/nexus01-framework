@@ -11,11 +11,12 @@ import json
 import sqlite3
 import threading
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Awaitable, Callable, TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -151,7 +152,6 @@ class CapabilityGrant:
             "actor_id": self.issued_by,
             "session_id": "",
             "scope": {"action": self.action, "resource": self.resource},
-            "expires_at": self.expires_at,
             "iso_expires": self.expires_at,
             "iso_created": self.created_at,
             "used": self.consumed_at is not None,
