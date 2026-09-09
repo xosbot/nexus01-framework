@@ -46,7 +46,7 @@ jobs:
       - name: XOS control plane must be ruff clean (F,I)
         run: |
           echo "Checking XOS files for critical issues (F,I)..."
-          ruff check --select F,I core/authority.py core/policy.py agents/executor.py gateway/gateway.py api/server.py config.py tests/test_authority.py tests/test_authority_compat.py tests/test_xos_hardening.py tests/test_xos_v012.py
+          ruff check --select F,I core/authority.py core/policy.py agents/executor.py gateway/gateway.py api/server.py config.py tests/test_authority.py tests/test_authority_compat.py tests/test_xos_hardening.py tests/test_xos_v012.py nodes/ tests/test_nodes_runtime.py scripts/xos_mock_node.py scripts/xos_node_proof_001.py
           echo "XOS gate passed"
 
   test:

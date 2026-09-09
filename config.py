@@ -78,6 +78,10 @@ class Config:
     xos_grant_ttl_seconds: int = field(default_factory=lambda: int(os.getenv("XOS_GRANT_TTL_SECONDS", "600")))
     xos_confirm_mode: bool = field(default_factory=lambda: _env_bool("XOS_CONFIRM_MODE", "false"))
 
+    # XOS Nodes Runtime
+    xos_nodes_db: str = field(default_factory=lambda: os.getenv("XOS_NODES_DB", "./data/xos_nodes.db"))
+    xos_nodes_dir: str = field(default_factory=lambda: os.getenv("XOS_NODES_DIR", "./data/nodes"))
+
     # Social Media (official API only)
     twitter_api_key: str = field(default_factory=lambda: os.getenv("TWITTER_API_KEY", ""))
     twitter_api_secret: str = field(default_factory=lambda: os.getenv("TWITTER_API_SECRET", ""))
