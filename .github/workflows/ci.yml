@@ -29,7 +29,9 @@ jobs:
         run: pip install ruff
 
       - name: Lint with ruff (legacy debt acknowledged)
-        run: ruff check . || echo "legacy lint debt: $(ruff check . --statistics | tail -1)"
+        run: |
+          ruff check . || echo "legacy lint debt acknowledged"
+          ruff check . --statistics | tail -1 || true
 
   xos-gate:
     runs-on: ubuntu-latest
@@ -44,7 +46,7 @@ jobs:
       - name: XOS control plane must be ruff clean (F,I)
         run: |
           echo "Checking XOS files for critical issues (F,I)..."
-          ruff check --select F,I core/authority.py core/policy.py agents/executor.py gateway/gateway.py api/server.py config.py tests/test_authority.py tests/test_authority_compat.py tests/test_xos_hardening.py
+          ruff check --select F,I core/authority.py core/policy.py agents/executor.py gateway/gateway.py api/server.py config.py tests/test_authority.py tests/test_authority_compat.py tests/test_xos_hardening.py tests/test_xos_v012.py
           echo "XOS gate passed"
 
   test:

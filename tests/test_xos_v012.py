@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import tempfile
-import asyncio
+from unittest.mock import MagicMock
+
 import pytest
 
-from core.authority import AuthorityService, ControlMode, GrantConsumed, GrantScopeMismatch, RiskClass
+from agents.executor import ExecutorAgent
+from core.authority import (
+    AuthorityService,
+    ControlMode,
+    GrantConsumed,
+    GrantScopeMismatch,
+)
 from core.bus import Message
 from core.cold_mode import ColdMode
-from agents.executor import ExecutorAgent
 from core.memory import Memory
-from unittest.mock import MagicMock
 
 
 def _auth(tmp_path):
@@ -180,7 +185,7 @@ def test_legacy_partial_consumed_without_started(tmp_path):
     # So consume via consume_grant (not begin_execution) will create consumed without started
     auth2 = AuthorityService(db)
     # use second connection to consume
-    grant2 = auth2.consume_grant(grant.id, action="run_command", resource="shell:legacy", actor="iva", principal="navigator")
+    auth2.consume_grant(grant.id, action="run_command", resource="shell:legacy", actor="iva", principal="navigator")
     # now incomplete should detect consumed without started
     incomplete = auth.list_incomplete_executions()
     assert any(i["grant_id"] == grant.id for i in incomplete)

@@ -7,6 +7,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi.testclient import TestClient
+
 from core.authority import (
     AuthorityService,
     ControlMode,
@@ -15,7 +17,6 @@ from core.authority import (
     GrantScopeMismatch,
     RiskClass,
 )
-from fastapi.testclient import TestClient
 
 # --- helpers for auth ---
 

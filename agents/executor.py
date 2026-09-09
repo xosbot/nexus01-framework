@@ -6,12 +6,11 @@ import asyncio
 import logging
 from pathlib import Path
 
+from agents.base import BaseAgent
 from core.bus import Message
 from core.cold_mode import ColdMode
 from core.resilience import with_retry
 from tools.shell_exec import _is_safe_command, run_command
-
-from agents.base import BaseAgent
 
 logger = logging.getLogger(__name__)
 

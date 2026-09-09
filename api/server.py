@@ -13,11 +13,11 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from gateway.types import ChannelKind, InboundMessage
 from pydantic import BaseModel
 
 from api.auth import AuthMiddleware, ws_auth
 from api.auth_routes import build_auth_router
+from gateway.types import ChannelKind, InboundMessage
 
 logger = logging.getLogger(__name__)
 WEB_ROOT = Path(__file__).parent.parent / "web" / "os"

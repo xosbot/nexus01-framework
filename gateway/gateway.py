@@ -2,7 +2,6 @@ import logging
 import re
 
 from core.bus import Message, MessageBus
-
 from gateway.approvals import ApprovalManager
 from gateway.types import GatewayResponse, InboundMessage
 
