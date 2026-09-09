@@ -35,98 +35,88 @@ class ExecutorAgent(BaseAgent):
         WORKSPACE.mkdir(parents=True, exist_ok=True)
 
     async def on_message(self, message: Message) -> dict:
-        import logging
         import time
-
-        logger = logging.getLogger(__name__)
         action = message.payload.get("action", "")
         params = message.payload.get("params", {})
         permission_level = message.payload.get("permission", "READ")
         grant_id = message.payload.get("grant_id") or message.payload.get("authority_grant_id") or ""
         request_id = message.payload.get("request_id") or message.payload.get("authority_request_id") or ""
-        # Trust source for actor/principal: use registered request binding, not arbitrary payload unless explicitly provided
-        # For security, we derive expected actor/principal from the grant's request via authority, but also accept explicit actor/principal if provided for testing
-        expected_actor = message.payload.get("actor") or message.payload.get("actor_id")
-        expected_principal = message.payload.get("principal")
 
         consequential = action in {"run_command", "write_file", "delete", "exec"}
-        # XOS enabled check: if authority present and action is consequential, grant is mandatory
+        # XOS enabled: every consequential action requires a valid grant — do NOT key on permission
+        # Trust source: message.sender is runtime actor; principal from grant's request (not payload)
         if self.authority is not None and consequential:
-            if permission_level in {"EXECUTE", "ADMIN"} or message.payload.get("approved") is True:
-                if not grant_id:
-                    return {"status": "blocked", "reasons": ["XOS grant required: no grant_id"], "action": action}
+            if not grant_id:
+                return {"status": "blocked", "reasons": ["XOS grant required: no grant_id"], "action": action}
 
-                # Resolve resource for scope check
-                raw_resource = params.get("path") or params.get("cmd") or params.get("resource") or ""
-                candidates = [raw_resource, f"shell:{raw_resource}"] if raw_resource else [""]
-                matched_resource = None
-                last_reason = ""
-                # If expected actor/principal not provided, fetch from request to enforce binding
-                if not expected_actor or not expected_principal:
-                    try:
-                        # Peek grant's request to get expected binding
-                        g = self.authority.get_grant(grant_id)
-                        req = self.authority.get_request(g.request_id)
-                        expected_actor = expected_actor or req.actor
-                        expected_principal = expected_principal or req.principal
-                    except Exception:
-                        pass
-                for cand in candidates:
-                    ok, reason = self.authority.verify_grant(grant_id, action, cand, actor=expected_actor, principal=expected_principal)
-                    if ok:
-                        matched_resource = cand
-                        break
-                    last_reason = reason
-                if matched_resource is None:
-                    return {"status": "blocked", "reasons": [f"XOS grant invalid: {last_reason}"], "action": action}
+            # Trust source for actor is message.sender (runtime), NOT payload actor
+            # Documented: MessageBus sender is current trust source; payload actor must not override
+            expected_actor = message.sender
+            # Principal must be derived from the grant's backing request, not caller payload (prevent widening)
+            try:
+                g = self.authority.get_grant(grant_id)
+                req = self.authority.get_request(g.request_id)
+                expected_principal = req.principal
+                # Also enforce that request's actor matches message.sender — stolen grant fails
+                if req.actor != expected_actor:
+                    return {"status": "blocked", "reasons": [f"XOS grant actor mismatch: grant actor {req.actor} vs sender {expected_actor}"], "action": action}
+            except Exception as exc:
+                return {"status": "blocked", "reasons": [f"XOS grant lookup failed: {exc}"], "action": action}
 
-                # ColdMode must pass BEFORE consumption (canonical lifecycle)
-                fallback_script = params.get("fallback") or params.get("fallback_script") or message.payload.get("fallback_script") or message.payload.get("fallback")
-                context = ColdMode.build_context(
+            # Resolve resource for scope check
+            raw_resource = params.get("path") or params.get("cmd") or params.get("resource") or ""
+            candidates = [raw_resource, f"shell:{raw_resource}"] if raw_resource else [""]
+            matched_resource = None
+            last_reason = ""
+            for cand in candidates:
+                ok, reason = self.authority.verify_grant(grant_id, action, cand, actor=expected_actor, principal=expected_principal)
+                if ok:
+                    matched_resource = cand
+                    break
+                last_reason = reason
+            if matched_resource is None:
+                return {"status": "blocked", "reasons": [f"XOS grant invalid: {last_reason}"], "action": action}
+
+            # ColdMode must pass BEFORE consumption (canonical lifecycle)
+            fallback_script = params.get("fallback") or params.get("fallback_script") or message.payload.get("fallback_script") or message.payload.get("fallback")
+            context = ColdMode.build_context(
+                action=action,
+                permission=permission_level,
+                confidence=message.payload.get("confidence"),
+                fallback_script=fallback_script,
+                numeric_values=message.payload.get("numeric_values", []),
+            )
+            if self.cold_mode.should_block(context):
+                reasons = self.cold_mode.get_failure_reasons(context)
+                return {"status": "blocked", "reasons": reasons, "action": action}
+
+            # Canonical execution: atomic begin_execution (consume+grant.consumed+execution.started) -> tool -> succeeded/failed
+            clean_params = {k: v for k, v in params.items() if k not in {"fallback", "fallback_script", "resource", "actor", "principal", "actor_id"}}
+            async def _tool_executor():
+                return await self.act(action, **clean_params) if action in self.tools else {"error": f"Unknown action: {action}"}
+
+            start_mono = time.monotonic()
+            try:
+                result = await self.authority.execute_with_grant(
+                    grant_id,
                     action=action,
-                    permission=permission_level,
-                    confidence=message.payload.get("confidence"),
-                    fallback_script=fallback_script,
-                    numeric_values=message.payload.get("numeric_values", []),
+                    resource=matched_resource,
+                    executor=_tool_executor,
+                    actor=expected_actor,
+                    principal=expected_principal,
                 )
-                if self.cold_mode.should_block(context):
-                    reasons = self.cold_mode.get_failure_reasons(context)
-                    return {"status": "blocked", "reasons": reasons, "action": action}
+            except Exception as exc:
+                msg = str(exc)
+                # AuthorityBusy or grant failures → blocked (fail closed)
+                if "Grant" in msg or "grant" in msg or "Scope" in msg or "Expired" in msg or "Consumed" in msg or "Busy" in msg or "busy" in msg:
+                    return {"status": "blocked", "reasons": [f"XOS grant failed: {exc}"], "action": action}
+                logger.error("execution failed for grant %s: %s", grant_id, exc)
+                return {"status": "error", "error": str(exc), "action": action, "evidence_status": "FAILED"}
+            duration_ms = int((time.monotonic() - start_mono) * 1000)
 
-                # Canonical execution: consume + started (durable) -> tool -> succeeded/failed
-                # Use execute_with_grant for crash-aware evidence lifecycle
-                clean_params = {k: v for k, v in params.items() if k not in {"fallback", "fallback_script", "resource", "actor", "principal"}}
-                # define executor callable for authority wrapper
-                async def _tool_executor():
-                    return await self.act(action, **clean_params) if action in self.tools else {"error": f"Unknown action: {action}"}
-
-                # Record wall-clock start for duration, monotonic for evidence
-                start_mono = time.monotonic()
-                try:
-                    # authority will consume atomically and record execution.started before invoking
-                    result = await self.authority.execute_with_grant(
-                        grant_id,
-                        action=action,
-                        resource=matched_resource,
-                        executor=_tool_executor,
-                        actor=expected_actor or "xos.executor",
-                        principal=expected_principal,
-                    )
-                except Exception as exc:
-                    # Map grant failures to blocked, preserve evidence failures
-                    msg = str(exc)
-                    if "Grant" in msg or "grant" in msg or "Scope" in msg or "Expired" in msg or "Consumed" in msg:
-                        return {"status": "blocked", "reasons": [f"XOS grant failed: {exc}"], "action": action}
-                    # execution.failed already recorded inside execute_with_grant; surface reconciliation if needed
-                    logger.error("execution failed for grant %s: %s", grant_id, exc)
-                    # Try to record failure if not already (execute_with_grant does), but ensure we return
-                    return {"status": "error", "error": str(exc), "action": action, "evidence_status": "FAILED"}
-                duration_ms = int((time.monotonic() - start_mono) * 1000)
-
-                self.memory.save_conversation(self.name, "user", f"Execute: {action}")
-                self.memory.save_conversation(self.name, "assistant", str(result))
-                # evidence already handled by execute_with_grant (started/succeeded); add outcome to memory
-                return result
+            self.memory.save_conversation(self.name, "user", f"Execute: {action}")
+            self.memory.save_conversation(self.name, "assistant", str(result))
+            return result
 
         # Non-consequential or no authority: fallback to original ColdMode + act
         fallback_script = params.get("fallback") or params.get("fallback_script") or message.payload.get("fallback_script") or message.payload.get("fallback")
