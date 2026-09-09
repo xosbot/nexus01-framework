@@ -12,6 +12,7 @@ aiohttp>=3.9.0
 pytest>=8.0
 pytest-asyncio>=0.24
 discord.py>=2.3.0
+PyJWT>=2.8.0
 
 # Phase 3 — Deploy & Control
 docker>=7.0.0

@@ -9,8 +9,13 @@ from __future__ import annotations
 import time
 
 import pytest
-
-from core.authority import AuthorityService, GrantConsumed, GrantExpired, GrantScopeMismatch, RequestNotPending
+from core.authority import (
+    AuthorityService,
+    GrantConsumed,
+    GrantExpired,
+    GrantScopeMismatch,
+    RequestNotPending,
+)
 
 
 @pytest.fixture

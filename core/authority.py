@@ -525,60 +525,128 @@ class AuthorityService:
 
         return self.get_request(request_id)
 
-    def consume_grant(self, grant_id: str, action: str | None = None, resource: str | None = None, **kwargs) -> CapabilityGrant:
-        # support both hardened keyword and legacy positional (gateway passes action/resource positionally)
+    def consume_grant(self, grant_id: str, action: str | None = None, resource: str | None = None, actor: str | None = None, principal: str | None = None, **kwargs) -> CapabilityGrant:
         if action is None:
             action = kwargs.get("action")
         if resource is None:
             resource = kwargs.get("resource")
+        if actor is None:
+            actor = kwargs.get("actor")
+        if principal is None:
+            principal = kwargs.get("principal")
         if not action or not resource:
             raise ValueError("action and resource are required")
-        with self._lock, self._conn:
-            row = self._conn.execute(
-                """
-                SELECT g.*, r.status AS request_status
-                FROM capability_grants g
-                JOIN authority_requests r ON r.id = g.request_id
-                WHERE g.id = ?
-                """,
-                (grant_id,),
-            ).fetchone()
-            if row is None:
-                raise GrantNotFound(grant_id)
-            if RequestStatus(row["request_status"]) is not RequestStatus.APPROVED:
-                raise AuthorityError(f"Grant {grant_id} is not backed by an approved request")
-            if row["action"] != action or row["resource"] != resource:
-                raise GrantScopeMismatch(
-                    f"Grant scope is {row['action']} on {row['resource']}, not {action} on {resource}"
-                )
-            if self._now() >= datetime.fromisoformat(row["expires_at"]):
-                raise GrantExpired(grant_id)
-            if bool(row["single_use"]) and row["consumed_at"] is not None:
-                raise GrantConsumed(grant_id)
-
-            consumed_at = row["consumed_at"]
-            if bool(row["single_use"]):
-                consumed_at = self._iso(self._now())
-                self._conn.execute(
-                    "UPDATE capability_grants SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL",
-                    (consumed_at, grant_id),
-                )
-                if self._conn.execute("SELECT changes()").fetchone()[0] != 1:
-                    raise GrantConsumed(grant_id)
-
-            self._append_evidence(
-                event_type="grant.consumed",
-                request_id=row["request_id"],
-                grant_id=grant_id,
-                actor="xos.executor",
-                data={"action": action, "resource": resource},
-            )
+        with self._lock:
+            # Use explicit transaction to ensure DB-level atomicity across connections
             try:
-                from core.events import emit
-                emit("grant_consumed", f"grant {grant_id} consumed for {action}", session_id=row["request_id"], agent="xos.executor", data={"grant_id": grant_id})
+                self._conn.execute("BEGIN IMMEDIATE")
             except Exception:
                 pass
+            try:
+                row = self._conn.execute(
+                    """
+                    SELECT g.*, r.status AS request_status, r.actor AS req_actor, r.principal AS req_principal
+                    FROM capability_grants g
+                    JOIN authority_requests r ON r.id = g.request_id
+                    WHERE g.id = ?
+                    """,
+                    (grant_id,),
+                ).fetchone()
+                if row is None:
+                    self._conn.execute("ROLLBACK")
+                    raise GrantNotFound(grant_id)
+                if RequestStatus(row["request_status"]) is not RequestStatus.APPROVED:
+                    self._conn.execute("ROLLBACK")
+                    raise AuthorityError(f"Grant {grant_id} is not backed by an approved request")
+                if row["action"] != action or row["resource"] != resource:
+                    self._conn.execute("ROLLBACK")
+                    raise GrantScopeMismatch(
+                        f"Grant scope is {row['action']} on {row['resource']}, not {action} on {resource}"
+                    )
+                if actor is not None and actor != row["req_actor"]:
+                    self._conn.execute("ROLLBACK")
+                    raise GrantScopeMismatch(f"Grant actor mismatch: {row['req_actor']} vs {actor}")
+                if principal is not None and principal != row["req_principal"]:
+                    self._conn.execute("ROLLBACK")
+                    raise GrantScopeMismatch(f"Grant principal mismatch: {row['req_principal']} vs {principal}")
+                if self._now() >= datetime.fromisoformat(row["expires_at"]):
+                    self._conn.execute("ROLLBACK")
+                    raise GrantExpired(grant_id)
+                if bool(row["single_use"]) and row["consumed_at"] is not None:
+                    self._conn.execute("ROLLBACK")
+                    raise GrantConsumed(grant_id)
 
+                if bool(row["single_use"]):
+                    now_iso = self._iso(self._now())
+                    # Final atomic UPDATE enforces all predicates; DB determines winner
+                    if actor is not None and principal is not None:
+                        cur = self._conn.execute(
+                            """
+                            UPDATE capability_grants SET consumed_at = ?
+                            WHERE id = ? AND consumed_at IS NULL
+                              AND expires_at > ?
+                              AND action = ? AND resource = ?
+                              AND (SELECT status FROM authority_requests WHERE id = request_id) = 'APPROVED'
+                              AND (SELECT actor FROM authority_requests WHERE id = request_id) = ?
+                              AND (SELECT principal FROM authority_requests WHERE id = request_id) = ?
+                            """,
+                            (now_iso, grant_id, now_iso, action, resource, row["req_actor"], row["req_principal"]),
+                        )
+                    else:
+                        cur = self._conn.execute(
+                            """
+                            UPDATE capability_grants SET consumed_at = ?
+                            WHERE id = ? AND consumed_at IS NULL
+                              AND expires_at > ?
+                              AND action = ? AND resource = ?
+                              AND (SELECT status FROM authority_requests WHERE id = request_id) = 'APPROVED'
+                            """,
+                            (now_iso, grant_id, now_iso, action, resource),
+                        )
+                    if cur.rowcount != 1:
+                        self._conn.execute("ROLLBACK")
+                        check = self._conn.execute("SELECT consumed_at, expires_at FROM capability_grants WHERE id=?", (grant_id,)).fetchone()
+                        if check and check["consumed_at"] is not None:
+                            raise GrantConsumed(grant_id)
+                        if check and self._now() >= datetime.fromisoformat(check["expires_at"]):
+                            raise GrantExpired(grant_id)
+                        raise GrantScopeMismatch(f"Atomic consume failed for {grant_id}")
+                    self._conn.execute("COMMIT")
+                    # evidence after commit (still durable)
+                    with self._lock, self._conn:
+                        self._append_evidence(
+                            event_type="grant.consumed",
+                            request_id=row["request_id"],
+                            grant_id=grant_id,
+                            actor=actor or "xos.executor",
+                            data={"action": action, "resource": resource, "actor": actor, "principal": principal},
+                        )
+                    try:
+                        from core.events import emit
+                        emit("grant_consumed", f"grant {grant_id} consumed for {action}", session_id=row["request_id"], agent=actor or "xos.executor", data={"grant_id": grant_id})
+                    except Exception:
+                        pass
+                else:
+                    self._conn.execute("COMMIT")
+                    with self._lock, self._conn:
+                        self._append_evidence(
+                            event_type="grant.consumed",
+                            request_id=row["request_id"],
+                            grant_id=grant_id,
+                            actor=actor or "xos.executor",
+                            data={"action": action, "resource": resource, "actor": actor, "principal": principal},
+                        )
+                    try:
+                        from core.events import emit
+                        emit("grant_consumed", f"grant {grant_id} consumed for {action}", session_id=row["request_id"], agent=actor or "xos.executor", data={"grant_id": grant_id})
+                    except Exception:
+                        pass
+            except Exception:
+                try:
+                    self._conn.execute("ROLLBACK")
+                except Exception:
+                    pass
+                raise
         return self.get_grant(grant_id)
 
     async def execute_with_grant(
@@ -589,19 +657,34 @@ class AuthorityService:
         resource: str,
         executor: Callable[..., T | Awaitable[T]],
         actor: str = "xos.executor",
+        principal: str | None = None,
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
     ) -> T:
-        grant = self.consume_grant(grant_id, action=action, resource=resource)
-        self.record_execution_started(grant, actor=actor)
+        # actor/principal binding: if principal provided, enforce; otherwise derive from grant's request
+        # For backward compat, if principal is None, we enforce only actor if provided
+        grant = self.consume_grant(grant_id, action=action, resource=resource, actor=actor if actor != "xos.executor" else None, principal=principal)
+        # record started BEFORE tool invocation; if this fails, do not execute
+        try:
+            self.record_execution_started(grant, actor=actor)
+        except Exception as exc:
+            # evidence failure before exec is fatal — do not proceed, surface reconciliation
+            raise AuthorityError(f"Failed to record execution.started for {grant_id}: {exc}") from exc
         try:
             result = executor(*args, **(kwargs or {}))
             if inspect.isawaitable(result):
                 result = await result
         except Exception as exc:
-            self.record_execution_failed(grant, actor=actor, error=exc)
+            try:
+                self.record_execution_failed(grant, actor=actor, error=exc)
+            except Exception as ev_exc:
+                # evidence failure after exec — surface but don't hide original error
+                raise AuthorityError(f"execution failed but evidence persistence also failed: {ev_exc}") from exc
             raise
-        self.record_execution_succeeded(grant, actor=actor)
+        try:
+            self.record_execution_succeeded(grant, actor=actor)
+        except Exception as exc:
+            raise AuthorityError(f"execution succeeded but evidence persistence failed (reconciliation required) for {grant_id}: {exc}") from exc
         return result
 
     def record_execution_started(self, grant: CapabilityGrant, *, actor: str) -> None:
@@ -664,6 +747,39 @@ class AuthorityService:
                     (request_id,),
                 ).fetchall()
             return [self._evidence_from_row(row) for row in rows]
+
+    def trace(self, correlation_id: str) -> list[EvidenceEvent]:
+        """Ordered lifecycle for a correlation_id (via request JOIN)."""
+        with self._lock:
+            req_rows = self._conn.execute(
+                "SELECT id FROM authority_requests WHERE correlation_id = ?", (correlation_id,)
+            ).fetchall()
+            if not req_rows:
+                return []
+            req_ids = [r["id"] for r in req_rows]
+            placeholders = ",".join("?" for _ in req_ids)
+            rows = self._conn.execute(
+                f"SELECT * FROM evidence WHERE request_id IN ({placeholders}) ORDER BY id ASC", req_ids
+            ).fetchall()
+            return [self._evidence_from_row(r) for r in rows]
+
+    def list_incomplete_executions(self) -> list[dict]:
+        """Find execution.started without succeeded/failed (crash recovery)."""
+        with self._lock:
+            started = self._conn.execute(
+                "SELECT grant_id, request_id FROM evidence WHERE event_type='execution.started'"
+            ).fetchall()
+            incomplete = []
+            for row in started:
+                gid = row["grant_id"]
+                req = row["request_id"]
+                exists = self._conn.execute(
+                    "SELECT 1 FROM evidence WHERE grant_id=? AND event_type IN ('execution.succeeded','execution.failed')",
+                    (gid,),
+                ).fetchone()
+                if not exists:
+                    incomplete.append({"grant_id": gid, "request_id": req, "status": "RECONCILIATION_REQUIRED"})
+            return incomplete
 
     # -- additional helpers for stats/audit --
 
@@ -866,15 +982,18 @@ class AuthorityService:
         except RequestNotFound:
             return None
 
-    def verify_grant(self, grant_id: str, action: str, resource: str) -> tuple[bool, str]:
+    def verify_grant(self, grant_id: str, action: str, resource: str, actor: str | None = None, principal: str | None = None) -> tuple[bool, str]:
         try:
-            # peek without consuming
             with self._lock:
-                row = self._conn.execute("SELECT g.*, r.status AS rs FROM capability_grants g JOIN authority_requests r ON r.id=g.request_id WHERE g.id=?", (grant_id,)).fetchone()
+                row = self._conn.execute("SELECT g.*, r.status AS rs, r.actor AS req_actor, r.principal AS req_principal FROM capability_grants g JOIN authority_requests r ON r.id=g.request_id WHERE g.id=?", (grant_id,)).fetchone()
                 if row is None:
                     return False, "grant not found"
                 if row["action"] != action or row["resource"] != resource:
                     return False, f"resource scope mismatch: grant={row['resource']} vs request={resource}" if row["resource"] != resource else f"action scope mismatch: grant={row['action']} vs request={action}"
+                if actor is not None and actor != row["req_actor"]:
+                    return False, f"actor mismatch: {row['req_actor']} vs {actor}"
+                if principal is not None and principal != row["req_principal"]:
+                    return False, f"principal mismatch: {row['req_principal']} vs {principal}"
                 if datetime.now(timezone.utc) >= datetime.fromisoformat(row["expires_at"]):
                     return False, "grant expired"
                 if bool(row["single_use"]) and row["consumed_at"] is not None:

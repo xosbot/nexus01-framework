@@ -2,13 +2,14 @@ import logging
 import re
 
 from core.bus import Message, MessageBus
+
 from gateway.approvals import ApprovalManager
 from gateway.types import GatewayResponse, InboundMessage
 
 logger = logging.getLogger(__name__)
 
-EXEC_PATTERN = re.compile(r"^\s*exec\s+", re.I)
-EXEC_INTENT = re.compile(r"\b(exec|run|command|shell|deploy|install)\b", re.I)
+EXEC_PATTERN = re.compile(r"^\s*exec\s+", re.IGNORECASE)
+EXEC_INTENT = re.compile(r"\b(exec|run|command|shell|deploy|install)\b", re.IGNORECASE)
 APPROVE_WORDS = frozenset({"yes", "y", "approve", "confirm", "ok", "✅"})
 CANCEL_WORDS = frozenset({"no", "n", "cancel", "abort", "stop", "❌"})
 

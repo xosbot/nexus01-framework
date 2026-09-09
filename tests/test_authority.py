@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from core.authority import (
     AuthorityService,
     ControlMode,
@@ -148,7 +147,8 @@ async def test_authorized_execution_records_success(authority: AuthorityService)
         action="github.create_branch",
         resource="xosbot/nexus01-framework",
         executor=create_branch,
-        actor="nexus.github-adapter",
+        actor="agent.coder.01",
+        principal="navigator",
     )
 
     assert result == {"branch": "proof/xos-control-001"}
@@ -182,7 +182,8 @@ async def test_authorized_execution_records_failure_and_reraises(authority: Auth
             action="github.create_branch",
             resource="xosbot/nexus01-framework",
             executor=fail,
-            actor="nexus.github-adapter",
+            actor="agent.coder.02",
+            principal="navigator",
         )
 
     events = authority.list_evidence(request_id=request.id)

@@ -9,15 +9,15 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from gateway.types import ChannelKind, InboundMessage
 from pydantic import BaseModel
 
 from api.auth import AuthMiddleware, ws_auth
 from api.auth_routes import build_auth_router
-from gateway.types import ChannelKind, InboundMessage
 
 logger = logging.getLogger(__name__)
 WEB_ROOT = Path(__file__).parent.parent / "web" / "os"
@@ -435,7 +435,7 @@ def create_api_app(nexus_app) -> FastAPI:
             except HTTPException:
                 raise
             except Exception as e:
-                raise HTTPException(400, f"URL ingest failed: {str(e)}")
+                raise HTTPException(400, f"URL ingest failed: {e!s}")
         elif req.path:
             p = Path(req.path)
             if p.is_dir():
@@ -1604,6 +1604,14 @@ def create_api_app(nexus_app) -> FastAPI:
             raise HTTPException(503, "XOS authority not enabled")
         return auth
 
+    def _require_operator(request: Request):
+        ctx = getattr(request.state, "auth", None)
+        if ctx is None:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        if not ctx.is_admin():
+            raise HTTPException(status_code=403, detail="Operator privileges required")
+        return ctx
+
     @app.post("/api/authority/request")
     async def authority_request(body: AuthorityRequestBody):
         authority = _require_authority()
@@ -1640,17 +1648,20 @@ def create_api_app(nexus_app) -> FastAPI:
     @app.post("/api/authority/requests/{request_id}/approve")
     async def authority_approve(request_id: str, request: Request):
         authority = _require_authority()
+        operator = _require_operator(request)
+        # Do NOT trust approved_by from body — derive from authenticated operator
         try:
             data = await request.json()
         except Exception:
             data = {}
-        approved_by = data.get("approved_by") or data.get("created_by") or "human"
+        # log if client tried to forge identity
+        if data.get("approved_by") and data.get("approved_by") != operator.user_id:
+            logger.warning("approve: forged approved_by=%s ignored, using authenticated %s", data.get("approved_by"), operator.user_id)
         ttl = data.get("ttl_seconds")
+        approved_by = operator.user_id
         try:
-            # hardened returns CapabilityGrant, legacy shim returns dict
             result = authority.approve(request_id, approved_by=approved_by, ttl_seconds=ttl) if ttl is not None else authority.approve(request_id, approved_by=approved_by)
             if hasattr(result, "to_dict"):
-                # hardened: return grant dict + request for compat
                 try:
                     req = authority.get_request(request_id)
                     return {"request": req.to_dict() if hasattr(req, "to_dict") else req, "grant": result.to_dict()}
@@ -1662,7 +1673,6 @@ def create_api_app(nexus_app) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(400, str(exc))
         except Exception as exc:
-            # map hardened exceptions
             msg = str(exc)
             if "not found" in msg.lower():
                 raise HTTPException(404, msg)
@@ -1671,11 +1681,16 @@ def create_api_app(nexus_app) -> FastAPI:
     @app.post("/api/authority/requests/{request_id}/deny")
     async def authority_deny(request_id: str, request: Request):
         authority = _require_authority()
+        operator = _require_operator(request)
         try:
             data = await request.json()
         except Exception:
             data = {}
-        denied_by = data.get("approved_by") or data.get("denied_by") or "human"
+        if data.get("denied_by") and data.get("denied_by") != operator.user_id:
+            logger.warning("deny: forged denied_by=%s ignored, using authenticated %s", data.get("denied_by"), operator.user_id)
+        if data.get("approved_by") and data.get("approved_by") != operator.user_id:
+            logger.warning("deny: forged approved_by=%s ignored, using authenticated %s", data.get("approved_by"), operator.user_id)
+        denied_by = operator.user_id
         reason = data.get("reason", "")
         try:
             result = authority.deny(request_id, denied_by=denied_by, reason=reason)
